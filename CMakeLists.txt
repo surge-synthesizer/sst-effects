@@ -17,8 +17,8 @@ if (${SST_EFFECTS_BUILD_TESTS})
     endif()
 
     if (NOT TARGET sst-filters)
-        CPMAddPackage(NAME sst-basic-blocks
-                GITHUB_REPOSITORY surge-synthesizer/sst-basic-blocks
+        CPMAddPackage(NAME sst-filters
+                GITHUB_REPOSITORY surge-synthesizer/sst-filters
                 GIT_TAG main
                 )
     endif()
