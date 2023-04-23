@@ -20,6 +20,7 @@
 #ifndef INCLUDE_SST_EFFECTS_REVERB1_H
 #define INCLUDE_SST_EFFECTS_REVERB1_H
 
+#include <cstring>
 #include "EffectCore.h"
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/Lag.h"
