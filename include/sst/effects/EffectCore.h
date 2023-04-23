@@ -1,16 +1,28 @@
 /*
- * flarg
+ * sst-effects - an open source library of audio effects
+ * built by Surge Synth Team.
+ *
+ * Copyright 2018-2023, various authors, as described in the GitHub
+ * transaction log.
+ *
+ * sst-effects is released under the GNU General Public Licence v3
+ * or later (GPL-3.0-or-later). The license is found in the "LICENSE"
+ * file in the root of this repository, or at
+ * https://www.gnu.org/licenses/gpl-3.0.en.html
+ *
+ * The majority of these effects at initiation were factored from
+ * Surge XT, and so git history prior to April 2023 is found in the
+ * surge repo, https://github.com/surge-synthesizer/surge
+ *
+ * All source in sst-effects available at
+ * https://github.com/surge-synthesizer/sst-effects
  */
 
-
-#ifndef PREMD_FXCORE
-#define PREMD_FXCORE
+#ifndef INCLUDE_SST_EFFECTS_EFFECTCORE_H
+#define INCLUDE_SST_EFFECTS_EFFECTCORE_H
 
 /*
  * OK so here's the deal
- *
- * In this pre-factoring folder is stuff which will live in sst-basic-blocks or sst-effects
- * and you can tell by the namespace name
  *
  * in basic-blocks::params we have parameter medatadat. its just a class describing a param
  * and pretty boring. The core is really here
@@ -52,45 +64,71 @@
  *
  */
 
-namespace sst::fx
+// For shared width calculations
+#include "sst/basic-blocks/dsp/MidSide.h"
+#include "sst/basic-blocks/dsp/BlockInterpolators.h"
+#include "sst/filters/BiquadFilter.h"
+#include <type_traits>
+
+namespace sst::effects
 {
 // Todo: as we port consider this FXConfig::BaseClass being a bit more configurable.
-template<typename FXConfig>
-struct EffectTemplateBase : public FXConfig::BaseClass
+template <typename FXConfig> struct EffectTemplateBase : public FXConfig::BaseClass
 {
+    static_assert(std::is_integral<decltype(FXConfig::blockSize)>::value);
+    static_assert(!(FXConfig::blockSize & (FXConfig::blockSize - 1))); // 2^n
+    static_assert(FXConfig::blockSize >= 4);                           // > simd register length
     static_assert(std::is_class<typename FXConfig::BaseClass>::value);
     static_assert(std::is_pointer<typename FXConfig::GlobalStorage *>::value);
     static_assert(std::is_pointer<typename FXConfig::EffectStorage *>::value);
+    static_assert(std::is_class<typename FXConfig::BiquadAdapter>::value);
     static_assert(std::is_pointer<typename FXConfig::ValueStorage *>::value);
-    static_assert(std::is_same<decltype(FXConfig::floatValueAt), float(const typename FXConfig::BaseClass * const, int)>::value);
-    static_assert(std::is_same<decltype(FXConfig::intValueAt), int(const typename FXConfig::BaseClass * const, int)>::value);
-    static_assert(std::is_same<decltype(FXConfig::temposyncRatio), float(typename FXConfig::GlobalStorage *, typename FXConfig::EffectStorage *, int)>::value);
+    static_assert(std::is_same<decltype(FXConfig::floatValueAt),
+                               float(const typename FXConfig::BaseClass *const,
+                                     const typename FXConfig::ValueStorage *const, int)>::value);
+    static_assert(std::is_same<decltype(FXConfig::intValueAt),
+                               int(const typename FXConfig::BaseClass *const,
+                                   const typename FXConfig::ValueStorage *const, int)>::value);
+    static_assert(std::is_same<decltype(FXConfig::temposyncRatio),
+                               float(typename FXConfig::GlobalStorage *,
+                                     typename FXConfig::EffectStorage *, int)>::value);
 
     typename FXConfig::GlobalStorage *globalStorage{nullptr};
     typename FXConfig::EffectStorage *fxStorage{nullptr};
     typename FXConfig::ValueStorage *valueStorage{nullptr};
 
-    EffectTemplateBase(typename FXConfig::GlobalStorage *s,
-                       typename FXConfig::EffectStorage *e,
-                       typename FXConfig::ValueStorage *p) : FXConfig::BaseClass(s,e,p), globalStorage(s), fxStorage(e), valueStorage(p) {
+    EffectTemplateBase(typename FXConfig::GlobalStorage *s, typename FXConfig::EffectStorage *e,
+                       typename FXConfig::ValueStorage *p)
+        : FXConfig::BaseClass(s, e, p), globalStorage(s), fxStorage(e), valueStorage(p)
+    {
     }
 
-    inline typename FXConfig::BaseClass *asBase() {
+    using lipol_ps_blocksz = sst::basic_blocks::dsp::lipol_sse<FXConfig::blockSize, false>;
+    static constexpr float blockSize_inv{1.f / FXConfig::blockSize};
+    static constexpr float blockSize_quad{FXConfig::blockSize >> 2};
+
+    using BiquadFilterType =
+        sst::filters::Biquad::BiquadFilter<typename FXConfig::GlobalStorage, FXConfig::blockSize,
+                                           typename FXConfig::BiquadAdapter>;
+
+    inline typename FXConfig::BaseClass *asBase()
+    {
         return static_cast<typename FXConfig::BaseClass *>(this);
     }
 
-    inline const typename FXConfig::BaseClass * const asBase() const {
-        return static_cast<const typename FXConfig::BaseClass * const>(this);
+    inline const typename FXConfig::BaseClass *const asBase() const
+    {
+        return static_cast<const typename FXConfig::BaseClass *const>(this);
     }
 
     inline float floatValue(int idx) const
     {
-        return FXConfig::floatValueAt(asBase(), idx);
+        return FXConfig::floatValueAt(asBase(), valueStorage, idx);
     }
 
     inline float intValue(int idx) const
     {
-        return FXConfig::intValueAt(asBase(), idx);
+        return FXConfig::intValueAt(asBase(), valueStorage, idx);
     }
 
     inline float temposyncRatio(int idx) const
@@ -98,57 +136,38 @@ struct EffectTemplateBase : public FXConfig::BaseClass
         return FXConfig::temposyncRatio(globalStorage, fxStorage, idx);
     }
 
-    inline bool isDeactivated(int idx) const
-    {
-        return FXConfig::isDeactivated(fxStorage, idx);
-    }
+    inline bool isDeactivated(int idx) const { return FXConfig::isDeactivated(fxStorage, idx); }
 
     inline float envelopeRateLinear(float f) const
     {
         return FXConfig::envelopeRateLinear(globalStorage, f);
     }
 
-    inline float storageRand01()
-    {
-        return FXConfig::rand01(globalStorage);
-    }
+    inline float storageRand01() { return FXConfig::rand01(globalStorage); }
 
-    inline double sampleRate()
-    {
-        return FXConfig::sampleRate(globalStorage);
-    }
+    inline double sampleRate() { return FXConfig::sampleRate(globalStorage); }
 
-    inline float noteToPitch(float p)
-    {
-        return FXConfig::noteToPitch(globalStorage, p);
-    }
+    inline float noteToPitch(float p) { return FXConfig::noteToPitch(globalStorage, p); }
 
     inline float noteToPitchIgnoringTuning(float p)
     {
         return FXConfig::noteToPitchIgnoringTuning(globalStorage, p);
     }
 
-    inline float noteToPitchInv(float p)
-    {
-        return FXConfig::noteToPitchInv(globalStorage, p);
-    }
+    inline float noteToPitchInv(float p) { return FXConfig::noteToPitchInv(globalStorage, p); }
 
-    inline float dbToLinear(float f)
-    {
-        return FXConfig::dbToLinear(globalStorage, f);
-    }
+    inline float dbToLinear(float f) { return FXConfig::dbToLinear(globalStorage, f); }
 
-    template<typename lipol>
+    template <typename lipol>
     inline void applyWidth(float *__restrict L, float *__restrict R, lipol &width)
     {
         namespace sdsp = sst::basic_blocks::dsp;
-        float M alignas(16)[BLOCK_SIZE], S alignas(16)[BLOCK_SIZE];
-        sdsp::encodeMS<BLOCK_SIZE>(L, R, M, S);
-        width.multiply_block(S, BLOCK_SIZE_QUAD);
-        sdsp::decodeMS<BLOCK_SIZE>(M, S, L, R);
+        float M alignas(16)[FXConfig::blockSize], S alignas(16)[FXConfig::blockSize];
+        sdsp::encodeMS<FXConfig::blockSize>(L, R, M, S);
+        width.multiply_block(S, FXConfig::blockSize >> 2);
+        sdsp::decodeMS<FXConfig::blockSize>(M, S, L, R);
     }
-
 };
-}
+} // namespace sst::effects
 
 #endif

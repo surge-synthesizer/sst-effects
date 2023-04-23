@@ -1,17 +1,38 @@
-#ifndef PREMD_FLANGER
-#define PREMD_FLANGER
+/*
+ * sst-effects - an open source library of audio effects
+ * built by Surge Synth Team.
+ *
+ * Copyright 2018-2023, various authors, as described in the GitHub
+ * transaction log.
+ *
+ * sst-effects is released under the GNU General Public Licence v3
+ * or later (GPL-3.0-or-later). The license is found in the "LICENSE"
+ * file in the root of this repository, or at
+ * https://www.gnu.org/licenses/gpl-3.0.en.html
+ *
+ * The majority of these effects at initiation were factored from
+ * Surge XT, and so git history prior to April 2023 is found in the
+ * surge repo, https://github.com/surge-synthesizer/surge
+ *
+ * All source in sst-effects available at
+ * https://github.com/surge-synthesizer/sst-effects
+ */
+#ifndef INCLUDE_SST_EFFECTS_FLANGER_H
+#define INCLUDE_SST_EFFECTS_FLANGER_H
 
 #include "EffectCore.h"
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/Lag.h"
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
 
-namespace sst::fx
+namespace sst::effects
 {
 namespace sdsp = sst::basic_blocks::dsp;
 
 template <typename FXConfig> struct Flanger : EffectTemplateBase<FXConfig>
 {
+    static constexpr double MIDI_0_FREQ = 8.17579891564371; // or 440.0 * pow( 2.0, - (69.0/12.0 ) )
+
     enum fl_modes
     {
         flm_classic = 0,
@@ -53,10 +74,11 @@ template <typename FXConfig> struct Flanger : EffectTemplateBase<FXConfig>
     };
 
     static constexpr int numParams{fl_num_params};
-    static constexpr const char* effectName{"flanger"};
+    static constexpr const char *effectName{"flanger"};
 
     Flanger(typename FXConfig::GlobalStorage *s, typename FXConfig::EffectStorage *e,
-            typename FXConfig::ValueStorage *p) : EffectTemplateBase<FXConfig>(s,e,p)
+            typename FXConfig::ValueStorage *p)
+        : EffectTemplateBase<FXConfig>(s, e, p)
     {
     }
 
@@ -72,29 +94,22 @@ template <typename FXConfig> struct Flanger : EffectTemplateBase<FXConfig>
         using pmd = basic_blocks::params::ParamMetaData;
         auto result = pmd().withName("Unknown " + std::to_string(idx));
 
-        switch((fl_params)idx)
+        switch ((fl_params)idx)
         {
         case fl_mode:
-            return result.withType(pmd::INT)
-                .withName("Mode")
-                .withDefault(0)
-                .withRange(flm_classic, flm_arp_solo);
+            return result.withType(pmd::INT).withName("Mode").withDefault(0).withRange(
+                flm_classic, flm_arp_solo);
         case fl_wave:
             return result.withType(pmd::INT)
                 .withName("Waveform")
                 .withDefault(0)
                 .withRange(flw_sine, flw_square);
         case fl_rate:
-            return result.withName("Rate")
-                .withRange(-7, 9)
-                .withDefault(-2.f)
-                .temposyncable();
+            return result.withName("Rate").withRange(-7, 9).withDefault(-2.f).temposyncable();
         case fl_depth:
             return result.withName("Depth").asPercent().withDefault(1.f);
         case fl_voices:
-            return result.withName("Count")
-                .withRange(1.f, 4.f)
-                .withDefault(4.f);
+            return result.withName("Count").withRange(1.f, 4.f).withDefault(4.f);
         case fl_voice_basepitch:
             return result.withName("Base Pitch").asMIDIPitch();
         case fl_voice_spacing:
@@ -110,7 +125,7 @@ template <typename FXConfig> struct Flanger : EffectTemplateBase<FXConfig>
         case fl_mix:
             return result.withName("Mix").asPercentBipolar().withDefault(0.8f);
         case fl_num_params:
-            throw std::logic_error( "getParam called with num_params" );
+            throw std::logic_error("getParam called with num_params");
         }
         return result;
     }
@@ -145,8 +160,8 @@ template <typename FXConfig> struct Flanger : EffectTemplateBase<FXConfig>
     float lfophase[2][COMBS_PER_CHANNEL], longphase[2];
     float lpaL = 0.f, lpaR = 0.f; // state for the onepole LP filter
 
-
-    sdsp::lipol<float, FXConfig::blockSize, true> lfoval[2][COMBS_PER_CHANNEL], delaybase[2][COMBS_PER_CHANNEL];
+    sdsp::lipol<float, FXConfig::blockSize, true> lfoval[2][COMBS_PER_CHANNEL],
+        delaybase[2][COMBS_PER_CHANNEL];
     sdsp::lipol<float, FXConfig::blockSize, true> depth, mix;
     sdsp::lipol<float, FXConfig::blockSize, true> voices, voice_detune, voice_chord;
     sdsp::lipol<float, FXConfig::blockSize, true> feedback, fb_hf_damping;
@@ -161,12 +176,9 @@ template <typename FXConfig> struct Flanger : EffectTemplateBase<FXConfig>
     const static int LFO_TABLE_MASK = LFO_TABLE_SIZE - 1;
     float sin_lfo_table[LFO_TABLE_SIZE];
     float saw_lfo_table[LFO_TABLE_SIZE]; // don't make it analytic since I want to smooth the edges
-
 };
 
-
-template<typename FXConfig>
-inline void Flanger<FXConfig>::initialize()
+template <typename FXConfig> inline void Flanger<FXConfig>::initialize()
 {
     for (int c = 0; c < 2; ++c)
         for (int i = 0; i < COMBS_PER_CHANNEL; ++i)
@@ -192,9 +204,7 @@ inline void Flanger<FXConfig>::initialize()
     haveProcessed = false;
 }
 
-
-template<typename FXConfig>
-inline float Flanger<FXConfig>::InterpDelay::value(float delayBy)
+template <typename FXConfig> inline float Flanger<FXConfig>::InterpDelay::value(float delayBy)
 {
     // so if delayBy is 19.2
     int itap = (int)std::min(delayBy, (float)(DELAY_SIZE - 2)); // this is 19
@@ -207,7 +217,7 @@ inline float Flanger<FXConfig>::InterpDelay::value(float delayBy)
     return result;
 }
 
-template<typename FXConfig>
+template <typename FXConfig>
 inline void Flanger<FXConfig>::processBlock(float *__restrict dataL, float *__restrict dataR)
 {
     if (!haveProcessed)
@@ -229,7 +239,7 @@ inline void Flanger<FXConfig>::processBlock(float *__restrict dataL, float *__re
             longphase[c] -= COMBS_PER_CHANNEL;
     }
 
-    const float oneoverFreq0 = 1.0f / Tunings::MIDI_0_FREQ;
+    const float oneoverFreq0 = 1.0f / MIDI_0_FREQ;
 
     int mode = this->intValue(fl_mode);
     int mwave = this->intValue(fl_wave);
@@ -354,8 +364,7 @@ inline void Flanger<FXConfig>::processBlock(float *__restrict dataL, float *__re
 
             auto combspace = this->floatValue(fl_voice_spacing);
             float pitch = v0 + combspace * i;
-            float nv =
-                this->sampleRate() * oneoverFreq0 * this->noteToPitchInv((float)(pitch));
+            float nv = this->sampleRate() * oneoverFreq0 * this->noteToPitchInv((float)(pitch));
 
             // OK so biggest tap = delaybase[c][i].v * ( 1.0 + lfoval[c][i].v * depth.v ) + 1;
             // Assume lfoval is [-1,1] and depth is known
@@ -499,8 +508,8 @@ inline void Flanger<FXConfig>::processBlock(float *__restrict dataL, float *__re
         float fbr = 0.f;
         if (feedback.v > 0)
         {
-            fbl = clamp1bp(feedback.v * combs[0][b]);
-            fbr = clamp1bp(feedback.v * combs[1][b]);
+            fbl = std::clamp(feedback.v * combs[0][b], -1.f, 1.f);
+            fbr = std::clamp(feedback.v * combs[1][b], -1.f, 1.f);
 
             fbl = 1.5 * fbl - 0.5 * fbl * fbl * fbl;
             fbr = 1.5 * fbr - 0.5 * fbr * fbr * fbr;
@@ -549,8 +558,8 @@ inline void Flanger<FXConfig>::processBlock(float *__restrict dataL, float *__re
 
         gainadj -= 0.07 * mix.v;
 
-        outl = clamp1bp((1.0f + gainadj) * outl);
-        outr = clamp1bp((1.0f + gainadj) * outr);
+        outl = std::clamp((1.0f + gainadj) * outl, -1.f, 1.f);
+        outr = std::clamp((1.0f + gainadj) * outr, -1.f, 1.f);
 
         outl = 1.5 * outl - 0.5 * outl * outl * outl;
         outr = 1.5 * outr - 0.5 * outr * outr * outr;
@@ -570,6 +579,6 @@ inline void Flanger<FXConfig>::processBlock(float *__restrict dataL, float *__re
     this->applyWidth(dataL, dataR, width);
 }
 
-} // namespace sst::fx
+} // namespace sst::effects
 
 #endif

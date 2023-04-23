@@ -1,5 +1,24 @@
-#ifndef PREMD_REV1
-#define PREMD_REV1
+/*
+ * sst-effects - an open source library of audio effects
+ * built by Surge Synth Team.
+ *
+ * Copyright 2018-2023, various authors, as described in the GitHub
+ * transaction log.
+ *
+ * sst-effects is released under the GNU General Public Licence v3
+ * or later (GPL-3.0-or-later). The license is found in the "LICENSE"
+ * file in the root of this repository, or at
+ * https://www.gnu.org/licenses/gpl-3.0.en.html
+ *
+ * The majority of these effects at initiation were factored from
+ * Surge XT, and so git history prior to April 2023 is found in the
+ * surge repo, https://github.com/surge-synthesizer/surge
+ *
+ * All source in sst-effects available at
+ * https://github.com/surge-synthesizer/sst-effects
+ */
+#ifndef INCLUDE_SST_EFFECTS_REVERB1_H
+#define INCLUDE_SST_EFFECTS_REVERB1_H
 
 #include "EffectCore.h"
 #include "sst/basic-blocks/params/ParamMetadata.h"
@@ -9,8 +28,7 @@
 #include "sst/basic-blocks/mechanics/block-ops.h"
 #include "sst/basic-blocks/mechanics/simd-ops.h"
 
-
-namespace sst::fx
+namespace sst::effects
 {
 namespace sdsp = sst::basic_blocks::dsp;
 namespace mech = sst::basic_blocks::mechanics;
@@ -34,7 +52,7 @@ template <typename FXConfig> struct Reverb1 : EffectTemplateBase<FXConfig>
     };
 
     static constexpr int numParams{rev1_width + 1};
-    static constexpr const char* effectName{"flanger"};
+    static constexpr const char *effectName{"flanger"};
 
     Reverb1(typename FXConfig::GlobalStorage *s, typename FXConfig::EffectStorage *e,
             typename FXConfig::ValueStorage *p);
@@ -52,55 +70,39 @@ template <typename FXConfig> struct Reverb1 : EffectTemplateBase<FXConfig>
         auto result = pmd().withName("Unknown " + std::to_string(idx));
         // Once this switch is off we can turn on the configureControlsFromFXMetadata in
         // Reverb1Effect.cpp::init_ctrltypes
-#if 0
-        switch((fl_params)idx)
-        {
-        case fl_mode:
-            return result.withType(pmd::INT)
-                .withName("Mode")
-                .withDefault(0)
-                .withRange(flm_classic, flm_arp_solo);
-        case fl_wave:
-            return result.withType(pmd::INT)
-                .withName("Waveform")
-                .withDefault(0)
-                .withRange(flw_sine, flw_square);
-        case fl_rate:
-            return result.withName("Rate")
-                .withRange(-7, 9)
-                .withDefault(-2.f)
-                .temposyncable();
-        case fl_depth:
-            return result.withName("Depth").asPercent().withDefault(1.f);
-        case fl_voices:
-            return result.withName("Count")
-                .withRange(1.f, 4.f)
-                .withDefault(4.f);
-        case fl_voice_basepitch:
-            return result.withName("Base Pitch").asMIDIPitch();
-        case fl_voice_spacing:
-            return result.withName("Spacing").withRange(0.f, 12.f).withDefault(0.f);
 
+        switch ((rev1_params)idx)
+        {
+        case rev1_predelay:
+            return result.withName("Pre-Delay").asEnvelopeTime();
+        case rev1_shape:
+            return result.withName("Room Shape").withType(pmd::INT).withRange(0, 3).withDefault(0);
+        case rev1_roomsize:
+            return result.withName("Size").asPercent();
+        case rev1_decaytime:
+            return result.withName("Decay Time").withRange(-4, 6).withDefault(0);
+        case rev1_damping:
+            return result.withName("HF Damping").asPercent();
+        case rev1_lowcut:
+            return result.withName("Low Cut").asAudibleFrequency();
+        case rev1_freq1:
+            return result.withName("Peak Freq").asAudibleFrequency();
+        case rev1_gain1:
+            return result.withName("Peak Gain").asDecibel();
+        case rev1_highcut:
+            return result.withName("High Cut").asAudibleFrequency();
+        case rev1_mix:
+            return result.withName("Mix").asPercent();
+        case rev1_width:
+            return result.withName("Width").asDecibelNarrow();
+        default:
             break;
-        case fl_feedback:
-            return result.withName("Feedback").asPercent().withDefault(0.f);
-        case fl_damping:
-            return result.withName("HF Damping").asPercent().withDefault(0.1f);
-        case fl_width:
-            return result.withName("Width").asDecibelNarrow().withDefault(0.f);
-        case fl_mix:
-            return result.withName("Mix").asPercentBipolar().withDefault(0.8f);
-        case fl_num_params:
-            throw std::logic_error( "getParam called with num_params" );
         }
 
-#endif
         return result;
     }
 
   protected:
-
-
     static constexpr int revbits = 15;
     static constexpr int max_rev_dly = 1 << revbits;
     static constexpr int rev_tap_bits = 4;
@@ -112,12 +114,10 @@ template <typename FXConfig> struct Reverb1 : EffectTemplateBase<FXConfig>
     float out_tap alignas(16)[rev_taps];
     float predelay alignas(16)[max_rev_dly];
     int delay_time alignas(16)[rev_taps];
-    lipol_ps_blocksz mix alignas(16), width alignas(16);
+    typename EffectTemplateBase<FXConfig>::lipol_ps_blocksz mix alignas(16), width alignas(16);
 
     void update_rtime();
-    void update_rsize() {
-        loadpreset(shape);
-    }
+    void update_rsize() { loadpreset(shape); }
     void clear_buffers()
     {
         mech::clear_block<max_rev_dly>(predelay);
@@ -132,25 +132,22 @@ template <typename FXConfig> struct Reverb1 : EffectTemplateBase<FXConfig>
             float noise_target[rev_taps];*/
     double modphase{0.0};
     int shape{0};
-    float lastf[n_fx_params];
-    sst::filters::Biquad::BiquadFilter<typename FXConfig::GlobalStorage, FXConfig::blockSize> band1, locut, hicut;
+    float lastf[numParams];
+    typename EffectTemplateBase<FXConfig>::BiquadFilterType band1, locut, hicut;
     int ringout_time;
     int b{0};
-
 
     const float db60 = powf(10.f, 0.05f * -60.f);
 };
 
-template<typename FXConfig>
+template <typename FXConfig>
 Reverb1<FXConfig>::Reverb1(typename FXConfig::GlobalStorage *s, typename FXConfig::EffectStorage *e,
-        typename FXConfig::ValueStorage *p) : EffectTemplateBase<FXConfig>(s,e,p)
-                                                                 , band1(s), locut(s), hicut(s)
+                           typename FXConfig::ValueStorage *p)
+    : EffectTemplateBase<FXConfig>(s, e, p), band1(s), locut(s), hicut(s)
 {
 }
 
-
-template<typename FXConfig>
-inline void Reverb1<FXConfig>::initialize()
+template <typename FXConfig> inline void Reverb1<FXConfig>::initialize()
 {
     band1.coeff_peakEQ(band1.calc_omega(this->floatValue(rev1_freq1) / 12.f), 2,
                        this->floatValue(rev1_gain1));
@@ -187,11 +184,10 @@ inline void Reverb1<FXConfig>::initialize()
     delay_pos = 0;
 }
 
-
-template<typename FXConfig>
+template <typename FXConfig>
 inline void Reverb1<FXConfig>::processBlock(float *__restrict dataL, float *__restrict dataR)
 {
-    float wetL alignas(16)[BLOCK_SIZE], wetR alignas(16)[BLOCK_SIZE];
+    float wetL alignas(16)[FXConfig::blockSize], wetR alignas(16)[FXConfig::blockSize];
 
     if (this->intValue(rev1_shape) != shape)
         loadpreset(this->intValue(rev1_shape));
@@ -221,12 +217,12 @@ inline void Reverb1<FXConfig>::processBlock(float *__restrict dataL, float *__re
     const __m128 one4 = _mm_set1_ps(1.f);
     float dv = this->floatValue(rev1_damping);
 
-    dv = limit_range(dv, 0.01f, 0.99f); // this is a simple one-pole damper, w * y[n] + ( 1-w )
-                                        // y[n-1] so to be stable has to stay in range
+    dv = std::clamp(dv, 0.01f, 0.99f); // this is a simple one-pole damper, w * y[n] + ( 1-w )
+                                       // y[n-1] so to be stable has to stay in range
     __m128 damp4 = _mm_load1_ps(&dv);
     __m128 damp4m1 = _mm_sub_ps(one4, damp4);
 
-    for (int k = 0; k < BLOCK_SIZE; k++)
+    for (int k = 0; k < FXConfig::blockSize; k++)
     {
         for (int t = 0; t < rev_taps; t += 4)
         {
@@ -246,7 +242,8 @@ inline void Reverb1<FXConfig>::processBlock(float *__restrict dataL, float *__re
             __m128 out_tap4 = _mm_load_ps(&out_tap[t]);
             out_tap4 = _mm_add_ps(_mm_mul_ps(out_tap4, damp4), _mm_mul_ps(new4, damp4m1));
             _mm_store_ps(&out_tap[t], out_tap4);
-            // out_tap[t] = this->floatValue(rev1_damping]*out_tap[t) + (1- this->floatValue(rev1_damping))*newa;
+            // out_tap[t] = this->floatValue(rev1_damping]*out_tap[t) + (1-
+            // this->floatValue(rev1_damping))*newa;
         }
 
         __m128 fb = _mm_add_ps(_mm_add_ps(_mm_load_ps(out_tap), _mm_load_ps(out_tap + 4)),
@@ -299,12 +296,10 @@ inline void Reverb1<FXConfig>::processBlock(float *__restrict dataL, float *__re
     // scale width
     this->applyWidth(wetL, wetR, width);
 
-    mix.fade_2_blocks_to(dataL, wetL, dataR, wetR, dataL, dataR, BLOCK_SIZE_QUAD);
+    mix.fade_2_blocks_to(dataL, wetL, dataR, wetR, dataL, dataR, this->blockSize_quad);
 }
 
-
-template<typename FXConfig>
-inline void Reverb1<FXConfig>::loadpreset(int id)
+template <typename FXConfig> inline void Reverb1<FXConfig>::loadpreset(int id)
 {
     shape = id;
 
@@ -390,16 +385,15 @@ inline void Reverb1<FXConfig>::loadpreset(int id)
     {
         // float r = storage->rand_01();
         // float rbp = storage->rand_pm1();
-        // float a = 256.f * (3000.f * (1.f + rbp * rbp * this->floatValue(rev1_variation)))*(1.f + 1.f *
-        // this->floatValue(rev1_roomsize)); delay_time[t] = (int)a;
+        // float a = 256.f * (3000.f * (1.f + rbp * rbp * this->floatValue(rev1_variation)))*(1.f
+        // + 1.f * this->floatValue(rev1_roomsize)); delay_time[t] = (int)a;
         delay_time[t] = (int)((float)(2.f * this->floatValue(rev1_roomsize)) * delay_time[t]);
     }
     lastf[rev1_roomsize] = this->floatValue(rev1_roomsize);
     update_rtime();
 }
 
-template<typename FXConfig>
-inline void Reverb1<FXConfig>::update_rtime()
+template <typename FXConfig> inline void Reverb1<FXConfig>::update_rtime()
 {
     int max_dt = 0;
     for (int t = 0; t < rev_taps; t++)
@@ -409,12 +403,13 @@ inline void Reverb1<FXConfig>::update_rtime()
         max_dt = std::max(max_dt, delay_time[t]);
     }
     lastf[rev1_decaytime] = this->floatValue(rev1_decaytime);
-    float t = BLOCK_SIZE_INV *
-              ((float)(max_dt >> 8) + this->sampleRate() * powf(2.f, this->floatValue(rev1_decaytime)) *
-                                          2.f); // * 2.f is to get the db120 time
+    float t =
+        this->blockSize_inv *
+        ((float)(max_dt >> 8) + this->sampleRate() * powf(2.f, this->floatValue(rev1_decaytime)) *
+                                    2.f); // * 2.f is to get the db120 time
     ringout_time = (int)t;
 }
 
-} // namespace sst::fx
+} // namespace sst::effects
 
 #endif
