@@ -92,6 +92,7 @@ template <typename FXConfig> struct EffectTemplateBase : public FXConfig::BaseCl
     static_assert(std::is_same<decltype(FXConfig::temposyncRatio),
                                float(typename FXConfig::GlobalStorage *,
                                      typename FXConfig::EffectStorage *, int)>::value);
+    // TODO: Add the rest of the missing functions here
 
     typename FXConfig::GlobalStorage *globalStorage{nullptr};
     typename FXConfig::EffectStorage *fxStorage{nullptr};

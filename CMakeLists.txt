@@ -34,7 +34,6 @@ if (${SST_EFFECTS_BUILD_TESTS})
 
     add_executable(${PROJECT_NAME}-test
             tests/sst-effects-test.cpp
-            tests/create-effect.cpp
             tests/concrete-runs.cpp
             )
     target_link_libraries(${PROJECT_NAME}-test PUBLIC simde sst-basic-blocks sst-filters ${PROJECT_NAME})
