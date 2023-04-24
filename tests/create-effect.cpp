@@ -1,0 +1,107 @@
+/*
+ * sst-effects - an open source library of audio effects
+ * built by Surge Synth Team.
+ *
+ * Copyright 2018-2023, various authors, as described in the GitHub
+ * transaction log.
+ *
+ * sst-effects is released under the GNU General Public Licence v3
+ * or later (GPL-3.0-or-later). The license is found in the "LICENSE"
+ * file in the root of this repository, or at
+ * https://www.gnu.org/licenses/gpl-3.0.en.html
+ *
+ * The majority of these effects at initiation were factored from
+ * Surge XT, and so git history prior to April 2023 is found in the
+ * surge repo, https://github.com/surge-synthesizer/surge
+ *
+ * All source in sst-effects available at
+ * https://github.com/surge-synthesizer/sst-effects
+ */
+
+
+#include "catch2.hpp"
+#include "simd-test-include.h"
+#include "sst/effects/Flanger.h"
+#include "sst/effects/Reverb1.h"
+
+
+struct TestConfig
+{
+    struct BC{
+        template<typename ...Types>
+        BC(Types ...)  {}
+    };
+
+    struct GS {};
+    struct ES {
+        float values alignas(16) [20]; // 20 is arbitrary
+    };
+
+    using BaseClass = BC;
+    using GlobalStorage = GS;
+    using FilterStorage = GS;
+    using EffectStorage = ES;
+    using ValueStorage = float *;
+    using BiquadAdapter = GS;
+
+    static constexpr int blockSize{16};
+
+    static inline float floatValueAt(const BaseClass * const e, const ValueStorage *const v, int idx)
+    {
+        return 0;
+    }
+    static inline int intValueAt(const BaseClass * const e, const ValueStorage *const v, int idx)
+    {
+        return 0;
+    }
+
+    static inline float envelopeRateLinear(GlobalStorage *s, float f)
+    {
+        return 0;
+    }
+
+    static inline float temposyncRatio(GlobalStorage *s, EffectStorage *e, int idx)
+    {
+        return 1;
+    }
+
+    static inline bool isDeactivated(EffectStorage *e, int idx)
+    {
+        return false;
+    }
+
+    static inline float rand01(GlobalStorage *s) { return (float)rand() / (float)RAND_MAX; }
+
+    static inline double sampleRate(GlobalStorage *s) { return 48000; }
+
+    static inline float noteToPitch(GlobalStorage *s, float p) { return 1; }
+    static inline float noteToPitchIgnoringTuning(GlobalStorage *s, float p) { return noteToPitch(s, p); }
+
+    static inline float noteToPitchInv(GlobalStorage *s, float p)
+    {
+        return 1.0 / noteToPitch(s, p);
+    }
+
+    static inline float dbToLinear(GlobalStorage *s, float f) { return 1; }
+};
+
+template<typename T>
+struct Tester
+{
+    static void TestFX() {
+        INFO( "Starting test with instantiation" );
+        auto fx = T(nullptr, nullptr, nullptr);
+    };
+};
+
+TEST_CASE( "Can Create Types" )
+{
+    SECTION("Flanger")
+    {
+        Tester<sst::effects::Flanger<TestConfig>>::TestFX();
+    }
+    SECTION("Reverb1")
+    {
+        Tester<sst::effects::Reverb1<TestConfig>>::TestFX();
+    }
+}
