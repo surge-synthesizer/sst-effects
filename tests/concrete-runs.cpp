@@ -39,7 +39,7 @@ struct Tester
     static_assert(std::is_same<decltype(&T::initialize),
                                void(T::*)()>::value);
     static_assert(std::is_same<decltype(&T::processBlock),
-                               void(T::*)(float *, float*)>::value);
+                               void(T::*)(float *__restrict, float *__restrict)>::value);
     static_assert(std::is_same<decltype(&T::suspendProcessing),
                                void(T::*)()>::value);
     static_assert(std::is_same<decltype(&T::getRingoutDecay),
