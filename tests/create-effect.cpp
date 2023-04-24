@@ -20,11 +20,11 @@
 
 
 #include <memory>
+#include <type_traits>
 #include "catch2.hpp"
 #include "simd-test-include.h"
 #include "sst/effects/Flanger.h"
 #include "sst/effects/Reverb1.h"
-
 
 struct TestConfig
 {
@@ -89,6 +89,20 @@ struct TestConfig
 template<typename T>
 struct Tester
 {
+    static_assert(std::is_same<decltype(T::effectName), const char *const>::value);
+    static_assert(std::is_integral<decltype(T::numParams)>::value);
+    static_assert(std::is_same<decltype(&T::initialize),
+        void(T::*)()>::value);
+    static_assert(std::is_same<decltype(&T::processBlock),
+                               void(T::*)(float *, float*)>::value);
+    static_assert(std::is_same<decltype(&T::suspendProcessing),
+                               void(T::*)()>::value);
+    static_assert(std::is_same<decltype(&T::getRingoutDecay),
+                               int(T::*)() const>::value);
+    static_assert(std::is_same<decltype(&T::paramAt),
+                               sst::basic_blocks::params::ParamMetaData (T::*)(int) const>::value);
+
+
     static void TestFX() {
         INFO( "Starting test with instantiation : " << T::effectName );
         auto fx = std::make_unique<T>(nullptr, nullptr, nullptr);
