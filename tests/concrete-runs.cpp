@@ -2,6 +2,7 @@
 // Created by Paul Walker on 4/23/23.
 //
 
+#include <memory>
 
 #include "catch2.hpp"
 #include "simd-test-include.h"
@@ -20,18 +21,18 @@ struct Tester
     static void TestFX() {
         using FX = T;
 
-        INFO( "Starting test with instantiation" );
+        INFO( "Starting test with concrete implementation " << T::effectName );
 
         auto gs = sst::effects::ConcreteConfig::GlobalStorage(48000);
         auto es = sfx::ConcreteConfig::EffectStorage();
 
-        auto fx = FX(&gs, &es, nullptr);
+        auto fx = std::make_unique<FX>(&gs, &es, nullptr);
 
         // By using the concrete configuration you get a collection of params you can address
         for (int i=0; i< FX::numParams; ++i)
-            fx.paramStorage[i] = fx.paramAt(i).defaultVal;
+            fx->paramStorage[i] = fx->paramAt(i).defaultVal;
 
-        fx.initialize();
+        fx->initialize();
 
         float L alignas(16) [sfx::ConcreteConfig::blockSize],
             R alignas(16) [sfx::ConcreteConfig::blockSize];
@@ -49,7 +50,7 @@ struct Tester
                     phase -= 1;
             }
 
-            fx.processBlock(L, R);
+            fx->processBlock(L, R);
 
             for (int s=0; s<sfx::ConcreteConfig::blockSize; ++s)
             {

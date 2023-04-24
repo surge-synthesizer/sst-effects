@@ -19,6 +19,7 @@
  */
 
 
+#include <memory>
 #include "catch2.hpp"
 #include "simd-test-include.h"
 #include "sst/effects/Flanger.h"
@@ -89,8 +90,10 @@ template<typename T>
 struct Tester
 {
     static void TestFX() {
-        INFO( "Starting test with instantiation" );
-        auto fx = T(nullptr, nullptr, nullptr);
+        INFO( "Starting test with instantiation : " << T::effectName );
+        auto fx = std::make_unique<T>(nullptr, nullptr, nullptr);
+        REQUIRE(fx);
+
     };
 };
 
