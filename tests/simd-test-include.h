@@ -18,11 +18,15 @@
  * https://github.com/surge-synthesizer/sst-effects
  */
 
-#define CATCH_CONFIG_RUNNER
-#include "catch2.hpp"
+#ifndef SST_EFFECTS_TESTS_SIMD_TEST_INCLUDE_H
+#define SST_EFFECTS_TESTS_SIMD_TEST_INCLUDE_H
 
-int main(int argc, char **argv)
-{
-    int result = Catch::Session().run(argc, argv);
-    return result;
-}
+
+#if defined(__arm64__)
+#define SIMDE_ENABLE_NATIVE_ALIASES
+#include "simde/x86/sse2.h"
+#else
+#include <emmintrin.h>
+#endif
+
+#endif // SURGE_SIMD_TEST_INCLUDE_H

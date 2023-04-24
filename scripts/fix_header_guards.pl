@@ -32,6 +32,7 @@ sub findfiles
         $hg =~ s:\.:_:g;
         $hg =~ s:-:_:g;
         $hg =~ s:src:surge_src:;
+        $hg =~ s:tests:sst_effects_tests:;
         $hg = uc($hg);
         print "$f -> $hg\n";
 
