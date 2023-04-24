@@ -22,16 +22,40 @@
 #define INCLUDE_SST_EFFECTS_EFFECTCORE_H
 
 /*
- * OK so here's the deal
+ * The sst-effects provides robust effects which are adaptable to a variety of situations, but
+ * that adaptation requires some indirection. We chose a template strategy here to avoid virtual
+ * functions and to still retain compile time checking of interface compliance.
  *
- * in basic-blocks::params we have parameter medatadat. its just a class describing a param
- * and pretty boring. The core is really here
+ * The core design of an sst-effect is
  *
- * We say that all fx have a global storage, which answers questions like sample rate,
- * an fx storage, which answers questions about particular confiugration, and a value storage
- * which answers questions about actual float or int values. We make no assumptions about these
- * classes other than (1) they have pointer semantics and are owned outside us longer than us and
- * (2) they can be passed as pointers to a template type which then probes them.
+ * 1. It provides stereo processing on a block
+ * 2. It has parameters with values and features and
+ * 3. It runs in an environment which can answer questions and provide values about those
+ *    features and runtime features (like sample rate)
+ *
+ * To do that, each sst-effect has a single template parameter, `FXConfig`, which provides
+ * the ability to answer questions and provide types, and has a small non-virtual interface
+ * it provides to clients.
+ *
+ * The FX provided interface is
+ *
+ * 1. A 3 arg constructor
+ * 2. A member for numParams and effect name
+ * 3. An initialize, suspennd and ringout decay method and
+ * 4. a process method
+ *
+ * The regtest constraints in the tests/check-compile tester document this api.
+ *
+ * The FX Configuration provides type definitions for the core type and then methods
+ * which allow you to probe it. The core types are a Global storage (things like sample
+ * rate and tuning) and Effect storage (thigns like configuration of params) and an
+ * Value storage (things like what is the float value or int value of a particular param
+ * at this moment). It also provides a block size, since all surge effects work on a power
+ * of 2 block of at least size 4.
+ *
+ * We make no assumptions about these classes other than (1) they have pointer semantics
+ * and are owned outside us longer than us and (2) they can be passed as pointers to a template
+ * type which then probes them.
  *
  * That template type is `FXConfig`. You can see in this base class the questions we
  * ask of it, but for instance, to get the value of a particular param we ask
@@ -39,28 +63,13 @@
  * tempo synced we ask `FXConfig::tempoSyncRation(GlobalStorage*, FXStorage *, int)`.
  * This forms an API which means we can be neutral as to how these three bundles work.
  *
- * WIth that in hand, we can rewrite the flanger. Check out Flanger.h. It's pretty obvious
- * but basically (1) advertise param metadata, (2) handle process, init, etc.. and
- * (3) use the FXConfig to probe values and state.
+ * With that in hand, you can refactor the effects to match this interface and then
+ * present them in a variety of context. The test runners here provide two basic
+ * contexts and Surge currently provides a third. One day soon, ShortCircuit will
+ * provide a fourth.
  *
- * Now once we have that we have to go back to surge. The next header you want to
- * read ins src/common/dsp/effects/SurgeSSTFXAdapter.h. This gives us two things
- *
- * 1. It gives us an instance of FXCOnfig with the appropriate typedefs and methods and
- * 2. It gives us a base class which inherits from the virtual base class Effect and
- *    also inherits from a T, which is intended to be something the shape of Flanger.
- *
- *  WIth those two inheritances it can then implement a vast subset of Effect in a
- *  generic fashion just redirecting to the template.
- *
- *  And finally, you retain FlangerEffect.h and FLangerEfffect.cpp but these are massively
- *  reduced. They basically implement only the things which are surge specific. For
- *  instance the group pos api remains. And init_ctrltypes is still there with the old
- *  surge parameter, but we check that those parameters are configured to be consisten
- *  tiwht the metadata (obvioulsy more to do there). See the 'configureControlsFromFXMetadata`
- *  call at the end of init_ctrltypes.
- *
- *  And voila. Most of the effect is reuasable and decoupled.
+ * There's still some big TODOs here especially around param metadata. Still a bit of
+ * a work in flight right now.
  *
  */
 
@@ -89,9 +98,28 @@ template <typename FXConfig> struct EffectTemplateBase : public FXConfig::BaseCl
     static_assert(std::is_same<decltype(FXConfig::intValueAt),
                                int(const typename FXConfig::BaseClass *const,
                                    const typename FXConfig::ValueStorage *const, int)>::value);
+    static_assert(std::is_same<decltype(FXConfig::envelopeRateLinear),
+                               float(typename FXConfig::GlobalStorage *,
+                                     float)>::value);
     static_assert(std::is_same<decltype(FXConfig::temposyncRatio),
                                float(typename FXConfig::GlobalStorage *,
                                      typename FXConfig::EffectStorage *, int)>::value);
+    static_assert(std::is_same<decltype(FXConfig::isDeactivated),
+                               bool(typename FXConfig::EffectStorage *,
+                                     int)>::value);
+    static_assert(std::is_same<decltype(FXConfig::rand01),
+                               float(typename FXConfig::GlobalStorage *)>::value);
+    static_assert(std::is_same<decltype(FXConfig::sampleRate),
+                               double(typename FXConfig::GlobalStorage *)>::value);
+    static_assert(std::is_same<decltype(FXConfig::noteToPitch),
+                               float(typename FXConfig::GlobalStorage *, float)>::value);
+    static_assert(std::is_same<decltype(FXConfig::noteToPitchIgnoringTuning),
+                               float(typename FXConfig::GlobalStorage *, float)>::value);
+    static_assert(std::is_same<decltype(FXConfig::noteToPitchInv),
+                               float(typename FXConfig::GlobalStorage *, float)>::value);
+    static_assert(std::is_same<decltype(FXConfig::dbToLinear),
+                               float(typename FXConfig::GlobalStorage *, float)>::value);
+
 
     typename FXConfig::GlobalStorage *globalStorage{nullptr};
     typename FXConfig::EffectStorage *fxStorage{nullptr};

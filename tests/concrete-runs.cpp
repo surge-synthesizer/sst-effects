@@ -1,6 +1,22 @@
-//
-// Created by Paul Walker on 4/23/23.
-//
+/*
+ * sst-effects - an open source library of audio effects
+ * built by Surge Synth Team.
+ *
+ * Copyright 2018-2023, various authors, as described in the GitHub
+ * transaction log.
+ *
+ * sst-effects is released under the GNU General Public Licence v3
+ * or later (GPL-3.0-or-later). The license is found in the "LICENSE"
+ * file in the root of this repository, or at
+ * https://www.gnu.org/licenses/gpl-3.0.en.html
+ *
+ * The majority of these effects at initiation were factored from
+ * Surge XT, and so git history prior to April 2023 is found in the
+ * surge repo, https://github.com/surge-synthesizer/surge
+ *
+ * All source in sst-effects available at
+ * https://github.com/surge-synthesizer/sst-effects
+ */
 
 #include <memory>
 
@@ -18,6 +34,19 @@ namespace sfx = sst::effects;
 template<typename T>
 struct Tester
 {
+    static_assert(std::is_same<decltype(T::effectName), const char *const>::value);
+    static_assert(std::is_integral<decltype(T::numParams)>::value);
+    static_assert(std::is_same<decltype(&T::initialize),
+                               void(T::*)()>::value);
+    static_assert(std::is_same<decltype(&T::processBlock),
+                               void(T::*)(float *__restrict, float *__restrict)>::value);
+    static_assert(std::is_same<decltype(&T::suspendProcessing),
+                               void(T::*)()>::value);
+    static_assert(std::is_same<decltype(&T::getRingoutDecay),
+                               int(T::*)() const>::value);
+    static_assert(std::is_same<decltype(&T::paramAt),
+                               sst::basic_blocks::params::ParamMetaData (T::*)(int) const>::value);
+
     static void TestFX() {
         using FX = T;
 
