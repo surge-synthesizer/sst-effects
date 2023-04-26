@@ -75,27 +75,27 @@ template <typename FXConfig> struct Reverb1 : EffectTemplateBase<FXConfig>
         switch ((rev1_params)idx)
         {
         case rev1_predelay:
-            return result.withName("Pre-Delay").asEnvelopeTime();
+            return result.withName("Pre-Delay").asEnvelopeTime().withDefault(-4.f);
         case rev1_shape:
             return result.withName("Room Shape").withType(pmd::INT).withRange(0, 3).withDefault(0);
         case rev1_roomsize:
-            return result.withName("Size").asPercent();
+            return result.withName("Size").asPercent().withDefault(0.5);
         case rev1_decaytime:
-            return result.withName("Decay Time").withRange(-4, 6).withDefault(0);
+            return result.withName("Decay Time").withRange(-4, 6).withDefault(1.f);
         case rev1_damping:
-            return result.withName("HF Damping").asPercent();
+            return result.withName("HF Damping").asPercent().withDefault(0.2f);
         case rev1_lowcut:
-            return result.withName("Low Cut").asAudibleFrequency();
+            return result.withName("Low Cut").asAudibleFrequency().withDefault(-24.f);
         case rev1_freq1:
-            return result.withName("Peak Freq").asAudibleFrequency();
+            return result.withName("Peak Freq").asAudibleFrequency().withDefault(0.f);
         case rev1_gain1:
-            return result.withName("Peak Gain").asDecibel();
+            return result.withName("Peak Gain").asDecibel().withDefault(0.f);
         case rev1_highcut:
-            return result.withName("High Cut").asAudibleFrequency();
+            return result.withName("High Cut").asAudibleFrequency().withDefault(72.f);
         case rev1_mix:
-            return result.withName("Mix").asPercent();
+            return result.withName("Mix").asPercent().withDefault(0.5f);
         case rev1_width:
-            return result.withName("Width").asDecibelNarrow();
+            return result.withName("Width").asDecibelNarrow().withDefault(0.f);
         default:
             break;
         }
