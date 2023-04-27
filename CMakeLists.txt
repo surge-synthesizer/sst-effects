@@ -23,6 +23,13 @@ if (${SST_EFFECTS_BUILD_TESTS})
                 )
     endif()
 
+    if (NOT TARGET fmt)
+        CPMAddPackage(NAME fmt
+                GITHUB_REPOSITORY fmtlib/fmt
+                GIT_TAG master
+                )
+    endif()
+
     if (NOT TARGET simde)
         CPMAddPackage(NAME simde
                 GITHUB_REPOSITORY simd-everywhere/simde
@@ -37,7 +44,7 @@ if (${SST_EFFECTS_BUILD_TESTS})
             tests/create-effect.cpp
             tests/concrete-runs.cpp
             )
-    target_link_libraries(${PROJECT_NAME}-test PUBLIC simde sst-basic-blocks sst-filters ${PROJECT_NAME})
+    target_link_libraries(${PROJECT_NAME}-test PUBLIC simde sst-basic-blocks sst-filters fmt ${PROJECT_NAME})
     target_compile_definitions(${PROJECT_NAME}-test PUBLIC _USE_MATH_DEFINES=1)
     target_compile_definitions(${PROJECT_NAME}-test PRIVATE CATCH_CONFIG_DISABLE_EXCEPTIONS=1)
 
