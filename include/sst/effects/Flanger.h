@@ -98,25 +98,47 @@ template <typename FXConfig> struct Flanger : EffectTemplateBase<FXConfig>
         switch ((fl_params)idx)
         {
         case fl_mode:
-            return result.withType(pmd::INT).withName("Mode").withDefault(0).withRange(
-                flm_classic, flm_arp_solo);
+            return result.withType(pmd::INT)
+                .withName("Mode")
+                .withDefault(0)
+                .withRange(flm_classic, flm_arp_solo)
+                .withUnorderedMapFormatting({{flm_classic, "Dry + Combs"},
+                                             {flm_doppler, "Combs Only"},
+                                             {flm_arp_mix, "Dry + Arp Combs"},
+                                             {flm_arp_solo, "Arp Combs Only"}});
         case fl_wave:
             return result.withType(pmd::INT)
                 .withName("Waveform")
                 .withDefault(0)
-                .withRange(flw_sine, flw_square);
+                .withRange(flw_sine, flw_square)
+                .withUnorderedMapFormatting({{flw_sine, "Sine"},
+                                             {flw_tri, "Triangle"},
+                                             {flw_saw, "Sawtooth"},
+                                             {flw_sng, "Noise"},
+                                             {flw_snh, "Sample & Hold"},
+                                             {flw_square, "Square"}});
         case fl_rate:
-            return result.withName("Rate").withRange(-7, 9).withDefault(-2.f).temposyncable();
+            return result.withName("Rate")
+                .withRange(-7, 9)
+                .withDefault(-2.f)
+                .temposyncable()
+                .withATwoToTheBFormatting(1, 1, "Hz")
+                .withDecimalPlaces(3);
         case fl_depth:
             return result.withName("Depth").asPercent().withDefault(1.f);
         case fl_voices:
-            return result.withName("Count").withRange(1.f, 4.f).withDefault(4.f);
+            return result.withName("Count")
+                .withRange(1.f, 4.f)
+                .withDefault(4.f)
+                .withLinearScaleFormatting("Voices");
         case fl_voice_basepitch:
             return result.withName("Base Pitch").asMIDIPitch();
         case fl_voice_spacing:
-            return result.withName("Spacing").withRange(0.f, 12.f).withDefault(0.f);
+            return result.withName("Spacing")
+                .withRange(0.f, 12.f)
+                .withDefault(0.f)
+                .withLinearScaleFormatting("semitones");
 
-            break;
         case fl_feedback:
             return result.withName("Feedback").asPercent().withDefault(0.f);
         case fl_damping:

@@ -77,11 +77,21 @@ template <typename FXConfig> struct Reverb1 : EffectTemplateBase<FXConfig>
         case rev1_predelay:
             return result.withName("Pre-Delay").asEnvelopeTime().withDefault(-4.f);
         case rev1_shape:
-            return result.withName("Room Shape").withType(pmd::INT).withRange(0, 3).withDefault(0);
+            return result.withName("Room Shape")
+                .withType(pmd::INT)
+                .withRange(0, 3)
+                .withDefault(0)
+                .withUnorderedMapFormatting({{0, "Type 1"},
+                                             {1, "Type 2"},
+                                             {2, "Type 3"},
+                                             {3, "Type 4"}});
         case rev1_roomsize:
             return result.withName("Size").asPercent().withDefault(0.5);
         case rev1_decaytime:
-            return result.withName("Decay Time").withRange(-4, 6).withDefault(1.f);
+            return result.withName("Decay Time")
+                .withRange(-4, 6)
+                .withDefault(1.f)
+                .withLog2SecondsFormatting();
         case rev1_damping:
             return result.withName("HF Damping").asPercent().withDefault(0.2f);
         case rev1_lowcut:
