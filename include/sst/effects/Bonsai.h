@@ -36,9 +36,9 @@ inline float freq_sr_to_alpha(float freq, float delta)
     return temp / (temp + 1);
 }
 inline void freq_sr_to_alpha_block(float *__restrict freq, float delta, float *__restrict coef,
-                                   unsigned int nquads)
+                                   unsigned int blockSize)
 {
-    for (auto i = 1U; i < nquads << 2; ++i)
+    for (auto i = 1U; i < blockSize; ++i)
     {
         const auto temp = 2 * M_PI * delta * freq[i];
         coef[i] = temp / (temp + 1);
@@ -46,62 +46,109 @@ inline void freq_sr_to_alpha_block(float *__restrict freq, float delta, float *_
 }
 
 inline void onepole_lp_block(float last, float *__restrict coef, float *__restrict src,
-                             float *__restrict dst, unsigned int nquads)
+                             float *__restrict dst, unsigned int blockSize)
 {
-    const auto temp = coef[0] * (src[0] - last);
-    dst[0] = last + temp;
-    last = temp + dst[0];
-    for (auto i = 1U; i < nquads << 2; ++i)
+    dst[0] = last + coef[0] * (src[0] - last);
+    for (auto i = 1U; i < blockSize; ++i)
     {
-        const auto temp = coef[i] * (src[i] - src[i - 1]);
-        dst[i] = last + temp;
-        last = temp + dst[i];
+        dst[i] = dst[i - 1] + coef[i] * (src[i] - dst[i - 1]);
     }
+    last = dst[blockSize];
 }
 inline void onepole_lp_block(float last, float coef, float *__restrict src, float *__restrict dst,
-                             unsigned int nquads)
+                             unsigned int blockSize)
 {
-    const auto temp = coef * (src[0] - last);
-    dst[0] = last + temp;
-    last = temp + dst[0];
-    for (auto i = 1U; i < nquads << 2; ++i)
+    dst[0] = last + coef * (src[0] - last);
+    for (auto i = 1U; i < blockSize; ++i)
     {
-        const auto temp = coef * (src[i] - src[i - 1]);
-        dst[i] = last + temp;
-        last = temp + dst[i];
+        dst[i] = dst[i - 1] + coef * (src[i] - dst[i - 1]);
+    }
+    last = dst[blockSize];
+}
+
+inline void lp_to_hp_block(float *__restrict raw, float *__restrict lp, float *__restrict dst,
+                           unsigned int blockSize)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = raw[i] - lp[i];
     }
 }
 
 inline void onepole_hp_block(float last, float *__restrict coef, float *__restrict src,
-                             float *__restrict dst, unsigned int nquads)
+                             float *__restrict dst, unsigned int blockSize)
 {
-    const auto temp = coef[0] * (src[0] - last);
-    dst[0] = src[0] - (last + temp);
-    last = temp + dst[0];
-    for (auto i = 1U; i < nquads << 2; ++i)
-    {
-        const auto temp = coef[i] * (src[i] - src[i - 1]);
-        dst[i] = src[i] - (last + temp);
-        last = temp + dst[i];
-    }
+    float lp alignas(16)[blockSize];
+    onepole_lp_block(last, coef, src, lp, blockSize);
+    lp_to_hp_block(src, lp, dst, blockSize);
 }
 inline void onepole_hp_block(float last, float coef, float *__restrict src, float *__restrict dst,
-                             unsigned int nquads)
+                             unsigned int blockSize)
 {
-    const auto temp = coef * (src[0] - last);
-    dst[0] = src[0] - (last + temp);
-    last = temp + dst[0];
-    for (auto i = 1U; i < nquads << 2; ++i)
-    {
-        const auto temp = coef * (src[i] - src[i - 1]);
-        dst[i] = src[i] - (last + temp);
-        last = temp + dst[i];
-    }
+    float lp alignas(16)[blockSize];
+    onepole_lp_block(last, coef, src, lp, blockSize);
+    lp_to_hp_block(src, lp, dst, blockSize);
 }
+
+// algo based on last input
+// inline void onepole_lp_block(float last, float *__restrict coef, float *__restrict src,
+//                              float *__restrict dst, unsigned int nquads)
+// {
+//     const auto temp = coef[0] * (src[0] - last);
+//     dst[0] = last + temp;
+//     last = temp + dst[0];
+//     for (auto i = 1U; i < nquads << 2; ++i)
+//     {
+//         const auto temp = coef[i] * (src[i] - src[i - 1]);
+//         dst[i] = last + temp;
+//         last = temp + dst[i];
+//     }
+// }
+// inline void onepole_lp_block(float last, float coef, float *__restrict src,
+//                              float *__restrict dst, unsigned int nquads)
+// {
+//     const auto temp = coef * (src[0] - last);
+//     dst[0] = last + temp;
+//     last = temp + dst[0];
+//     for (auto i = 1U; i < nquads << 2; ++i)
+//     {
+//         const auto temp = coef * (src[i] - src[i - 1]);
+//         dst[i] = last + temp;
+//         last = temp + dst[i];
+//     }
+// }
+
+// inline void onepole_hp_block(float last, float *__restrict coef, float *__restrict src,
+//                              float *__restrict dst, unsigned int nquads)
+// {
+//     const auto temp = coef[0] * (src[0] - last);
+//     dst[0] = src[0] - (last + temp);
+//     last = temp + dst[0];
+//     for (auto i = 1U; i < nquads << 2; ++i)
+//     {
+//         const auto temp = coef[i] * (src[i] - src[i - 1]);
+//         dst[i] = src[i] - (last + temp);
+//         last = temp + dst[i];
+//     }
+// }
+// inline void onepole_hp_block(float last, float coef, float *__restrict src,
+//                              float *__restrict dst, unsigned int nquads)
+// {
+//     const auto temp = coef * (src[0] - last);
+//     dst[0] = src[0] - (last + temp);
+//     last = temp + dst[0];
+//     for (auto i = 1U; i < nquads << 2; ++i)
+//     {
+//         const auto temp = coef * (src[i] - src[i - 1]);
+//         dst[i] = src[i] - (last + temp);
+//         last = temp + dst[i];
+//     }
+// }
 
 template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
 {
-    static constexpr double MIDI_0_FREQ = 8.17579891564371; // or 440.0 * pow( 2.0, - (69.0/12.0 ) )
+    // static constexpr double MIDI_0_FREQ = 8.17579891564371;
+    // or 440.0 * pow( 2.0, - (69.0/12.0) )
 
     enum b_dist_modes
     {
@@ -287,7 +334,14 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
     // float vweights[2][COMBS_PER_CHANNEL];
 
     // sdsp::lipol_sse<FXConfig::blockSize, false> width;
-    bool haveProcessed{false};
+    // bool haveProcessed{false};
+
+    float filter_last[4] = {};
+    float sr_inv = Bonsai<FXConfig>::sampleRate();
+    float coef4690 = freq_sr_to_alpha(4690, sr_inv);
+    float coef1280 = freq_sr_to_alpha(1280, sr_inv);
+    float coef160 = freq_sr_to_alpha(160, sr_inv);
+    float coef99 = freq_sr_to_alpha(99, sr_inv);
 
     // const static int LFO_TABLE_SIZE = 8192;
     // const static int LFO_TABLE_MASK = LFO_TABLE_SIZE - 1;
@@ -338,6 +392,13 @@ template <typename FXConfig> inline void Bonsai<FXConfig>::initialize()
 template <typename FXConfig>
 inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__restrict dataR)
 {
+    float out alignas(16)[FXConfig::blockSize];
+    onepole_lp_block(filter_last[0], coef160, dataL, out, FXConfig::blockSize);
+    for (int i = 0; i < FXConfig::blockSize; ++i)
+    {
+        dataL[i] = out[i];
+        dataR[i] = out[i];
+    }
     // if (!haveProcessed)
     // {
     //     float v0 = this->floatValue(fl_voice_basepitch);
@@ -347,7 +408,8 @@ inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__res
     // }
     // // So here is a flanger with everything fixed
 
-    // float rate = this->envelopeRateLinear(-std::clamp(this->floatValue(fl_rate), -8.f, 10.f)) *
+    // float rate = this->envelopeRateLinear(-std::clamp(this->floatValue(fl_rate), -8.f, 10.f))
+    // *
     //              this->temposyncRatio(fl_rate);
 
     // for (int c = 0; c < 2; ++c)
@@ -467,8 +529,9 @@ inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__res
 
     //             if (mwave == flw_sng)
     //             {
-    //                 // FIXME exponential creep up. We want to get there in time related to our
-    //                 rate auto cv = lfoval[c][i].v; auto diff = (lfosandhtarget[c][i] - cv) * rate
+    //                 // FIXME exponential creep up. We want to get there in time related to
+    //                 our rate auto cv = lfoval[c][i].v; auto diff = (lfosandhtarget[c][i] -
+    //                 cv) * rate
     //                 * 2; lfoval[c][i].newValue(cv + diff);
     //             }
     //             else
@@ -481,9 +544,11 @@ inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__res
 
     //         auto combspace = this->floatValue(fl_voice_spacing);
     //         float pitch = v0 + combspace * i;
-    //         float nv = this->sampleRate() * oneoverFreq0 * this->noteToPitchInv((float)(pitch));
+    //         float nv = this->sampleRate() * oneoverFreq0 *
+    //         this->noteToPitchInv((float)(pitch));
 
-    //         // OK so biggest tap = delaybase[c][i].v * ( 1.0 + lfoval[c][i].v * depth.v ) + 1;
+    //         // OK so biggest tap = delaybase[c][i].v * ( 1.0 + lfoval[c][i].v * depth.v ) +
+    //         1;
     //         // Assume lfoval is [-1,1] and depth is known
     //         float maxtap = nv * (1.0 + depth_val) + 1;
     //         if (maxtap >= InterpDelay::DELAY_SIZE)
@@ -527,8 +592,8 @@ inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__res
     // }
     // case flm_arp_mix:
     // {
-    //     // this is one voice classic basically and the steady signal clamps away feedback more
-    //     feedbackScale += 0.3;
+    //     // this is one voice classic basically and the steady signal clamps away feedback
+    //     more feedbackScale += 0.3;
     // }
     // default:
     //     break;
@@ -591,8 +656,8 @@ inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__res
     //     }
     //     else
     //     {
-    //         float voices = std::clamp(this->floatValue(fl_voices), 1.f, COMBS_PER_CHANNEL * 1.f);
-    //         vweights[c][0] = 1.0;
+    //         float voices = std::clamp(this->floatValue(fl_voices), 1.f, COMBS_PER_CHANNEL
+    //         * 1.f); vweights[c][0] = 1.0;
 
     //         for (int i = 0; i < voices && i < 4; ++i)
     //             vweights[c][i] = 1.0;
