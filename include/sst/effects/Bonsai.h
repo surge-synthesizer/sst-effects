@@ -26,6 +26,7 @@
 #include "sst/basic-blocks/dsp/Lag.h"
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
 #include "sst/basic-blocks/dsp/FastMath.h"
+#include "sst/basic-blocks/tables/DbToLinearProvider.h"
 
 namespace sst::effects
 {
@@ -153,6 +154,21 @@ inline void onepole_hp_block(float &last, const float coef, float *__restrict sr
 
 template <typename T> inline int sgn(T val) { return (T(0) < val) - (val < T(0)); }
 
+// pade approximants tend either to infinity or 0. tanh and inv sinh have a horizontal asymptote and
+// so they will always eventually deviate. if you replace this with some approximation, please check
+// that it does not trend to infinity as increasing the gain enough will eventualy cause it to no
+// longer sound distorted
+inline float clip_inv_sinh(float src)
+{
+    const float abs2x = 2 * fabs(src);
+    return logf(abs2x + sqrt(abs2x * abs2x + 1)) * 0.5 * sgn(src);
+}
+inline float clip_inv_sinh(float invlevel, float level, float src)
+{
+    const float scaledown = invlevel * src;
+    const float abs2x = 2 * fabs(scaledown);
+    return logf(abs2x + sqrt(abs2x * abs2x + 1)) * 0.5 * sgn(scaledown) * level;
+}
 template <size_t blockSize>
 inline void clip_inv_sinh_block(float invlevel, float level, float *__restrict src,
                                 float *__restrict dst)
@@ -176,6 +192,12 @@ inline void clip_inv_sinh_block(float *__restrict level, float *__restrict src,
     }
 }
 
+// trends to infinity
+inline float clip_tanh76(float x) { return sst::basic_blocks::dsp::fasttanh(x); }
+inline float clip_tanh76(float x, float invlevel, float level)
+{
+    return sst::basic_blocks::dsp::fasttanh(invlevel * x) * level;
+}
 template <size_t blockSize>
 inline void clip_tanh76_block(float invlevel, float level, float *__restrict src,
                               float *__restrict dst)
@@ -194,12 +216,17 @@ inline void clip_tanh76_block(float *__restrict level, float *__restrict src, fl
     }
 }
 
+// trends to 0 decently slowly, 9,10 would be better
 inline float fasttanh78(float x)
 {
     auto x2 = x * x;
     auto numerator = x * (2027025 + x2 * (270270 + x2 * (6930 + x2 * 36)));
     auto denominator = 2027025 + x2 * (945945 + x2 * (51975 + x2 * (630 + x2)));
     return numerator / denominator;
+}
+inline float fasttanh78(float x, float invlevel, float level)
+{
+    return fasttanh78(x * invlevel) * level;
 }
 template <size_t blockSize>
 inline void clip_tanh78_block(float invlevel, float level, float *__restrict src,
@@ -219,6 +246,157 @@ inline void clip_tanh78_block(float *__restrict level, float *__restrict src, fl
     }
 }
 
+// trends to 0 quickly and only approximates tanh within around +-0.2
+inline float fasttanh_foldback(float x)
+{
+    auto x2 = x * x;
+    auto numerator = x * 5 * (21 + x2 * 2);
+    auto denominator = 105 + 0.6825 * x2 * (45 + x2 * 6);
+    return numerator / denominator;
+}
+inline float fasttanh_foldback(float x, float invlevel, float level)
+{
+    return fasttanh_foldback(x * invlevel) * level;
+}
+template <size_t blockSize>
+inline void clip_tanh_foldback_block(float invlevel, float level, float *__restrict src,
+                                     float *__restrict dst)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = fasttanh_foldback(invlevel * src[i]) * level;
+    }
+}
+template <size_t blockSize>
+inline void clip_tanh_foldback_block(float *__restrict level, float *__restrict src,
+                                     float *__restrict dst)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = fasttanh_foldback(src[i] / level[i]) * level[i];
+    }
+}
+
+inline float sech(float x) { return 2 / (exp(x) + exp(-x)); }
+
+// oscillates a bit in the middle but eventually stays around 0.5 * tanh(x)
+inline float clip_sine_tanh(float x)
+{
+    return (sech(x * 0.125) + 0.125) * sin(x) + 0.5 * fasttanh78(x * 0.125);
+}
+inline float clip_sine_tanh(float x, float invlevel, float level)
+{
+    return clip_sine_tanh(x * invlevel) * level;
+}
+template <size_t blockSize>
+inline void clip_sine_tanh_block(float invlevel, float level, float *__restrict src,
+                                 float *__restrict dst)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = clip_sine_tanh(invlevel * src[i]) * level;
+    }
+}
+template <size_t blockSize>
+inline void clip_sine_tanh_block(float *__restrict level, float *__restrict src,
+                                 float *__restrict dst)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = clip_sine_tanh(src[i] / level[i]) * level[i];
+    }
+}
+
+inline float rerange(float in, float l1, float h1, float l2, float h2)
+{
+    return (in - l1) * (l2 - h2) * (1.f / (l1 - h1)) + l2;
+}
+template <size_t blockSize>
+inline void rerange_block(float *__restrict in, float l1, float h1, float l2, float h2,
+                          float *__restrict src, float *__restrict dst)
+{
+    const float inv_l1_m_h1 = 1.f / (l1 - h1);
+    const float l2_m_h2 = l2 - h2;
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = (in[i] - l1) * l2_m_h2 * inv_l1_m_h1 + l2;
+    }
+}
+template <size_t blockSize>
+inline void rerange_block(float *__restrict in, float l1, float h1, float *__restrict l2,
+                          float *__restrict h2, float *__restrict src, float *__restrict dst)
+{
+    const float inv_l1_m_h1 = 1.f / (l1 - h1);
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = (in[i] - l1) * (l2[i] - h2[i]) * inv_l1_m_h1 + l2[i];
+    }
+}
+template <size_t blockSize>
+inline void rerange_block(float *__restrict in, float *__restrict l1, float *__restrict h1,
+                          float *__restrict l2, float *__restrict h2, float *__restrict src,
+                          float *__restrict dst)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = (in[i] - l1[i]) * (l2[i] - h2[i]) * (1.f / (l1[i] - h1[i])) + l2[i];
+    }
+}
+inline float rerange01(float in, float l2, float h2) { return in * (l2 - h2) + l2; }
+template <size_t blockSize>
+inline void rerange01_block(float *__restrict in, float l2, float h2, float *__restrict src,
+                            float *__restrict dst)
+{
+    const float l2_m_h2 = l2 - h2;
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = in[i] * l2_m_h2 + l2;
+    }
+}
+template <size_t blockSize>
+inline float rerange01_block(float *__restrict in, float *__restrict l2, float *__restrict h2,
+                             float *__restrict src, float *__restrict dst)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = in[i] * (l2[i] - h2[i]) + l2[i];
+    }
+}
+inline float rerange1b(float in, float l2, float h2) { return (in - 1.f) * (l2 - h2) * 0.5 + l2; }
+template <size_t blockSize>
+inline void rerange1b_block(float *__restrict in, float l2, float h2, float *__restrict src,
+                            float *__restrict dst)
+{
+    const float l2_m_h2 = l2 - h2;
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = (in[i] - 1.f) * l2_m_h2 + l2;
+    }
+}
+template <size_t blockSize>
+inline float rerange1b_block(float *__restrict in, float *__restrict l2, float *__restrict h2,
+                             float *__restrict src, float *__restrict dst)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = (in[i] - 1.f) * (l2[i] - h2[i]) + l2[i];
+    }
+}
+
+inline float invsq(float in)
+{
+    const float inv = 1.f - in;
+    return 1 - (inv * inv);
+}
+template <size_t blockSize> inline void invsq_block(float *__restrict src, float *__restrict dst)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        const float inv = 1.f - src[i];
+        dst[i] = 1 - (inv * inv);
+    }
+}
+
 template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
 {
     // static constexpr double MIDI_0_FREQ = 8.17579891564371;
@@ -229,7 +407,6 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
         bdm_inv_sinh = 0,
         bdm_tanh,
         bdm_tanh_approx_foldback,
-        bdm_mix_invsinh_foldback,
         bdm_sine,
     };
 
@@ -410,13 +587,15 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
     // sdsp::lipol_sse<FXConfig::blockSize, false> width;
     // bool haveProcessed{false};
 
-    float last[10] = {};
+    float last[14] = {};
     float sr = Bonsai<FXConfig>::sampleRate();
     const float coef4690 = freq_sr_to_alpha(4690, sr);
     const float coef1280 = freq_sr_to_alpha(1280, sr);
     const float coef160 = freq_sr_to_alpha(160, sr);
     const float coef99 = freq_sr_to_alpha(99, sr);
     const float coef10 = freq_sr_to_alpha(10, sr);
+    const float coef3000 = freq_sr_to_alpha(3000, sr);
+    const float coef8000 = freq_sr_to_alpha(8000, sr);
 
     // const static int LFO_TABLE_SIZE = 8192;
     // const static int LFO_TABLE_MASK = LFO_TABLE_SIZE - 1;
@@ -493,16 +672,38 @@ inline void tilt_lowboost_block(float &last1, float &last2, float coef1, float c
     sum3_block<blockSize>(tilt1_hp160, tilt1_lp99, src, dst);
 }
 template <size_t blockSize>
+inline void high_shelf_block(float &last, float coef, float gainfactor, float *__restrict src,
+                             float *__restrict dst)
+{
+    float highpass alignas(16)[blockSize] = {};
+    onepole_hp_block<blockSize>(last, coef, src, highpass);
+    mul_block_inplace<blockSize>(highpass, gainfactor);
+    sum2_block<blockSize>(highpass, src, dst);
+}
+template <size_t blockSize>
 inline void tape_sat_block(float last[], int lastmin, const float coef1, const float coef2,
-                           const float coef3, const float coef4, float *__restrict src,
+                           const float coef3, const float coef4, const float coef5,
+                           const float coef6, float sat, int mode, float *__restrict src,
                            float *__restrict dst)
 {
     float predist alignas(16)[blockSize] = {};
+    float predist_scaled alignas(16)[blockSize] = {};
     float dist alignas(16)[blockSize] = {};
+    float dist_scaled alignas(16)[blockSize] = {};
+    float dist_reg alignas(16)[blockSize] = {};
+    float high_shelf alignas(16)[blockSize] = {};
+    const float sat_invsq = invsq(sat);
+    const float sat_halfsq = 0.5 * (sat * sat + sat);
+    const float level = rerange01(sat_invsq, 0.15, 0.025);
     tilt_highboost_block<blockSize>(last[lastmin + 0], last[lastmin + 1], coef1, coef2, src,
                                     predist);
+    mul_block<blockSize>(predist, this->dbToLinear(rerange01(sat, 0.f, 9.f)), predist_scaled);
     clip_tanh78_block<blockSize>(1 / 0.01, 0.01, predist, dist);
     tilt_lowboost_block<blockSize>(last[lastmin + 2], last[lastmin + 3], coef3, coef4, dist, dst);
+    mul_block<blockSize>(dist, this->dbToLinear(rerange01(sat_halfsq, 1.5, 6.f)), dist_scaled);
+    clip_tanh78_block<blockSize>(6.6666666666666666, 0.15, dist_scaled, dist_reg); // 1/0.15
+    high_shelf_block<blockSize>(last[lastmin + 4], coef5, -sat_invsq, dist_reg, high_shelf);
+    high_shelf_block<blockSize>(last[lastmin + 5], coef6, -sat_invsq, high_shelf, dst);
 }
 
 template <typename FXConfig>
@@ -516,10 +717,16 @@ inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__res
     float outR alignas(16)[FXConfig::blockSize] = {};
     mul_block<FXConfig::blockSize>(dataL, 8.f, scaledL);
     mul_block<FXConfig::blockSize>(dataR, 8.f, scaledR);
-    onepole_hp_block<FXConfig::blockSize>(last[8], coef10, scaledL, hpL);
-    onepole_hp_block<FXConfig::blockSize>(last[9], coef10, scaledR, hpR);
-    tape_sat_block<FXConfig::blockSize>(last, 0, coef4690, coef1280, coef160, coef99, hpL, outL);
-    tape_sat_block<FXConfig::blockSize>(last, 4, coef4690, coef1280, coef160, coef99, hpR, outR);
+    onepole_hp_block<FXConfig::blockSize>(last[0], coef10, scaledL, hpL);
+    onepole_hp_block<FXConfig::blockSize>(last[1], coef10, scaledR, hpR);
+    tape_sat_block<FXConfig, FXConfig::blockSize>(
+        last, 2, coef4690, coef1280, coef160, coef99, coef3000, coef8000,
+        std::clamp(this->floatValue(b_tape_sat), 0.f, 1.f), this->floatValue(b_tape_dist_mode), hpL,
+        outL);
+    tape_sat_block<FXConfig, FXConfig::blockSize>(
+        last, 8, coef4690, coef1280, coef160, coef99, coef3000, coef8000,
+        std::clamp(this->floatValue(b_tape_sat), 0.f, 1.f), this->floatValue(b_tape_dist_mode), hpR,
+        outR);
     for (int i = 0; i < FXConfig::blockSize; ++i)
     {
         dataL[i] = outL[i];
