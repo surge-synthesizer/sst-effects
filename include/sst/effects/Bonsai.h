@@ -25,125 +25,199 @@
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/Lag.h"
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
+#include "sst/basic-blocks/dsp/FastMath.h"
 
 namespace sst::effects
 {
 namespace sdsp = sst::basic_blocks::dsp;
 
-inline float freq_sr_to_alpha(float freq, float delta)
+inline float freq_sr_to_alpha(float freq, float sr)
 {
-    const auto temp = 2 * M_PI * delta * freq;
-    return temp / (temp + 1);
+    const float rc = 1.f / (2.f * M_PI * freq);
+    // return delta / (rc + delta);
+    // std::cout << delta << std::endl << rc << std::endl << (delta / (rc + delta)) << std::endl;
+    return 1.f / (rc * sr + 1.f);
+    // const auto temp = 2 * M_PI * delta * freq;
+    // return temp / (temp + 1);
 }
-inline void freq_sr_to_alpha_block(float *__restrict freq, float delta, float *__restrict coef,
-                                   unsigned int blockSize)
+template <size_t blockSize>
+inline void freq_sr_to_alpha_block(float *__restrict freq, float sr, float *__restrict coef)
 {
     for (auto i = 1U; i < blockSize; ++i)
     {
-        const auto temp = 2 * M_PI * delta * freq[i];
-        coef[i] = temp / (temp + 1);
+        const float rc = 1.f / (2.f * M_PI * freq[i]);
+        coef[i] = 1.f / (rc * sr + 1.f);
+        // const auto temp = 2 * M_PI * delta * freq[i];
+        // coef[i] = temp / (temp + 1);
     }
 }
 
-inline void onepole_lp_block(float last, float *__restrict coef, float *__restrict src,
-                             float *__restrict dst, unsigned int blockSize)
+template <size_t blockSize>
+inline void onepole_lp_block(float &last, const float *__restrict coef, float *__restrict src,
+                             float *__restrict dst)
 {
     dst[0] = last + coef[0] * (src[0] - last);
     for (auto i = 1U; i < blockSize; ++i)
     {
         dst[i] = dst[i - 1] + coef[i] * (src[i] - dst[i - 1]);
     }
-    last = dst[blockSize];
+    last = dst[blockSize - 1];
 }
-inline void onepole_lp_block(float last, float coef, float *__restrict src, float *__restrict dst,
-                             unsigned int blockSize)
+template <size_t blockSize>
+inline void onepole_lp_block(float &last, const float coef, float *__restrict src,
+                             float *__restrict dst)
 {
     dst[0] = last + coef * (src[0] - last);
     for (auto i = 1U; i < blockSize; ++i)
     {
         dst[i] = dst[i - 1] + coef * (src[i] - dst[i - 1]);
     }
-    last = dst[blockSize];
+    last = dst[blockSize - 1];
 }
 
-inline void lp_to_hp_block(float *__restrict raw, float *__restrict lp, float *__restrict dst,
-                           unsigned int blockSize)
+template <size_t blockSize>
+inline void sum2_block(float *__restrict one, float *__restrict two, float *__restrict dst)
 {
     for (auto i = 0U; i < blockSize; ++i)
     {
-        dst[i] = raw[i] - lp[i];
+        dst[i] = one[i] + two[i];
+    }
+}
+template <size_t blockSize>
+inline void sum3_block(float *__restrict one, float *__restrict two, float *__restrict three,
+                       float *__restrict dst)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = one[i] + two[i] + three[i];
+    }
+}
+template <size_t blockSize>
+inline void minus2_block(float *__restrict one, float *__restrict two, float *__restrict dst)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = one[i] - two[i];
     }
 }
 
-inline void onepole_hp_block(float last, float *__restrict coef, float *__restrict src,
-                             float *__restrict dst, unsigned int blockSize)
+template <size_t blockSize>
+inline void mul_block(float *__restrict src1, float src2, float *__restrict dst)
 {
-    float lp alignas(16)[blockSize];
-    onepole_lp_block(last, coef, src, lp, blockSize);
-    lp_to_hp_block(src, lp, dst, blockSize);
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = src1[i] * src2;
+    }
 }
-inline void onepole_hp_block(float last, float coef, float *__restrict src, float *__restrict dst,
-                             unsigned int blockSize)
+template <size_t blockSize>
+inline void mul_block(float *__restrict src1, float *__restrict src2, float *__restrict dst)
 {
-    float lp alignas(16)[blockSize];
-    onepole_lp_block(last, coef, src, lp, blockSize);
-    lp_to_hp_block(src, lp, dst, blockSize);
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = src1[i] * src2[i];
+    }
 }
 
-// algo based on last input
-// inline void onepole_lp_block(float last, float *__restrict coef, float *__restrict src,
-//                              float *__restrict dst, unsigned int nquads)
-// {
-//     const auto temp = coef[0] * (src[0] - last);
-//     dst[0] = last + temp;
-//     last = temp + dst[0];
-//     for (auto i = 1U; i < nquads << 2; ++i)
-//     {
-//         const auto temp = coef[i] * (src[i] - src[i - 1]);
-//         dst[i] = last + temp;
-//         last = temp + dst[i];
-//     }
-// }
-// inline void onepole_lp_block(float last, float coef, float *__restrict src,
-//                              float *__restrict dst, unsigned int nquads)
-// {
-//     const auto temp = coef * (src[0] - last);
-//     dst[0] = last + temp;
-//     last = temp + dst[0];
-//     for (auto i = 1U; i < nquads << 2; ++i)
-//     {
-//         const auto temp = coef * (src[i] - src[i - 1]);
-//         dst[i] = last + temp;
-//         last = temp + dst[i];
-//     }
-// }
+template <size_t blockSize> inline void mul_block_inplace(float *__restrict src, float factor)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        src[i] = src[i] * factor;
+    }
+}
+template <size_t blockSize>
+inline void mul_block_inplace(float *__restrict src, float *__restrict factor)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        src[i] = src[i] * factor[i];
+    }
+}
 
-// inline void onepole_hp_block(float last, float *__restrict coef, float *__restrict src,
-//                              float *__restrict dst, unsigned int nquads)
-// {
-//     const auto temp = coef[0] * (src[0] - last);
-//     dst[0] = src[0] - (last + temp);
-//     last = temp + dst[0];
-//     for (auto i = 1U; i < nquads << 2; ++i)
-//     {
-//         const auto temp = coef[i] * (src[i] - src[i - 1]);
-//         dst[i] = src[i] - (last + temp);
-//         last = temp + dst[i];
-//     }
-// }
-// inline void onepole_hp_block(float last, float coef, float *__restrict src,
-//                              float *__restrict dst, unsigned int nquads)
-// {
-//     const auto temp = coef * (src[0] - last);
-//     dst[0] = src[0] - (last + temp);
-//     last = temp + dst[0];
-//     for (auto i = 1U; i < nquads << 2; ++i)
-//     {
-//         const auto temp = coef * (src[i] - src[i - 1]);
-//         dst[i] = src[i] - (last + temp);
-//         last = temp + dst[i];
-//     }
-// }
+template <size_t blockSize>
+inline void onepole_hp_block(float &last, const float *__restrict coef, float *__restrict src,
+                             float *__restrict dst)
+{
+    float lp alignas(16)[blockSize];
+    onepole_lp_block<blockSize>(last, coef, src, lp);
+    minus2_block<blockSize>(src, lp, dst);
+}
+template <size_t blockSize>
+inline void onepole_hp_block(float &last, const float coef, float *__restrict src,
+                             float *__restrict dst)
+{
+    float lp alignas(16)[blockSize];
+    onepole_lp_block<blockSize>(last, coef, src, lp);
+    minus2_block<blockSize>(src, lp, dst);
+}
+
+template <typename T> inline int sgn(T val) { return (T(0) < val) - (val < T(0)); }
+
+template <size_t blockSize>
+inline void clip_inv_sinh_block(float invlevel, float level, float *__restrict src,
+                                float *__restrict dst)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        const float scaledown = invlevel * src[i];
+        const float abs2x = 2 * fabs(scaledown);
+        dst[i] = logf(abs2x + sqrt(abs2x * abs2x + 1)) * 0.5 * sgn(scaledown) * level;
+    }
+}
+template <size_t blockSize>
+inline void clip_inv_sinh_block(float *__restrict level, float *__restrict src,
+                                float *__restrict dst)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        const float scaledown = src[i] / level[i];
+        const float abs2x = 2 * fabs(scaledown);
+        dst[i] = logf(abs2x + sqrt(abs2x * abs2x + 1)) * 0.5 * sgn(scaledown) * level[i];
+    }
+}
+
+template <size_t blockSize>
+inline void clip_tanh76_block(float invlevel, float level, float *__restrict src,
+                              float *__restrict dst)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = sst::basic_blocks::dsp::fasttanh(invlevel * src[i]) * level;
+    }
+}
+template <size_t blockSize>
+inline void clip_tanh76_block(float *__restrict level, float *__restrict src, float *__restrict dst)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = sst::basic_blocks::dsp::fasttanh(src[i] / level[i]) * level[i];
+    }
+}
+
+inline float fasttanh78(float x)
+{
+    auto x2 = x * x;
+    auto numerator = x * (2027025 + x2 * (270270 + x2 * (6930 + x2 * 36)));
+    auto denominator = 2027025 + x2 * (945945 + x2 * (51975 + x2 * (630 + x2)));
+    return numerator / denominator;
+}
+template <size_t blockSize>
+inline void clip_tanh78_block(float invlevel, float level, float *__restrict src,
+                              float *__restrict dst)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = fasttanh78(invlevel * src[i]) * level;
+    }
+}
+template <size_t blockSize>
+inline void clip_tanh78_block(float *__restrict level, float *__restrict src, float *__restrict dst)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = fasttanh78(src[i] / level[i]) * level[i];
+    }
+}
 
 template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
 {
@@ -322,7 +396,7 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
     // InterpDelay idels[2];
 
     // float lfophase[2][COMBS_PER_CHANNEL], longphase[2];
-    float lpaL = 0.f, lpaR = 0.f; // state for the onepole LP filter
+    // float lpaL = 0.f, lpaR = 0.f; // state for the onepole LP filter
 
     // sdsp::lipol<float, FXConfig::blockSize, true> lfoval[2][COMBS_PER_CHANNEL],
     //     delaybase[2][COMBS_PER_CHANNEL];
@@ -336,12 +410,13 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
     // sdsp::lipol_sse<FXConfig::blockSize, false> width;
     // bool haveProcessed{false};
 
-    float filter_last[4] = {};
-    float sr_inv = Bonsai<FXConfig>::sampleRate();
-    float coef4690 = freq_sr_to_alpha(4690, sr_inv);
-    float coef1280 = freq_sr_to_alpha(1280, sr_inv);
-    float coef160 = freq_sr_to_alpha(160, sr_inv);
-    float coef99 = freq_sr_to_alpha(99, sr_inv);
+    float last[10] = {};
+    float sr = Bonsai<FXConfig>::sampleRate();
+    const float coef4690 = freq_sr_to_alpha(4690, sr);
+    const float coef1280 = freq_sr_to_alpha(1280, sr);
+    const float coef160 = freq_sr_to_alpha(160, sr);
+    const float coef99 = freq_sr_to_alpha(99, sr);
+    const float coef10 = freq_sr_to_alpha(10, sr);
 
     // const static int LFO_TABLE_SIZE = 8192;
     // const static int LFO_TABLE_MASK = LFO_TABLE_SIZE - 1;
@@ -389,15 +464,66 @@ template <typename FXConfig> inline void Bonsai<FXConfig>::initialize()
 //     return result;
 // }
 
+template <size_t blockSize>
+inline void tilt_highboost_block(float &last1, float &last2, float coef1, float coef2,
+                                 float *__restrict src, float *__restrict dst)
+{
+    float tilt1_hp4690 alignas(16)[blockSize] = {};
+    float tilt1_lp1280 alignas(16)[blockSize] = {};
+    const float amp_db13_5 = 4.7315127124153629629634297;   // 1.122018456459045 ^ 13.5
+    const float amp_mdbm1_7 = -0.8222426472597752553172857; // -(1.122018456459045 ^ -1.7)
+    onepole_hp_block<blockSize>(last1, coef1, src, tilt1_hp4690);
+    onepole_lp_block<blockSize>(last2, coef2, src, tilt1_lp1280);
+    mul_block_inplace<blockSize>(tilt1_hp4690, amp_db13_5);
+    mul_block_inplace<blockSize>(tilt1_lp1280, amp_mdbm1_7);
+    sum3_block<blockSize>(tilt1_hp4690, tilt1_lp1280, src, dst);
+}
+template <size_t blockSize>
+inline void tilt_lowboost_block(float &last1, float &last2, float coef1, float coef2,
+                                float *__restrict src, float *__restrict dst)
+{
+    float tilt1_hp160 alignas(16)[blockSize] = {};
+    float tilt1_lp99 alignas(16)[blockSize] = {};
+    const float amp_db13_5 = 4.7315127124153629629634297;   // 1.122018456459045 ^ 13.5
+    const float amp_mdbm1_4 = -0.8511380359115372899247841; // -(1.122018456459045 ^ -1.4)
+    onepole_hp_block<blockSize>(last1, coef1, src, tilt1_hp160);
+    onepole_lp_block<blockSize>(last2, coef2, src, tilt1_lp99);
+    mul_block_inplace<blockSize>(tilt1_hp160, amp_mdbm1_4);
+    mul_block_inplace<blockSize>(tilt1_lp99, amp_db13_5);
+    sum3_block<blockSize>(tilt1_hp160, tilt1_lp99, src, dst);
+}
+template <size_t blockSize>
+inline void tape_sat_block(float last[], int lastmin, const float coef1, const float coef2,
+                           const float coef3, const float coef4, float *__restrict src,
+                           float *__restrict dst)
+{
+    float predist alignas(16)[blockSize] = {};
+    float dist alignas(16)[blockSize] = {};
+    tilt_highboost_block<blockSize>(last[lastmin + 0], last[lastmin + 1], coef1, coef2, src,
+                                    predist);
+    clip_tanh78_block<blockSize>(1 / 0.01, 0.01, predist, dist);
+    tilt_lowboost_block<blockSize>(last[lastmin + 2], last[lastmin + 3], coef3, coef4, dist, dst);
+}
+
 template <typename FXConfig>
 inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__restrict dataR)
 {
-    float out alignas(16)[FXConfig::blockSize];
-    onepole_lp_block(filter_last[0], coef160, dataL, out, FXConfig::blockSize);
+    float scaledL alignas(16)[FXConfig::blockSize] = {};
+    float scaledR alignas(16)[FXConfig::blockSize] = {};
+    float hpL alignas(16)[FXConfig::blockSize] = {};
+    float hpR alignas(16)[FXConfig::blockSize] = {};
+    float outL alignas(16)[FXConfig::blockSize] = {};
+    float outR alignas(16)[FXConfig::blockSize] = {};
+    mul_block<FXConfig::blockSize>(dataL, 8.f, scaledL);
+    mul_block<FXConfig::blockSize>(dataR, 8.f, scaledR);
+    onepole_hp_block<FXConfig::blockSize>(last[8], coef10, scaledL, hpL);
+    onepole_hp_block<FXConfig::blockSize>(last[9], coef10, scaledR, hpR);
+    tape_sat_block<FXConfig::blockSize>(last, 0, coef4690, coef1280, coef160, coef99, hpL, outL);
+    tape_sat_block<FXConfig::blockSize>(last, 4, coef4690, coef1280, coef160, coef99, hpR, outR);
     for (int i = 0; i < FXConfig::blockSize; ++i)
     {
-        dataL[i] = out[i];
-        dataR[i] = out[i];
+        dataL[i] = outL[i];
+        dataR[i] = outR[i];
     }
     // if (!haveProcessed)
     // {
