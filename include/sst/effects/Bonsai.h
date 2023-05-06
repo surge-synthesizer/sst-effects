@@ -34,10 +34,11 @@ namespace sdsp = sst::basic_blocks::dsp;
 
 inline float freq_sr_to_alpha(float freq, float sr)
 {
-    const float rc = 1.f / (2.f * M_PI * freq);
+    const float freq2pi = 2.f * M_PI * freq;
+    return freq2pi / (freq2pi + sr);
+    // const float rc = 1.f / (2.f * M_PI * freq);
+    // return 1.f / (rc * sr + 1.f);
     // return delta / (rc + delta);
-    // std::cout << delta << std::endl << rc << std::endl << (delta / (rc + delta)) << std::endl;
-    return 1.f / (rc * sr + 1.f);
     // const auto temp = 2 * M_PI * delta * freq;
     // return temp / (temp + 1);
 }
@@ -200,6 +201,17 @@ inline void clip_inv_sinh_block(float invlevel, float level, float *__restrict s
     }
 }
 template <size_t blockSize>
+inline void clip_inv_sinh_block(float level, float *__restrict src, float *__restrict dst)
+{
+    const float invlevel = 1 / level;
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        const float scaledown = invlevel * src[i];
+        const float abs2x = 2 * fabs(scaledown);
+        dst[i] = logf(abs2x + sqrt(abs2x * abs2x + 1)) * 0.5 * sgn(scaledown) * level;
+    }
+}
+template <size_t blockSize>
 inline void clip_inv_sinh_block(float *__restrict level, float *__restrict src,
                                 float *__restrict dst)
 {
@@ -296,6 +308,15 @@ inline void clip_tanh_foldback_block(float invlevel, float level, float *__restr
     }
 }
 template <size_t blockSize>
+inline void clip_tanh_foldback_block(float level, float *__restrict src, float *__restrict dst)
+{
+    const float invlevel = 1 / level;
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = fasttanh_foldback(invlevel * src[i]) * level;
+    }
+}
+template <size_t blockSize>
 inline void clip_tanh_foldback_block(float *__restrict level, float *__restrict src,
                                      float *__restrict dst)
 {
@@ -323,6 +344,15 @@ inline void clip_sine_tanh_block(float invlevel, float level, float *__restrict 
     for (auto i = 0U; i < blockSize; ++i)
     {
         dst[i] = clip_sine_tanh(invlevel * src[i]) * level;
+    }
+}
+template <size_t blockSize>
+inline void clip_sine_tanh_block(float level, float *__restrict src, float *__restrict dst)
+{
+    const float invlevel = 1 / level;
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = clip_sine_tanh(src[i] * invlevel) * level;
     }
 }
 template <size_t blockSize>
@@ -596,6 +626,10 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
                           const float coef1000, const float coef2000, float sens, float gain,
                           float *__restrict srcL, float *__restrict srcR, float *__restrict dstL,
                           float *__restrict dstR);
+    void age_block(float last[], int lastmin, const float coef0, const float coef100,
+                   const float coef700, const float coef1200, const float coef2000,
+                   const float coef3000, float dull, float *__restrict srcL, float *__restrict srcR,
+                   float *__restrict dstL, float *__restrict dstR);
 
     void suspendProcessing() { initialize(); }
     int getRingoutDecay() const { return ringout_value; }
@@ -612,16 +646,17 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
             return result.withName("Amount").withRange(0.f, 1.f).withDefault(0.25f);
         case b_bass_distort:
             return result.withName("Distort").withRange(0.f, 3.f).withDefault(1.f);
-        // case b_bass_st_mono:
-        //     return result.withType(pmd::INT).withName("Mono/Stereo").withRange(0,
-        //     1).withDefault(0);
         case b_tape_sat:
             return result.withName("Tape Sat").withRange(0.f, 1.f).withDefault(0.25f);
         case b_tape_dist_mode:
             return result.withType(pmd::INT)
                 .withName("Tape Dist Mode")
                 .withRange(bdm_inv_sinh, bdm_sine)
-                .withDefault(bdm_tanh);
+                .withDefault(bdm_tanh)
+                .withUnorderedMapFormatting({{bdm_inv_sinh, "Inverse Sinh"},
+                                             {bdm_tanh, "Tanh"},
+                                             {bdm_tanh_approx_foldback, "Foldback"},
+                                             {bdm_sine, "Sine-Tanh Combo"}});
         case b_noise_sensitivity:
             return result.withName("Sensitivity").withRange(0.f, 1.f).withDefault(0.25f);
         case b_noise_gain:
@@ -634,105 +669,17 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
             return result.withName("Output Gain").asDecibelNarrow().withDefault(0.f);
         case b_mix:
             return result.withName("Mix").asPercent().withDefault(1.f);
-        // case fl_mode:
-        //     return result.withType(pmd::INT)
-        //         .withName("Mode")
-        //         .withDefault(0)
-        //         .withRange(flm_classic, flm_arp_solo)
-        //         .withUnorderedMapFormatting({{flm_classic, "Dry + Combs"},
-        //                                      {flm_doppler, "Combs Only"},
-        //                                      {flm_arp_mix, "Dry + Arp Combs"},
-        //                                      {flm_arp_solo, "Arp Combs Only"}});
-        // case fl_wave:
-        //     return result.withType(pmd::INT)
-        //         .withName("Waveform")
-        //         .withDefault(0)
-        //         .withRange(flw_sine, flw_square)
-        //         .withUnorderedMapFormatting({{flw_sine, "Sine"},
-        //                                      {flw_tri, "Triangle"},
-        //                                      {flw_saw, "Sawtooth"},
-        //                                      {flw_sng, "Noise"},
-        //                                      {flw_snh, "Sample & Hold"},
-        //                                      {flw_square, "Square"}});
-        // case fl_rate:
-        //     return result.withName("Rate")
-        //         .withRange(-7, 9)
-        //         .withDefault(-2.f)
-        //         .temposyncable()
-        //         .withATwoToTheBFormatting(1, 1, "Hz")
-        //         .withDecimalPlaces(3);
-        // case fl_depth:
-        //     return result.withName("Depth").asPercent().withDefault(1.f);
-        // case fl_voices:
-        //     return result.withName("Count")
-        //         .withRange(1.f, 4.f)
-        //         .withDefault(4.f)
-        //         .withLinearScaleFormatting("Voices");
-        // case fl_voice_basepitch:
-        //     return result.withName("Base Pitch").asMIDIPitch();
-        // case fl_voice_spacing:
-        //     return result.withName("Spacing")
-        //         .withRange(0.f, 12.f)
-        //         .withDefault(0.f)
-        //         .withLinearScaleFormatting("semitones");
-
-        // case fl_feedback:
-        //     return result.withName("Feedback").asPercent().withDefault(0.f);
-        // case fl_damping:
-        //     return result.withName("HF Damping").asPercent().withDefault(0.1f);
-        // case fl_width:
-        //     return result.withName("Width").asDecibelNarrow().withDefault(0.f);
-        // case fl_mix:
-        //     return result.withName("Mix").asPercentBipolar().withDefault(0.8f);
         case b_num_params:
             throw std::logic_error("getParam called with num_params");
         }
         return result;
     }
 
-    //   protected:
-    //     static constexpr int COMBS_PER_CHANNEL = 4;
-    //     struct InterpDelay
-    //     {
-    //         // OK so lets say we want lowest tunable frequency to be 23.5hz at 96k
-    //         // 96000/23.5 = 4084
-    //         // And lets future proof a bit and make it a power of 2 so we can use & properly
-    //         static constexpr int DELAY_SIZE = 32768, DELAY_SIZE_MASK = DELAY_SIZE - 1;
-    //         float line[DELAY_SIZE];
-    //         int k = 0;
-    //         InterpDelay() { reset(); }
-    //         void reset()
-    //         {
-    //             memset(line, 0, DELAY_SIZE * sizeof(float));
-    //             k = 0;
-    //         }
-    //         float value(float delayBy);
-    //         void push(float nv)
-    //         {
-    //             k = (k + 1) & DELAY_SIZE_MASK;
-    //             line[k] = nv;
-    //         }
-    //     };
-
     int ringout_value = -1;
-    // InterpDelay idels[2];
-
-    // float lfophase[2][COMBS_PER_CHANNEL], longphase[2];
-    // float lpaL = 0.f, lpaR = 0.f; // state for the onepole LP filter
-
-    // sdsp::lipol<float, FXConfig::blockSize, true> lfoval[2][COMBS_PER_CHANNEL],
-    //     delaybase[2][COMBS_PER_CHANNEL];
     sdsp::lipol<float, FXConfig::blockSize, true> depth, mix;
-    // sdsp::lipol<float, FXConfig::blockSize, true> voices, voice_detune, voice_chord;
-    // sdsp::lipol<float, FXConfig::blockSize, true> feedback, fb_hf_damping;
     sdsp::SurgeLag<float> vzeropitch;
-    // float lfosandhtarget[2][COMBS_PER_CHANNEL];
-    // float vweights[2][COMBS_PER_CHANNEL];
 
-    // sdsp::lipol_sse<FXConfig::blockSize, false> width;
-    // bool haveProcessed{false};
-
-    float last[58] = {};
+    float last[70] = {};
     float sr = Bonsai<FXConfig>::sampleRate();
     const float coef_hb_hp = freq_sr_to_alpha(4690, sr);
     const float coef_hb_lp = freq_sr_to_alpha(1280, sr);
@@ -740,62 +687,26 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
     const float coef_lb_lp = freq_sr_to_alpha(99, sr);
     const float coef_dist_hs1 = freq_sr_to_alpha(3000, sr);
     const float coef_dist_hs2 = freq_sr_to_alpha(8000, sr);
+    const float coef0 = freq_sr_to_alpha(0, sr);
     const float coef10 = freq_sr_to_alpha(10, sr);
     const float coef20 = freq_sr_to_alpha(20, sr);
     const float coef30 = freq_sr_to_alpha(20, sr);
     const float coef50 = freq_sr_to_alpha(50, sr);
+    const float coef100 = freq_sr_to_alpha(100, sr);
     const float coef200 = freq_sr_to_alpha(200, sr);
     const float coef500 = freq_sr_to_alpha(500, sr);
+    const float coef700 = freq_sr_to_alpha(700, sr);
     const float coef1000 = freq_sr_to_alpha(1000, sr);
+    const float coef1200 = freq_sr_to_alpha(1200, sr);
     const float coef2000 = freq_sr_to_alpha(2000, sr);
-
-    // const static int LFO_TABLE_SIZE = 8192;
-    // const static int LFO_TABLE_MASK = LFO_TABLE_SIZE - 1;
-    // float sin_lfo_table[LFO_TABLE_SIZE];
-    // float saw_lfo_table[LFO_TABLE_SIZE]; // don't make it analytic since I want to smooth the
-    // edges
+    const float coef3000 = freq_sr_to_alpha(3000, sr);
 };
 
 template <typename FXConfig> inline void Bonsai<FXConfig>::initialize()
 {
     last[36] = 1; // noise mid seed
     last[37] = 2; // noise side seed
-    // for (int c = 0; c < 2; ++c)
-    //     for (int i = 0; i < COMBS_PER_CHANNEL; ++i)
-    //     {
-    //         lfophase[c][i] = 1.f * (i + 0.5 * c) / COMBS_PER_CHANNEL;
-    //         lfosandhtarget[c][i] = 0.0;
-    //     }
-    // longphase[0] = 0;
-    // longphase[1] = 0.5;
-
-    // for (int i = 0; i < LFO_TABLE_SIZE; ++i)
-    // {
-    //     sin_lfo_table[i] = sin(2.0 * M_PI * i / LFO_TABLE_SIZE);
-
-    //     saw_lfo_table[i] = 0;
-
-    //     // http://www.cs.cmu.edu/~music/icm-online/readings/panlaws/
-    //     double panAngle = 1.0 * i / (LFO_TABLE_SIZE - 1) * M_PI / 2.0;
-    //     auto piby2 = M_PI / 2.0;
-    //     auto lW = sqrt((piby2 - panAngle) / piby2 * cos(panAngle));
-    //     auto rW = sqrt(panAngle * sin(panAngle) / piby2);
-    // }
-    // haveProcessed = false;
 }
-
-// template <typename FXConfig> inline float Bonsai<FXConfig>::InterpDelay::value(float delayBy)
-// {
-//     // so if delayBy is 19.2
-//     int itap = (int)std::min(delayBy, (float)(DELAY_SIZE - 2)); // this is 19
-//     float fractap = delayBy - itap;                             // this is .2
-//     int k0 = (k + DELAY_SIZE - itap - 1) & DELAY_SIZE_MASK;     // this is 20 back
-//     int k1 = (k + DELAY_SIZE - itap) & DELAY_SIZE_MASK;         // this is 19 back
-//     float result =
-//         line[k0] * fractap + line[k1] * (1.0 - fractap); // FIXME move to the one mul form
-
-//     return result;
-// }
 
 template <size_t blockSize>
 inline void tilt_highboost_block(float &last1, float &last2, float coef1, float coef2,
@@ -834,6 +745,35 @@ inline void high_shelf_block(float &last, float coef, float gainfactor, float *_
     mul_block_inplace<blockSize>(highpass, gainfactor);
     sum2_block<blockSize>(highpass, src, dst);
 }
+template <size_t blockSize>
+inline void low_shelf_block(float &last, float coef, float gainfactor, float *__restrict src,
+                            float *__restrict dst)
+{
+    float lowpass alignas(16)[blockSize] = {};
+    onepole_lp_block<blockSize>(last, coef, src, lowpass);
+    mul_block_inplace<blockSize>(lowpass, gainfactor);
+    sum2_block<blockSize>(lowpass, src, dst);
+}
+template <size_t blockSize>
+inline void high_shelf_nl_block(float &last, float coef, float gainfactor, float invlevel,
+                                float level, float *__restrict src, float *__restrict dst)
+{
+    float highpass alignas(16)[blockSize] = {};
+    onepole_hp_block<blockSize>(last, coef, src, highpass);
+    mul_block_inplace<blockSize>(highpass, gainfactor);
+    clip_inv_sinh_block<blockSize>(invlevel, level, highpass, highpass);
+    sum2_block<blockSize>(highpass, src, dst);
+}
+template <size_t blockSize>
+inline void low_shelf_nl_block(float &last, float coef, float gainfactor, float invlevel,
+                               float level, float *__restrict src, float *__restrict dst)
+{
+    float lowpass alignas(16)[blockSize] = {};
+    onepole_lp_block<blockSize>(last, coef, src, lowpass);
+    mul_block_inplace<blockSize>(lowpass, gainfactor);
+    clip_inv_sinh_block<blockSize>(invlevel, level, lowpass, lowpass);
+    sum2_block<blockSize>(lowpass, src, dst);
+}
 // 6 last slots
 template <typename FXConfig>
 inline void Bonsai<FXConfig>::tape_sat_block(float last[], int lastmin, const float coef_hb_hp,
@@ -844,13 +784,6 @@ inline void Bonsai<FXConfig>::tape_sat_block(float last[], int lastmin, const fl
 {
     float bufA alignas(16)[FXConfig::blockSize] = {};
     float bufB alignas(16)[FXConfig::blockSize] = {};
-    // float predist alignas(16)[FXConfig::blockSize] = {};
-    // float predist_scaled alignas(16)[FXConfig::blockSize] = {};
-    // float dist alignas(16)[FXConfig::blockSize] = {};
-    // float untilt alignas(16)[FXConfig::blockSize] = {};
-    // float untilt_scaled alignas(16)[FXConfig::blockSize] = {};
-    // float dist2 alignas(16)[FXConfig::blockSize] = {};
-    // float high_shelf alignas(16)[FXConfig::blockSize] = {};
     const float sat_invsq = invsq(sat);
     const float sat_halfsq = 0.5 * (sat * sat + sat);
     const float level = rerange01(sat_invsq, 0.15, 0.025);
@@ -860,19 +793,19 @@ inline void Bonsai<FXConfig>::tape_sat_block(float last[], int lastmin, const fl
     switch ((b_dist_modes)mode)
     {
     case bdm_inv_sinh:
-        clip_inv_sinh_block<FXConfig::blockSize>(1 / level, level, bufA, bufA);
+        clip_inv_sinh_block<FXConfig::blockSize>(level, bufA, bufA);
         break;
     case bdm_tanh:
-        clip_tanh78_block<FXConfig::blockSize>(1 / level, level, bufA, bufA);
+        clip_tanh78_block<FXConfig::blockSize>(level, bufA, bufA);
         break;
     case bdm_tanh_approx_foldback:
-        clip_tanh_foldback_block<FXConfig::blockSize>(1 / level, level, bufA, bufA);
+        clip_tanh_foldback_block<FXConfig::blockSize>(level, bufA, bufA);
         break;
     case bdm_sine:
-        clip_sine_tanh_block<FXConfig::blockSize>(1 / level, level, bufA, bufA);
+        clip_sine_tanh_block<FXConfig::blockSize>(level, bufA, bufA);
         break;
     default:
-        clip_tanh78_block<FXConfig::blockSize>(1 / level, level, bufA, bufA);
+        clip_tanh78_block<FXConfig::blockSize>(level, bufA, bufA);
         break;
     }
     tilt_lowboost_block<FXConfig::blockSize>(last[lastmin + 2], last[lastmin + 3], coef_lb_hp,
@@ -985,15 +918,55 @@ inline void Bonsai<FXConfig>::tape_noise_block(float last[], int lastmin, const 
     noise_channel_block(last, lastmin + 2, coef50, coef500, coef1000, sens, sens_isq, sens_lp_coef,
                         threshold, sr_scaled, srcL, noiseL, bufA);
     mul_block<FXConfig::blockSize>(bufA, gain_adj, bufA);
-    clip_tanh78_block<FXConfig::blockSize>(0.1, bufA, bufA);
+    clip_tanh78_block<FXConfig::blockSize>(10, 0.1, bufA, bufA);
     onepole_lp_block<FXConfig::blockSize>(last[lastmin + 10], coef2000, bufA, bufB);
     sum2_block<FXConfig::blockSize>(srcL, bufB, dstL);
     noise_channel_block(last, lastmin + 11, coef50, coef500, coef1000, sens, sens_isq, sens_lp_coef,
                         threshold, sr_scaled, srcR, noiseR, bufB);
     mul_block<FXConfig::blockSize>(bufB, gain_adj, bufB);
-    clip_tanh78_block<FXConfig::blockSize>(0.1, bufB, bufB);
+    clip_tanh78_block<FXConfig::blockSize>(10, 0.1, bufB, bufB);
     onepole_lp_block<FXConfig::blockSize>(last[lastmin + 19], coef2000, bufB, bufA);
     sum2_block<FXConfig::blockSize>(srcR, bufA, dstR);
+}
+// 12 last slots
+template <typename FXConfig>
+inline void
+Bonsai<FXConfig>::age_block(float last[], int lastmin, const float coef0, const float coef100,
+                            const float coef700, const float coef1200, const float coef2000,
+                            const float coef3000, float dull, float *__restrict srcL,
+                            float *__restrict srcR, float *__restrict dstL, float *__restrict dstR)
+{
+    float bufA alignas(16)[FXConfig::blockSize] = {};
+    float bufB alignas(16)[FXConfig::blockSize] = {};
+    const float dull_sq = dull * dull;
+    const float dull_isq = invsq(dull);
+    const float gain = this->dbToLinear(rerange01(dull_isq, -36.f, 3.f));
+    const float coef_highcut =
+        freq_sr_to_alpha(rerange01(dull_isq, 20000.f, 2000.f), this->sampleRate());
+    const float coef_lowcut = rerange01(dull_sq, coef0, coef100);
+    const float cliplevel = rerange01(dull_isq, 0.25, 0.075);
+    high_shelf_nl_block<FXConfig::blockSize>(last[lastmin + 0], coef3000, -gain, 50.f, 0.02, srcL,
+                                             bufA);
+    high_shelf_nl_block<FXConfig::blockSize>(last[lastmin + 1], coef2000, gain, 20.f, 0.05, bufA,
+                                             bufB);
+    low_shelf_nl_block<FXConfig::blockSize>(last[lastmin + 2], coef700, -gain, 13.33333333333333333,
+                                            0.075, bufB, bufA);
+    low_shelf_nl_block<FXConfig::blockSize>(last[lastmin + 3], coef1200, gain, 25.f, 0.04, bufA,
+                                            bufB);
+    onepole_lp_block<FXConfig::blockSize>(last[lastmin + 4], coef_highcut, bufB, bufA);
+    onepole_hp_block<FXConfig::blockSize>(last[lastmin + 5], coef_lowcut, bufA, bufB);
+    clip_tanh78_block<FXConfig::blockSize>(cliplevel, bufB, dstL);
+    high_shelf_nl_block<FXConfig::blockSize>(last[lastmin + 6], coef3000, -gain, 50.f, 0.02, srcR,
+                                             bufA);
+    high_shelf_nl_block<FXConfig::blockSize>(last[lastmin + 7], coef2000, gain, 20.f, 0.05, bufA,
+                                             bufB);
+    low_shelf_nl_block<FXConfig::blockSize>(last[lastmin + 8], coef700, -gain, 13.33333333333333333,
+                                            0.075, bufB, bufA);
+    low_shelf_nl_block<FXConfig::blockSize>(last[lastmin + 9], coef1200, gain, 25.f, 0.04, bufA,
+                                            bufB);
+    onepole_lp_block<FXConfig::blockSize>(last[lastmin + 10], coef_highcut, bufB, bufA);
+    onepole_hp_block<FXConfig::blockSize>(last[lastmin + 11], coef_lowcut, bufA, bufB);
+    clip_tanh78_block<FXConfig::blockSize>(cliplevel, bufB, dstR);
 }
 
 template <typename FXConfig>
@@ -1011,6 +984,8 @@ inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__res
     float satR alignas(16)[FXConfig::blockSize] = {};
     float noiseL alignas(16)[FXConfig::blockSize] = {};
     float noiseR alignas(16)[FXConfig::blockSize] = {};
+    float agedL alignas(16)[FXConfig::blockSize] = {};
+    float agedR alignas(16)[FXConfig::blockSize] = {};
     float outL alignas(16)[FXConfig::blockSize] = {};
     float outR alignas(16)[FXConfig::blockSize] = {};
     mul_block<FXConfig::blockSize>(dataL, this->dbToLinear(this->floatValue(b_gain_in)), scaledL);
@@ -1034,374 +1009,14 @@ inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__res
     tape_noise_block(last, 36, coef50, coef500, coef1000, coef2000,
                      this->floatValue(b_noise_sensitivity),
                      this->dbToLinear(this->floatValue(b_noise_gain)), satL, satR, noiseL, noiseR);
-    onepole_hp_block<FXConfig::blockSize>(last[56], coef10, noiseL, outL);
-    onepole_hp_block<FXConfig::blockSize>(last[57], coef10, noiseR, outR);
+    age_block(last, 56, coef0, coef100, coef700, coef1200, coef2000, coef3000,
+              this->floatValue(b_dull), noiseL, noiseR, agedL, agedR);
+    onepole_hp_block<FXConfig::blockSize>(last[68], coef10, agedL, outL);
+    onepole_hp_block<FXConfig::blockSize>(last[69], coef10, agedR, outR);
     mul_block<FXConfig::blockSize>(outL, this->dbToLinear(this->floatValue(b_gain_out)), outL);
     mul_block<FXConfig::blockSize>(outR, this->dbToLinear(this->floatValue(b_gain_out)), outR);
     lerp_block<FXConfig::blockSize>(dataL, outL, this->floatValue(b_mix), dataL);
     lerp_block<FXConfig::blockSize>(dataR, outR, this->floatValue(b_mix), dataR);
-    // if (!haveProcessed)
-    // {
-    //     float v0 = this->floatValue(fl_voice_basepitch);
-    //     if (v0 > 0)
-    //         haveProcessed = true;
-    //     vzeropitch.startValue(v0);
-    // }
-    // // So here is a flanger with everything fixed
-
-    // float rate = this->envelopeRateLinear(-std::clamp(this->floatValue(fl_rate), -8.f, 10.f))
-    // *
-    //              this->temposyncRatio(fl_rate);
-
-    // for (int c = 0; c < 2; ++c)
-    // {
-    //     longphase[c] += rate;
-    //     if (longphase[c] >= COMBS_PER_CHANNEL)
-    //         longphase[c] -= COMBS_PER_CHANNEL;
-    // }
-
-    // const float oneoverFreq0 = 1.0f / MIDI_0_FREQ;
-
-    // int mode = this->intValue(fl_mode);
-    // int mwave = this->intValue(fl_wave);
-    // float depth_val = std::clamp(this->floatValue(fl_depth), 0.f, 2.f);
-
-    // float v0 = this->floatValue(fl_voice_basepitch);
-    // vzeropitch.newValue(v0);
-    // vzeropitch.process();
-    // v0 = vzeropitch.v;
-    // float averageDelayBase = 0.0;
-
-    // for (int c = 0; c < 2; ++c)
-    //     for (int i = 0; i < COMBS_PER_CHANNEL; ++i)
-    //     {
-    //         bool lforeset = false;
-
-    //         lfophase[c][i] += rate;
-
-    //         if (lfophase[c][i] > 1)
-    //         {
-    //             lforeset = true;
-    //             lfophase[c][i] -= 1;
-    //         }
-
-    //         float lfoout = lfoval[c][i].v;
-    //         float thisphase = lfophase[c][i];
-
-    //         if (mode == flm_arp_mix || mode == flm_arp_solo)
-    //         {
-    //             // arpeggio - everyone needs to use the same phase with the voice swap
-    //             thisphase = longphase[c] - (int)longphase[c];
-    //         }
-
-    //         switch (mwave)
-    //         {
-    //         case flw_sine:
-    //         {
-    //             float ps = thisphase * LFO_TABLE_SIZE;
-    //             int psi = (int)ps;
-    //             float psf = ps - psi;
-    //             int psn = (psi + 1) & LFO_TABLE_MASK;
-
-    //             lfoout = sin_lfo_table[psi] * (1.0 - psf) + psf * sin_lfo_table[psn];
-
-    //             lfoval[c][i].newValue(lfoout);
-
-    //             break;
-    //         }
-    //         case flw_tri:
-    //             lfoout = (2.f * fabs(2.f * thisphase - 1.f) - 1.f);
-    //             lfoval[c][i].newValue(lfoout);
-    //             break;
-    //         case flw_saw: // Gentler than a pure saw, more like a heavily skewed triangle
-    //         {
-    //             float cutAt = 0.98;
-    //             float usephase;
-
-    //             if (thisphase < cutAt)
-    //             {
-    //                 usephase = thisphase / cutAt;
-    //                 lfoout = usephase * 2.0f - 1.f;
-    //             }
-    //             else
-    //             {
-    //                 usephase = (thisphase - cutAt) / (1.0 - cutAt);
-    //                 lfoout = (1.0 - usephase) * 2.f - 1.f;
-    //             }
-
-    //             lfoval[c][i].newValue(lfoout);
-
-    //             break;
-    //         }
-    //         case flw_square:
-    //         {
-    //             auto cutOffset = 0.02f;
-    //             auto m = 2.f / cutOffset;
-    //             auto c2 = cutOffset / 2.f;
-
-    //             if (thisphase < 0.5f - c2)
-    //             {
-    //                 lfoout = 1.f;
-    //             }
-    //             else if ((thisphase >= 0.5 + c2) && (thisphase <= 1.f - cutOffset))
-    //             {
-    //                 lfoout = -1.f;
-    //             }
-    //             else if ((thisphase > 0.5 - c2) && (thisphase < 0.5 + c2))
-    //             {
-    //                 lfoout = -m * thisphase + (m / 2);
-    //             }
-    //             else
-    //             {
-    //                 lfoout = (m * thisphase) - (2 * m) + m + 1;
-    //             }
-
-    //             lfoval[c][i].newValue(lfoout);
-
-    //             break;
-    //         }
-    //         case flw_sng: // Sample & Hold random
-    //         case flw_snh: // Sample & Glide smoothed random
-    //         {
-    //             if (lforeset)
-    //             {
-    //                 lfosandhtarget[c][i] = this->storageRand01() - 1.f;
-    //             }
-
-    //             if (mwave == flw_sng)
-    //             {
-    //                 // FIXME exponential creep up. We want to get there in time related to
-    //                 our rate auto cv = lfoval[c][i].v; auto diff = (lfosandhtarget[c][i] -
-    //                 cv) * rate
-    //                 * 2; lfoval[c][i].newValue(cv + diff);
-    //             }
-    //             else
-    //             {
-    //                 lfoval[c][i].newValue(lfosandhtarget[c][i]);
-    //             }
-    //         }
-    //         break;
-    //         }
-
-    //         auto combspace = this->floatValue(fl_voice_spacing);
-    //         float pitch = v0 + combspace * i;
-    //         float nv = this->sampleRate() * oneoverFreq0 *
-    //         this->noteToPitchInv((float)(pitch));
-
-    //         // OK so biggest tap = delaybase[c][i].v * ( 1.0 + lfoval[c][i].v * depth.v ) +
-    //         1;
-    //         // Assume lfoval is [-1,1] and depth is known
-    //         float maxtap = nv * (1.0 + depth_val) + 1;
-    //         if (maxtap >= InterpDelay::DELAY_SIZE)
-    //         {
-    //             nv = nv * 0.999 * InterpDelay::DELAY_SIZE / maxtap;
-    //         }
-    //         delaybase[c][i].newValue(nv);
-
-    //         averageDelayBase += delaybase[c][i].new_v;
-    //     }
-    // averageDelayBase /= (2 * COMBS_PER_CHANNEL);
-    // vzeropitch.process();
-
-    // float dApprox = rate * this->sampleRate() / FXConfig::blockSize * averageDelayBase *
-    // depth_val;
-
-    // depth.newValue(depth_val);
-    // mix.newValue(this->floatValue(fl_mix));
-    // voices.newValue(std::clamp(this->floatValue(fl_voices), 1.f, 4.f));
-    // float feedbackScale = 0.4 * sqrt((std::clamp(dApprox, 2.f, 60.f) + 30) / 100.0);
-
-    // // Feedback adjust based on mode
-    // switch (mode)
-    // {
-    // case flm_classic:
-    // {
-    //     float dv = (voices.v - 1);
-    //     feedbackScale += (3.0 - dv) * 0.45 / 3.0;
-    //     break;
-    // }
-    // case flm_doppler:
-    // {
-    //     float dv = (voices.v - 1);
-    //     feedbackScale += (3.0 - dv) * 0.45 / 3.0;
-    //     break;
-    // }
-    // case flm_arp_solo:
-    // {
-    //     // this is one voice doppler basically
-    //     feedbackScale += 0.2;
-    // }
-    // case flm_arp_mix:
-    // {
-    //     // this is one voice classic basically and the steady signal clamps away feedback
-    //     more feedbackScale += 0.3;
-    // }
-    // default:
-    //     break;
-    // }
-
-    // float fbv = this->floatValue(fl_feedback);
-    // if (fbv > 0)
-    //     ringout_value = this->sampleRate() * 32.0;
-    // else
-    //     ringout_value = 1024;
-
-    // if (mwave == flw_saw || mwave == flw_snh)
-    // {
-    //     feedbackScale *= 0.7;
-    // }
-
-    // if (fbv < 0)
-    //     fbv = fbv;
-    // else if (fbv > 1)
-    //     fbv = fbv;
-    // else
-    //     fbv = sqrt(fbv);
-
-    // feedback.newValue(feedbackScale * fbv);
-    // fb_hf_damping.newValue(0.4 * this->floatValue(fl_damping));
-    // float combs alignas(16)[2][FXConfig::blockSize];
-
-    // // Obviously when we implement stereo spread this will be different
-    // for (int c = 0; c < 2; ++c)
-    // {
-    //     for (int i = 0; i < COMBS_PER_CHANNEL; ++i)
-    //         vweights[c][i] = 0;
-
-    //     if (mode == flm_arp_mix || mode == flm_arp_solo)
-    //     {
-    //         int ilp = (int)longphase[c];
-    //         float flp = longphase[c] - ilp;
-
-    //         if (ilp == COMBS_PER_CHANNEL)
-    //             ilp = 0;
-
-    //         if (flp > 0.9)
-    //         {
-    //             float dt = (flp - 0.9) * 10; // this will be between 0,1
-    //             float nxt = sqrt(dt);
-    //             float prr = sqrt(1.f - dt);
-    //             // std::cout << _D(longphase) << _D(dt) << _D(nxt) << _D(prr) << _D(ilp) <<
-    //             _D(flp)
-    //             // << std::endl;
-    //             vweights[c][ilp] = prr;
-    //             if (ilp == COMBS_PER_CHANNEL - 1)
-    //                 vweights[c][0] = nxt;
-    //             else
-    //                 vweights[c][ilp + 1] = nxt;
-    //         }
-    //         else
-    //         {
-    //             vweights[c][ilp] = 1.f;
-    //         }
-    //     }
-    //     else
-    //     {
-    //         float voices = std::clamp(this->floatValue(fl_voices), 1.f, COMBS_PER_CHANNEL
-    //         * 1.f); vweights[c][0] = 1.0;
-
-    //         for (int i = 0; i < voices && i < 4; ++i)
-    //             vweights[c][i] = 1.0;
-
-    //         int li = (int)voices;
-    //         float fi = voices - li;
-    //         if (li < 4)
-    //             vweights[c][li] = fi;
-    //     }
-    // }
-
-    // for (int b = 0; b < FXConfig::blockSize; ++b)
-    // {
-    //     for (int c = 0; c < 2; ++c)
-    //     {
-    //         combs[c][b] = 0;
-    //         for (int i = 0; i < COMBS_PER_CHANNEL; ++i)
-    //         {
-    //             if (vweights[c][i] > 0)
-    //             {
-    //                 auto tap = delaybase[c][i].v * (1.0 + lfoval[c][i].v * depth.v) + 1;
-    //                 auto v = idels[c].value(tap);
-    //                 combs[c][b] += vweights[c][i] * v;
-    //             }
-
-    //             lfoval[c][i].process();
-    //             delaybase[c][i].process();
-    //         }
-    //     }
-    //     // softclip the feedback to avoid explosive runaways
-    //     float fbl = 0.f;
-    //     float fbr = 0.f;
-    //     if (feedback.v > 0)
-    //     {
-    //         fbl = std::clamp(feedback.v * combs[0][b], -1.f, 1.f);
-    //         fbr = std::clamp(feedback.v * combs[1][b], -1.f, 1.f);
-
-    //         fbl = 1.5 * fbl - 0.5 * fbl * fbl * fbl;
-    //         fbr = 1.5 * fbr - 0.5 * fbr * fbr * fbr;
-
-    //         // and now we have clipped, apply the damping. FIXME - move to one mul form
-    //         float df = std::clamp(fb_hf_damping.v, 0.01f, 0.99f);
-    //         lpaL = lpaL * (1.0 - df) + fbl * df;
-    //         fbl = fbl - lpaL;
-
-    //         lpaR = lpaR * (1.0 - df) + fbr * df;
-    //         fbr = fbr - lpaR;
-    //     }
-
-    //     auto vl = dataL[b] - fbl;
-    //     auto vr = dataR[b] - fbr;
-    //     idels[0].push(vl);
-    //     idels[1].push(vr);
-
-    //     auto origw = 1.f;
-    //     if (mode == flm_doppler || mode == flm_arp_solo)
-    //     {
-    //         // doppler modes
-    //         origw = 0.f;
-    //     }
-
-    //     float outl = origw * dataL[b] + mix.v * combs[0][b];
-    //     float outr = origw * dataR[b] + mix.v * combs[1][b];
-
-    //     // Some gain heueirstics
-    //     float gainadj = 0.0;
-    //     switch (mode)
-    //     {
-    //     case flm_classic:
-    //         gainadj = -1 / sqrt(7 - voices.v);
-    //         break;
-    //     case flm_doppler:
-    //         gainadj = -1 / sqrt(8 - voices.v);
-    //         break;
-    //     case flm_arp_mix:
-    //         gainadj = -1 / sqrt(6);
-    //         break;
-    //     case flm_arp_solo:
-    //         gainadj = -1 / sqrt(7);
-    //         break;
-    //     }
-
-    //     gainadj -= 0.07 * mix.v;
-
-    //     outl = std::clamp((1.0f + gainadj) * outl, -1.f, 1.f);
-    //     outr = std::clamp((1.0f + gainadj) * outr, -1.f, 1.f);
-
-    //     outl = 1.5 * outl - 0.5 * outl * outl * outl;
-    //     outr = 1.5 * outr - 0.5 * outr * outr * outr;
-
-    //     dataL[b] = outl;
-    //     dataR[b] = outr;
-
-    //     depth.process();
-    //     mix.process();
-    //     feedback.process();
-    //     fb_hf_damping.process();
-    //     voices.process();
-    // }
-
-    // width.set_target_smoothed(this->dbToLinear(this->floatValue(fl_width)) / 3);
-
-    // this->applyWidth(dataL, dataR, width);
 }
 
 } // namespace sst::effects
