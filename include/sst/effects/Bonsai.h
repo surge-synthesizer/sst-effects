@@ -94,6 +94,14 @@ inline void sum3_block(float *__restrict one, float *__restrict two, float *__re
     }
 }
 template <size_t blockSize>
+inline void minus2_block(float *__restrict one, float two, float *__restrict dst)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = one[i] - two;
+    }
+}
+template <size_t blockSize>
 inline void minus2_block(float *__restrict one, float *__restrict two, float *__restrict dst)
 {
     for (auto i = 0U; i < blockSize; ++i)
@@ -150,6 +158,17 @@ inline void onepole_hp_block(float &last, const float coef, float *__restrict sr
     float lp alignas(16)[blockSize];
     onepole_lp_block<blockSize>(last, coef, src, lp);
     minus2_block<blockSize>(src, lp, dst);
+}
+
+template <size_t blockSize>
+inline void unit_delay_block(float &last, float *__restrict src, float *__restrict dst)
+{
+    dst[0] = last;
+    for (auto i = 1U; i < blockSize; ++i)
+    {
+        dst[i] = src[i - 1];
+    }
+    last = src[blockSize - 1];
 }
 
 template <typename T> inline int sgn(T val) { return (T(0) < val) - (val < T(0)); }
@@ -426,6 +445,14 @@ inline void clampbi_block(float minmax, float *__restrict src, float *__restrict
         // }
     }
 }
+template <size_t blockSize>
+inline void max_block(float *__restrict src, float value, float *__restrict dst)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = fmax(src[i], value);
+    }
+}
 
 template <size_t blockSize>
 inline void lerp_block(float *__restrict src1, float *__restrict src2, float mix,
@@ -443,6 +470,64 @@ inline void lerp_block(float *__restrict src1, float *__restrict src2, float *__
     for (auto i = 0U; i < blockSize; ++i)
     {
         dst[i] = (src2[i] - src1[i]) * mix[i] + src1[i];
+    }
+}
+
+template <size_t blockSize> inline void abs_block(float *__restrict src, float *__restrict dst)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = fabs(src[i]);
+    }
+}
+
+inline int32_t super_simple_noise(int32_t last) { return last * 1103515245 + 12345; }
+template <size_t blockSize> inline void noise_block(float &last, float *__restrict dst)
+{
+    int32_t temp alignas(16)[blockSize] = {};
+    temp[0] = super_simple_noise(last);
+    for (auto i = 1U; i < blockSize; ++i)
+    {
+        temp[i] = super_simple_noise(temp[i - 1]);
+    }
+    last = temp[blockSize - 1];
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = 4.656700025584826e-10 * (float)temp[i];
+    }
+}
+template <size_t blockSize> inline void noise_ds2_block(float &last, float *__restrict dst)
+{
+    int32_t temp alignas(16)[blockSize] = {};
+    temp[0] = super_simple_noise(last);
+    for (auto i = 1U; i < (blockSize >> 1); ++i)
+    {
+        const float noise = super_simple_noise(temp[2 * i - 2]);
+        temp[2 * i - 1] = noise;
+        temp[2 * i] = noise;
+    }
+    last = dst[blockSize - 1];
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = 4.656700025584826e-10 * (float)temp[i];
+    }
+}
+template <size_t blockSize> inline void noise_ds4_block(float &last, float *__restrict dst)
+{
+    int32_t temp alignas(16)[blockSize] = {};
+    temp[0] = super_simple_noise(last);
+    for (auto i = 1U; i < (blockSize >> 2); ++i)
+    {
+        const float noise = super_simple_noise(temp[4 * i - 4]);
+        temp[4 * i - 3] = noise;
+        temp[4 * i - 2] = noise;
+        temp[4 * i - 1] = noise;
+        temp[4 * i] = noise;
+    }
+    last = temp[blockSize - 1];
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        dst[i] = 4.656700025584826e-10 * (float)temp[i];
     }
 }
 
@@ -475,9 +560,8 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
         b_tape_sat,       // tape sat meta control
 
         // Noise
-        b_noise_mode,   // vinyl inspired or tape inspired
-        b_noise_amount, // noise meta control, not volume compensated
-        b_noise_gain,   // additional gain control of the noise
+        b_noise_sensitivity, // noise meta control, not volume compensated
+        b_noise_gain,        // additional gain control of the noise
 
         // Misc
         b_dull,     // dull meta control
@@ -504,6 +588,14 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
     void bass_boost_block(float last[], int lastmin, const float coef20, const float coef30,
                           const float coef50, const float coef200, const float coef500, float boost,
                           float dist, float *__restrict src, float *__restrict dst);
+    void noise_channel_block(float last[], int lastmin, const float coef50, const float coef500,
+                             const float coef1000, float sens, float sens_isq, float sens_lp_coef,
+                             float threshold, float sr_scaled, float *__restrict src,
+                             float *__restrict noise, float *__restrict dst);
+    void tape_noise_block(float last[], int lastmin, const float coef50, const float coef500,
+                          const float coef1000, const float coef2000, float sens, float gain,
+                          float *__restrict srcL, float *__restrict srcR, float *__restrict dstL,
+                          float *__restrict dstR);
 
     void suspendProcessing() { initialize(); }
     int getRingoutDecay() const { return ringout_value; }
@@ -530,12 +622,10 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
                 .withName("Tape Dist Mode")
                 .withRange(bdm_inv_sinh, bdm_sine)
                 .withDefault(bdm_tanh);
-        case b_noise_amount:
+        case b_noise_sensitivity:
             return result.withName("Sensitivity").withRange(0.f, 1.f).withDefault(0.25f);
         case b_noise_gain:
             return result.withName("Gain").asDecibelNarrow().withDefault(0.f);
-        case b_noise_mode:
-            return result.withType(pmd::INT).withName("Mode").withRange(0, 1).withDefault(0);
         case b_dull:
             return result.withName("Dull").withRange(0.f, 1.f).withDefault(0.f);
         case b_gain_in:
@@ -642,7 +732,7 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
     // sdsp::lipol_sse<FXConfig::blockSize, false> width;
     // bool haveProcessed{false};
 
-    float last[35] = {};
+    float last[58] = {};
     float sr = Bonsai<FXConfig>::sampleRate();
     const float coef_hb_hp = freq_sr_to_alpha(4690, sr);
     const float coef_hb_lp = freq_sr_to_alpha(1280, sr);
@@ -656,6 +746,8 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
     const float coef50 = freq_sr_to_alpha(50, sr);
     const float coef200 = freq_sr_to_alpha(200, sr);
     const float coef500 = freq_sr_to_alpha(500, sr);
+    const float coef1000 = freq_sr_to_alpha(1000, sr);
+    const float coef2000 = freq_sr_to_alpha(2000, sr);
 
     // const static int LFO_TABLE_SIZE = 8192;
     // const static int LFO_TABLE_MASK = LFO_TABLE_SIZE - 1;
@@ -666,6 +758,8 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
 
 template <typename FXConfig> inline void Bonsai<FXConfig>::initialize()
 {
+    last[36] = 1; // noise mid seed
+    last[37] = 2; // noise side seed
     // for (int c = 0; c < 2; ++c)
     //     for (int i = 0; i < COMBS_PER_CHANNEL; ++i)
     //     {
@@ -740,6 +834,7 @@ inline void high_shelf_block(float &last, float coef, float gainfactor, float *_
     mul_block_inplace<blockSize>(highpass, gainfactor);
     sum2_block<blockSize>(highpass, src, dst);
 }
+// 6 last slots
 template <typename FXConfig>
 inline void Bonsai<FXConfig>::tape_sat_block(float last[], int lastmin, const float coef_hb_hp,
                                              const float coef_hb_lp, const float coef_lb_hp,
@@ -762,27 +857,21 @@ inline void Bonsai<FXConfig>::tape_sat_block(float last[], int lastmin, const fl
     tilt_highboost_block<FXConfig::blockSize>(last[lastmin + 0], last[lastmin + 1], coef_hb_hp,
                                               coef_hb_lp, src, bufA);
     mul_block<FXConfig::blockSize>(bufA, this->dbToLinear(rerange01(sat, 0.f, 9.f)), bufA);
-    std::cout << mode << (b_dist_modes)mode << std::endl;
     switch ((b_dist_modes)mode)
     {
     case bdm_inv_sinh:
-        // std::cout << "bdm_inv_sinh" << std::endl;
         clip_inv_sinh_block<FXConfig::blockSize>(1 / level, level, bufA, bufA);
         break;
     case bdm_tanh:
-        // std::cout << "bdm_tanh" << std::endl;
         clip_tanh78_block<FXConfig::blockSize>(1 / level, level, bufA, bufA);
         break;
     case bdm_tanh_approx_foldback:
-        // std::cout << "bdm_tanh_approx_foldback" << std::endl;
         clip_tanh_foldback_block<FXConfig::blockSize>(1 / level, level, bufA, bufA);
         break;
     case bdm_sine:
-        // std::cout << "bdm_sine" << std::endl;
         clip_sine_tanh_block<FXConfig::blockSize>(1 / level, level, bufA, bufA);
         break;
     default:
-        // std::cout << "default" << std::endl;
         clip_tanh78_block<FXConfig::blockSize>(1 / level, level, bufA, bufA);
         break;
     }
@@ -793,6 +882,7 @@ inline void Bonsai<FXConfig>::tape_sat_block(float last[], int lastmin, const fl
     high_shelf_block<FXConfig::blockSize>(last[lastmin + 4], coef_dist_hs1, -sat_invsq, bufB, bufA);
     high_shelf_block<FXConfig::blockSize>(last[lastmin + 5], coef_dist_hs2, -sat_invsq, bufA, dst);
 }
+// 11 last slots
 template <typename FXConfig>
 inline void Bonsai<FXConfig>::bass_boost_block(float last[], int lastmin, const float coef20,
                                                const float coef30, const float coef50,
@@ -838,6 +928,73 @@ inline void Bonsai<FXConfig>::bass_boost_block(float last[], int lastmin, const 
     // mul_block<FXConfig::blockSize>(bufA, rerange01(dist01, 1.25, 0.75), bufA);
     onepole_lp_block<FXConfig::blockSize>(last[lastmin + 10], coef500, bufA, dst);
 }
+// 7 last slots
+template <typename FXConfig>
+inline void Bonsai<FXConfig>::noise_channel_block(float last[], int lastmin, const float coef50,
+                                                  const float coef500, const float coef1000,
+                                                  float sens, float sens_isq, float sens_lp_coef,
+                                                  float threshold, float sr_scaled,
+                                                  float *__restrict src, float *__restrict noise,
+                                                  float *__restrict dst)
+{
+    float bufA alignas(16)[FXConfig::blockSize] = {};
+    float bufB alignas(16)[FXConfig::blockSize] = {};
+    float bufC alignas(16)[FXConfig::blockSize] = {};
+    float noise_filt alignas(16)[FXConfig::blockSize] = {};
+    clampbi_block<FXConfig::blockSize>(1.f, noise, bufA);
+    onepole_lp_block<FXConfig::blockSize>(last[lastmin + 0], coef1000, bufA, noise_filt);
+    onepole_lp_block<FXConfig::blockSize>(last[lastmin + 1], coef50, bufA, bufB);
+    onepole_lp_block<FXConfig::blockSize>(last[lastmin + 2], coef50, bufB, bufC);
+    onepole_lp_block<FXConfig::blockSize>(last[lastmin + 3], coef50, src, bufA);
+    sum3_block<FXConfig::blockSize>(src, bufA, bufC, bufB);
+    onepole_lp_block<FXConfig::blockSize>(last[lastmin + 4], coef1000, bufB, bufA);
+    unit_delay_block<FXConfig::blockSize>(last[lastmin + 5], bufA, bufC);
+    minus2_block<FXConfig::blockSize>(bufA, bufC, bufB);
+    mul_block<FXConfig::blockSize>(bufB, sr_scaled, bufC);
+    abs_block<FXConfig::blockSize>(bufC, bufB);
+    minus2_block<FXConfig::blockSize>(bufB, threshold, bufB);
+    max_block<FXConfig::blockSize>(bufB, 0.f, bufB);
+    mul_block<FXConfig::blockSize>(bufB, bufB, bufB);
+    mul_block<FXConfig::blockSize>(bufB, rerange01(sens, 100.f, 50.f), bufB);
+    onepole_lp_block<FXConfig::blockSize>(last[lastmin + 6], sens_lp_coef, bufB, bufA);
+    mul_block<FXConfig::blockSize>(bufA, noise_filt, bufB);
+    onepole_hp_block<FXConfig::blockSize>(last[lastmin + 7], coef500, bufB, dst);
+}
+// 20 last slots, set first two to set noise seeds
+template <typename FXConfig>
+inline void Bonsai<FXConfig>::tape_noise_block(float last[], int lastmin, const float coef50,
+                                               const float coef500, const float coef1000,
+                                               const float coef2000, float sens, float gain,
+                                               float *__restrict srcL, float *__restrict srcR,
+                                               float *__restrict dstL, float *__restrict dstR)
+{
+    float bufA alignas(16)[FXConfig::blockSize] = {};
+    float bufB alignas(16)[FXConfig::blockSize] = {};
+    float noiseL alignas(16)[FXConfig::blockSize] = {};
+    float noiseR alignas(16)[FXConfig::blockSize] = {};
+    noise_block<FXConfig::blockSize>(last[lastmin + 0], bufA);
+    noise_block<FXConfig::blockSize>(last[lastmin + 1], bufB);
+    mul_block<FXConfig::blockSize>(bufB, 0.5, bufB);
+    sum2_block<FXConfig::blockSize>(bufA, bufB, noiseL);
+    minus2_block<FXConfig::blockSize>(bufA, bufB, noiseR);
+    const float gain_adj = gain * 0.25;
+    const float sens_isq = invsq(sens);
+    const float sens_lp_coef = rerange01(sens_isq, coef500, coef50);
+    const float threshold = rerange01(sens_isq, 0.125, 0.f);
+    const float sr_scaled = 0.001 * this->sampleRate();
+    noise_channel_block(last, lastmin + 2, coef50, coef500, coef1000, sens, sens_isq, sens_lp_coef,
+                        threshold, sr_scaled, srcL, noiseL, bufA);
+    mul_block<FXConfig::blockSize>(bufA, gain_adj, bufA);
+    clip_tanh78_block<FXConfig::blockSize>(0.1, bufA, bufA);
+    onepole_lp_block<FXConfig::blockSize>(last[lastmin + 10], coef2000, bufA, bufB);
+    sum2_block<FXConfig::blockSize>(srcL, bufB, dstL);
+    noise_channel_block(last, lastmin + 11, coef50, coef500, coef1000, sens, sens_isq, sens_lp_coef,
+                        threshold, sr_scaled, srcR, noiseR, bufB);
+    mul_block<FXConfig::blockSize>(bufB, gain_adj, bufB);
+    clip_tanh78_block<FXConfig::blockSize>(0.1, bufB, bufB);
+    onepole_lp_block<FXConfig::blockSize>(last[lastmin + 19], coef2000, bufB, bufA);
+    sum2_block<FXConfig::blockSize>(srcR, bufA, dstR);
+}
 
 template <typename FXConfig>
 inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__restrict dataR)
@@ -850,6 +1007,10 @@ inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__res
     float bassR alignas(16)[FXConfig::blockSize] = {};
     float bassboostedL alignas(16)[FXConfig::blockSize] = {};
     float bassboostedR alignas(16)[FXConfig::blockSize] = {};
+    float satL alignas(16)[FXConfig::blockSize] = {};
+    float satR alignas(16)[FXConfig::blockSize] = {};
+    float noiseL alignas(16)[FXConfig::blockSize] = {};
+    float noiseR alignas(16)[FXConfig::blockSize] = {};
     float outL alignas(16)[FXConfig::blockSize] = {};
     float outR alignas(16)[FXConfig::blockSize] = {};
     mul_block<FXConfig::blockSize>(dataL, this->dbToLinear(this->floatValue(b_gain_in)), scaledL);
@@ -866,19 +1027,19 @@ inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__res
     sum2_block<FXConfig::blockSize>(hpR, bassR, bassboostedR);
     tape_sat_block(last, 24, coef_hb_hp, coef_hb_lp, coef_lb_hp, coef_lb_lp, coef_dist_hs1,
                    coef_dist_hs2, std::clamp(this->floatValue(b_tape_sat), 0.f, 1.f),
-                   this->intValue(b_tape_dist_mode), bassboostedL, outL);
+                   this->intValue(b_tape_dist_mode), bassboostedL, satL);
     tape_sat_block(last, 30, coef_hb_hp, coef_hb_lp, coef_lb_hp, coef_lb_lp, coef_dist_hs1,
                    coef_dist_hs2, std::clamp(this->floatValue(b_tape_sat), 0.f, 1.f),
-                   this->intValue(b_tape_dist_mode), bassboostedR, outR);
+                   this->intValue(b_tape_dist_mode), bassboostedR, satR);
+    tape_noise_block(last, 36, coef50, coef500, coef1000, coef2000,
+                     this->floatValue(b_noise_sensitivity),
+                     this->dbToLinear(this->floatValue(b_noise_gain)), satL, satR, noiseL, noiseR);
+    onepole_hp_block<FXConfig::blockSize>(last[56], coef10, noiseL, outL);
+    onepole_hp_block<FXConfig::blockSize>(last[57], coef10, noiseR, outR);
     mul_block<FXConfig::blockSize>(outL, this->dbToLinear(this->floatValue(b_gain_out)), outL);
     mul_block<FXConfig::blockSize>(outR, this->dbToLinear(this->floatValue(b_gain_out)), outR);
     lerp_block<FXConfig::blockSize>(dataL, outL, this->floatValue(b_mix), dataL);
     lerp_block<FXConfig::blockSize>(dataR, outR, this->floatValue(b_mix), dataR);
-    // for (int i = 0; i < FXConfig::blockSize; ++i)
-    // {
-    //     dataL[i] = outL[i];
-    //     dataR[i] = outR[i];
-    // }
     // if (!haveProcessed)
     // {
     //     float v0 = this->floatValue(fl_voice_basepitch);
