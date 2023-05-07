@@ -725,8 +725,8 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
 
 template <typename FXConfig> inline void Bonsai<FXConfig>::initialize()
 {
-    last[43] = 1; // noise mid seed
-    last[44] = 2; // noise side seed
+    last[47] = 1; // noise mid seed
+    last[48] = 2; // noise side seed
 }
 
 template <size_t blockSize>
