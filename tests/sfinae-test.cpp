@@ -23,11 +23,9 @@
 #include "catch2.hpp"
 #include "simd-test-include.h"
 
-#include "sst/effects/Delay.h"
-#include "sst/effects/Flanger.h"
-#include "sst/effects/Reverb1.h"
+#include "sst/effects/EffectCore.h"
 
-struct TestConfig
+struct NoExtraConfig
 {
     struct BC
     {
@@ -53,7 +51,7 @@ struct TestConfig
 
     static inline float floatValueAt(const BaseClass *const e, const ValueStorage *const v, int idx)
     {
-        return 0;
+        return 17.2;
     }
     static inline int intValueAt(const BaseClass *const e, const ValueStorage *const v, int idx)
     {
@@ -62,11 +60,11 @@ struct TestConfig
 
     static inline float envelopeRateLinear(GlobalStorage *s, float f) { return 0; }
 
-    static inline float temposyncRatio(GlobalStorage *s, EffectStorage *e, int idx) { return 1; }
+    static inline float temposyncRatio(GlobalStorage *s, EffectStorage *e, int idx) { return 1.5; }
 
     static inline bool isDeactivated(EffectStorage *e, int idx) { return false; }
 
-    static inline bool isExtended(EffectStorage *s, int idx) { return false; }
+    static bool isExtended(EffectStorage *e, int idx) { return false; }
 
     static inline float rand01(GlobalStorage *s) { return (float)rand() / (float)RAND_MAX; }
 
@@ -86,29 +84,41 @@ struct TestConfig
     static inline float dbToLinear(GlobalStorage *s, float f) { return 1; }
 };
 
-template <typename T> struct Tester
+struct ExtraConfig : NoExtraConfig
 {
-    static_assert(std::is_same<decltype(T::effectName), const char *const>::value);
-    static_assert(std::is_integral<decltype(T::numParams)>::value);
-    static_assert(std::is_same<decltype(&T::initialize), void (T::*)()>::value);
-    static_assert(std::is_same<decltype(&T::processBlock),
-                               void (T::*)(float *__restrict, float *__restrict)>::value);
-    static_assert(std::is_same<decltype(&T::suspendProcessing), void (T::*)()>::value);
-    static_assert(std::is_same<decltype(&T::getRingoutDecay), int (T::*)() const>::value);
-    static_assert(std::is_same<decltype(&T::paramAt),
-                               sst::basic_blocks::params::ParamMetaData (T::*)(int) const>::value);
-
-    static void TestFX()
+    static inline float floatValueExtendedAt(const BaseClass *const e, const ValueStorage *const v,
+                                             int idx)
     {
-        INFO("Starting test with instantiation : " << T::effectName);
-        auto fx = std::make_unique<T>(nullptr, nullptr, nullptr);
-        REQUIRE(fx);
-    };
+        return 37.4f;
+    }
+
+    static inline bool temposyncInitialized(GlobalStorage *) { return false; }
+    static float temposyncRatioInv(GlobalStorage *s, EffectStorage *e, int idx) { return 0.5f; }
+    static int deformType(EffectStorage *s, int idx) { return 7; }
 };
 
-TEST_CASE("Can Create Types")
+TEST_CASE("SFINAE gives us extras")
 {
-    SECTION("Flanger") { Tester<sst::effects::Flanger<TestConfig>>::TestFX(); }
-    SECTION("Reverb1") { Tester<sst::effects::Reverb1<TestConfig>>::TestFX(); }
-    SECTION("Delay") { Tester<sst::effects::Delay<TestConfig>>::TestFX(); }
+    SECTION("On Missing")
+    {
+        auto ec = std::make_unique<sst::effects::EffectTemplateBase<NoExtraConfig>>(
+            nullptr, nullptr, nullptr);
+        REQUIRE(ec->floatValue(0) == 17.2f);
+        REQUIRE(ec->floatValueExtended(0) == 17.2f);
+        REQUIRE(ec->temposyncInitialized() == true);
+        REQUIRE(ec->temposyncRatio(0) == 1.5f);
+        REQUIRE(ec->temposyncRatioInv(0) == 1.f / 1.5f);
+        REQUIRE(ec->deformType(0) == 0);
+    }
+
+    SECTION("On Not Missing")
+    {
+        auto ec = std::make_unique<sst::effects::EffectTemplateBase<ExtraConfig>>(nullptr, nullptr,
+                                                                                  nullptr);
+        REQUIRE(ec->floatValue(0) == 17.2f);
+        REQUIRE(ec->floatValueExtended(0) == 37.4f);
+        REQUIRE(ec->temposyncInitialized() == false);
+        REQUIRE(ec->temposyncRatioInv(0) == 0.5f);
+        REQUIRE(ec->deformType(0) == 7);
+    }
 }
