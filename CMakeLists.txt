@@ -43,6 +43,7 @@ if (${SST_EFFECTS_BUILD_TESTS})
             tests/sst-effects-test.cpp
             tests/create-effect.cpp
             tests/concrete-runs.cpp
+            tests/sfinae-test.cpp
             )
     target_link_libraries(${PROJECT_NAME}-test PUBLIC simde sst-basic-blocks sst-filters fmt ${PROJECT_NAME})
     target_compile_definitions(${PROJECT_NAME}-test PUBLIC _USE_MATH_DEFINES=1)

@@ -77,6 +77,9 @@
 #include "sst/basic-blocks/dsp/MidSide.h"
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
 #include "sst/filters/BiquadFilter.h"
+
+#include "EffectCoreDetails.h"
+
 #include <type_traits>
 
 namespace sst::effects
@@ -99,16 +102,16 @@ template <typename FXConfig> struct EffectTemplateBase : public FXConfig::BaseCl
                                int(const typename FXConfig::BaseClass *const,
                                    const typename FXConfig::ValueStorage *const, int)>::value);
     static_assert(std::is_same<decltype(FXConfig::envelopeRateLinear),
-                               float(typename FXConfig::GlobalStorage *,
-                                     float)>::value);
+                               float(typename FXConfig::GlobalStorage *, float)>::value);
     static_assert(std::is_same<decltype(FXConfig::temposyncRatio),
                                float(typename FXConfig::GlobalStorage *,
                                      typename FXConfig::EffectStorage *, int)>::value);
     static_assert(std::is_same<decltype(FXConfig::isDeactivated),
-                               bool(typename FXConfig::EffectStorage *,
-                                     int)>::value);
-    static_assert(std::is_same<decltype(FXConfig::rand01),
-                               float(typename FXConfig::GlobalStorage *)>::value);
+                               bool(typename FXConfig::EffectStorage *, int)>::value);
+    static_assert(std::is_same<decltype(FXConfig::isExtended),
+                               bool(typename FXConfig::EffectStorage *, int)>::value);
+    static_assert(
+        std::is_same<decltype(FXConfig::rand01), float(typename FXConfig::GlobalStorage *)>::value);
     static_assert(std::is_same<decltype(FXConfig::sampleRate),
                                double(typename FXConfig::GlobalStorage *)>::value);
     static_assert(std::is_same<decltype(FXConfig::noteToPitch),
@@ -119,7 +122,6 @@ template <typename FXConfig> struct EffectTemplateBase : public FXConfig::BaseCl
                                float(typename FXConfig::GlobalStorage *, float)>::value);
     static_assert(std::is_same<decltype(FXConfig::dbToLinear),
                                float(typename FXConfig::GlobalStorage *, float)>::value);
-
 
     typename FXConfig::GlobalStorage *globalStorage{nullptr};
     typename FXConfig::EffectStorage *fxStorage{nullptr};
@@ -154,6 +156,18 @@ template <typename FXConfig> struct EffectTemplateBase : public FXConfig::BaseCl
         return FXConfig::floatValueAt(asBase(), valueStorage, idx);
     }
 
+    inline float floatValueExtended(int idx) const
+    {
+        if constexpr (details::Has_floatValueExtendedAt<FXConfig>::value)
+        {
+            return FXConfig::floatValueExtendedAt(asBase(), valueStorage, idx);
+        }
+        else
+        {
+            return FXConfig::floatValueAt(asBase(), valueStorage, idx);
+        }
+    }
+
     inline float intValue(int idx) const
     {
         return FXConfig::intValueAt(asBase(), valueStorage, idx);
@@ -164,7 +178,39 @@ template <typename FXConfig> struct EffectTemplateBase : public FXConfig::BaseCl
         return FXConfig::temposyncRatio(globalStorage, fxStorage, idx);
     }
 
+    inline float temposyncRatioInv(int idx) const
+    {
+        if constexpr (details::Has_temposyncRatioInv<FXConfig>::value)
+        {
+            return FXConfig::temposyncRatioInv(globalStorage, fxStorage, idx);
+        }
+        else
+        {
+            return 1.f / temposyncRatio(idx);
+        }
+    }
+
+    inline bool temposyncInitialized() const
+    {
+        if constexpr (details::Has_temposyncInitialized<FXConfig>::value)
+            return FXConfig::temposyncInitialized(globalStorage);
+        else
+            return true; // assume folks who support it will have it
+    }
+
     inline bool isDeactivated(int idx) const { return FXConfig::isDeactivated(fxStorage, idx); }
+    inline bool isExtended(int idx) const { return FXConfig::isExtended(fxStorage, idx); }
+    inline int deformType(int idx) const
+    {
+        if constexpr (details::Has_deformType<FXConfig>::value)
+        {
+            return FXConfig::deformType(fxStorage, idx);
+        }
+        else
+        {
+            return 0;
+        }
+    }
 
     inline float envelopeRateLinear(float f) const
     {
