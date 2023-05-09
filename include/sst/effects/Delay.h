@@ -166,9 +166,8 @@ template <typename FXConfig> struct Delay : EffectTemplateBase<FXConfig>
     // TODO - we've wanted a sample rate adjustable max for a while.
     // Still don't have it here.
     static constexpr int max_delay_length{1 << 18};
-    typename EffectTemplateBase<FXConfig>::lipol_ps_blocksz feedback alignas(16),
-        crossfeed alignas(16), aligpan alignas(16), pan alignas(16), mix alignas(16),
-        width alignas(16);
+    typename EffectTemplateBase<FXConfig>::lipol_ps_blocksz feedback, crossfeed, aligpan, pan, mix,
+        width;
     float buffer alignas(
         16)[2][max_delay_length + sst::basic_blocks::tables::SurgeSincTableProvider::FIRipol_N];
 
