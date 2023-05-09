@@ -127,7 +127,7 @@ template <typename FXConfig> struct Reverb1 : EffectTemplateBase<FXConfig>
     float out_tap alignas(16)[rev_taps];
     float predelay alignas(16)[max_rev_dly];
     int delay_time alignas(16)[rev_taps];
-    typename EffectTemplateBase<FXConfig>::lipol_ps_blocksz mix alignas(16), width alignas(16);
+    typename EffectTemplateBase<FXConfig>::lipol_ps_blocksz mix, width;
 
     void update_rtime();
     void update_rsize() { loadpreset(shape); }
