@@ -81,10 +81,8 @@ template <typename FXConfig> struct Reverb1 : EffectTemplateBase<FXConfig>
                 .withType(pmd::INT)
                 .withRange(0, 3)
                 .withDefault(0)
-                .withUnorderedMapFormatting({{0, "Type 1"},
-                                             {1, "Type 2"},
-                                             {2, "Type 3"},
-                                             {3, "Type 4"}});
+                .withUnorderedMapFormatting(
+                    {{0, "Type 1"}, {1, "Type 2"}, {2, "Type 3"}, {3, "Type 4"}});
         case rev1_roomsize:
             return result.withName("Size").asPercent().withDefault(0.5);
         case rev1_decaytime:
@@ -95,13 +93,17 @@ template <typename FXConfig> struct Reverb1 : EffectTemplateBase<FXConfig>
         case rev1_damping:
             return result.withName("HF Damping").asPercent().withDefault(0.2f);
         case rev1_lowcut:
-            return result.withName("Low Cut").asAudibleFrequency().withDefault(-24.f);
+            return result.withName("Low Cut").asAudibleFrequency().deactivatable().withDefault(
+                -24.f);
         case rev1_freq1:
             return result.withName("Peak Freq").asAudibleFrequency().withDefault(0.f);
         case rev1_gain1:
             return result.withName("Peak Gain").asDecibel().withDefault(0.f);
         case rev1_highcut:
-            return result.withName("High Cut").asAudibleFrequency().withDefault(72.f);
+            return result.withName("High Cut")
+                .asAudibleFrequency()
+                .deactivatable()
+                .withDefault(72.f);
         case rev1_mix:
             return result.withName("Mix").asPercent().withDefault(0.5f);
         case rev1_width:
@@ -125,7 +127,7 @@ template <typename FXConfig> struct Reverb1 : EffectTemplateBase<FXConfig>
     float out_tap alignas(16)[rev_taps];
     float predelay alignas(16)[max_rev_dly];
     int delay_time alignas(16)[rev_taps];
-    typename EffectTemplateBase<FXConfig>::lipol_ps_blocksz mix alignas(16), width alignas(16);
+    typename EffectTemplateBase<FXConfig>::lipol_ps_blocksz mix, width;
 
     void update_rtime();
     void update_rsize() { loadpreset(shape); }

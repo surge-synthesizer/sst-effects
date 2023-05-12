@@ -24,6 +24,8 @@
 #include "simd-test-include.h"
 
 #include "sst/effects/ConcreteConfig.h"
+
+#include "sst/effects/Delay.h"
 #include "sst/effects/Flanger.h"
 #include "sst/effects/Reverb1.h"
 
@@ -89,4 +91,5 @@ TEST_CASE("Can Run Types with Concrete Config")
 {
     SECTION("Flanger") { Tester<sfx::Flanger<sfx::ConcreteConfig>>::TestFX(); }
     SECTION("Reverb1") { Tester<sfx::Reverb1<sfx::ConcreteConfig>>::TestFX(); }
+    SECTION("Delay") { Tester<sfx::Delay<sfx::ConcreteConfig>>::TestFX(); }
 }

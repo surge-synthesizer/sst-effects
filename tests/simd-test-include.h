@@ -21,7 +21,6 @@
 #ifndef SST_EFFECTS_TESTS_SIMD_TEST_INCLUDE_H
 #define SST_EFFECTS_TESTS_SIMD_TEST_INCLUDE_H
 
-
 #if defined(__arm64__)
 #define SIMDE_ENABLE_NATIVE_ALIASES
 #include "simde/x86/sse2.h"
