@@ -597,6 +597,7 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
                         // maybe right click options need to be elsewhere
 
         // Tape(ish) Saturation
+        b_tape_bias_mode, // tape sat bias filter
         b_tape_dist_mode, // what distortion should be used in the saturation
         b_tape_sat,       // tape sat meta control
 
@@ -623,10 +624,9 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
 
     void initialize();
     void processBlock(float *__restrict L, float *__restrict R);
-    void tape_sat(float last[], int lastmin, const float coef4690, const float coef1280,
-                  const float coef160, const float coef99, const float coef3000,
-                  const float coef8000, float sat, int mode, float *__restrict srcL,
-                  float *__restrict srcR, float *__restrict dstL, float *__restrict dstR);
+    void tape_sat(float last[], int lastmin, const float coef3000, const float coef8000, float sat,
+                  int mode, float *__restrict srcL, float *__restrict srcR, float *__restrict dstL,
+                  float *__restrict dstR);
     void bass_boost(float last[], int lastmin, const float coef20, const float coef30,
                     const float coef50, const float coef200, const float coef500, float boost,
                     float dist, float *__restrict srcL, float *__restrict srcR,
@@ -644,6 +644,12 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
              const float coef1200, const float coef2000, const float coef3000, float dull,
              float *__restrict srcL, float *__restrict srcR, float *__restrict dstL,
              float *__restrict dstR);
+    void tilt1_pre(float &last1, float &last2, float *__restrict src, float *__restrict dst);
+    void tilt1_post(float &last1, float &last2, float *__restrict src, float *__restrict dst);
+    void tilt4_pre(float &last1, float &last2, float &last3, float &last4, float *__restrict src,
+                   float *__restrict dst);
+    void tilt4_post(float &last1, float &last2, float &last3, float &last4, float *__restrict src,
+                    float *__restrict dst);
 
     void suspendProcessing() { initialize(); }
     int getRingoutDecay() const { return ringout_value; }
@@ -660,11 +666,17 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
             return result.withName("Amount").withRange(0.f, 1.f).withDefault(0.25f);
         case b_bass_distort:
             return result.withName("Distort").withRange(0.f, 3.f).withDefault(1.f);
+        case b_tape_bias_mode:
+            return result.withType(pmd::INT)
+                .withName("Bias Filter")
+                .withRange(0, 1)
+                .withDefault(0)
+                .withUnorderedMapFormatting({{0, "Tilt - Type 1"}, {1, "Pull Mids - Type 4"}});
         case b_tape_sat:
-            return result.withName("Tape Sat").withRange(0.f, 1.f).withDefault(0.25f);
+            return result.withName("Saturation").withRange(0.f, 1.f).withDefault(0.25f);
         case b_tape_dist_mode:
             return result.withType(pmd::INT)
-                .withName("Tape Dist Mode")
+                .withName("Dist Mode")
                 .withRange(bdm_inv_sinh, bdm_sine)
                 .withDefault(bdm_tanh)
                 .withUnorderedMapFormatting({{bdm_inv_sinh, "Inverse Sinh"},
@@ -698,54 +710,30 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
     const float coef20 = freq_sr2pi_to_alpha(20, sr_div2pi);
     const float coef30 = freq_sr2pi_to_alpha(20, sr_div2pi);
     const float coef50 = freq_sr2pi_to_alpha(50, sr_div2pi);
+    const float coef70 = freq_sr2pi_to_alpha(70, sr_div2pi);
     const float coef99 = freq_sr2pi_to_alpha(99, sr_div2pi);
     const float coef100 = freq_sr2pi_to_alpha(100, sr_div2pi);
     const float coef160 = freq_sr2pi_to_alpha(160, sr_div2pi);
     const float coef200 = freq_sr2pi_to_alpha(200, sr_div2pi);
     const float coef500 = freq_sr2pi_to_alpha(500, sr_div2pi);
     const float coef700 = freq_sr2pi_to_alpha(700, sr_div2pi);
+    const float coef900 = freq_sr2pi_to_alpha(900, sr_div2pi);
     const float coef1000 = freq_sr2pi_to_alpha(1000, sr_div2pi);
     const float coef1200 = freq_sr2pi_to_alpha(1200, sr_div2pi);
     const float coef1280 = freq_sr2pi_to_alpha(1280, sr_div2pi);
+    const float coef1300 = freq_sr2pi_to_alpha(1300, sr_div2pi);
     const float coef2000 = freq_sr2pi_to_alpha(2000, sr_div2pi);
     const float coef3000 = freq_sr2pi_to_alpha(3000, sr_div2pi);
     const float coef4690 = freq_sr2pi_to_alpha(4690, sr_div2pi);
+    const float coef6000 = freq_sr2pi_to_alpha(6000, sr_div2pi);
     const float coef8000 = freq_sr2pi_to_alpha(8000, sr_div2pi);
+    const float coef11000 = freq_sr2pi_to_alpha(11000, sr_div2pi);
 };
 
 template <typename FXConfig> inline void Bonsai<FXConfig>::initialize()
 {
     last[58] = 1; // noise mid seed
     last[59] = 2; // noise side seed
-}
-
-template <size_t blockSize>
-inline void tilt1_pre(float &last1, float &last2, float coef1, float coef2, float *__restrict src,
-                      float *__restrict dst)
-{
-    float tilt1_hp4690 alignas(16)[blockSize] = {};
-    float tilt1_lp1280 alignas(16)[blockSize] = {};
-    const float amp_db13_5 = 4.7315127124153629629634297;   // 1.122018456459045 ^ 13.5
-    const float amp_mdbm1_7 = -0.8222426472597752553172857; // -(1.122018456459045 ^ -1.7)
-    onepole_hp<blockSize>(last1, coef1, src, tilt1_hp4690);
-    onepole_lp<blockSize>(last2, coef2, src, tilt1_lp1280);
-    mul_inplace<blockSize>(tilt1_hp4690, amp_db13_5);
-    mul_inplace<blockSize>(tilt1_lp1280, amp_mdbm1_7);
-    sum3<blockSize>(tilt1_hp4690, tilt1_lp1280, src, dst);
-}
-template <size_t blockSize>
-inline void tilt1_post(float &last1, float &last2, float coef1, float coef2, float *__restrict src,
-                       float *__restrict dst)
-{
-    float tilt1_hp160 alignas(16)[blockSize] = {};
-    float tilt1_lp99 alignas(16)[blockSize] = {};
-    const float amp_db13_5 = 4.7315127124153629629634297;   // 1.122018456459045 ^ 13.5
-    const float amp_mdbm1_4 = -0.8511380359115372899247841; // -(1.122018456459045 ^ -1.4)
-    onepole_hp<blockSize>(last1, coef1, src, tilt1_hp160);
-    onepole_lp<blockSize>(last2, coef2, src, tilt1_lp99);
-    mul_inplace<blockSize>(tilt1_hp160, amp_mdbm1_4);
-    mul_inplace<blockSize>(tilt1_lp99, amp_db13_5);
-    sum3<blockSize>(tilt1_hp160, tilt1_lp99, src, dst);
 }
 
 template <size_t blockSize>
@@ -826,13 +814,69 @@ inline void low_shelf_nl(float &last, float coef, float *__restrict gainfactor, 
     sum2<blockSize>(lowpass, src, dst);
 }
 
+template <typename FXConfig>
+inline void Bonsai<FXConfig>::tilt1_pre(float &last1, float &last2, float *__restrict src,
+                                        float *__restrict dst)
+{
+    float tilt1_hp4690 alignas(16)[FXConfig::blockSize] = {};
+    float tilt1_lp1280 alignas(16)[FXConfig::blockSize] = {};
+    const float amp_db13_5 = 4.7315127124153629629634297;   // 1.122018456459045 ^ 13.5
+    const float amp_mdbm1_7 = -0.8222426472597752553172857; // -(1.122018456459045 ^ -1.7)
+    onepole_hp<FXConfig::blockSize>(last1, this->coef4690, src, tilt1_hp4690);
+    onepole_lp<FXConfig::blockSize>(last2, this->coef1280, src, tilt1_lp1280);
+    mul_inplace<FXConfig::blockSize>(tilt1_hp4690, amp_db13_5);
+    mul_inplace<FXConfig::blockSize>(tilt1_lp1280, amp_mdbm1_7);
+    sum3<FXConfig::blockSize>(tilt1_hp4690, tilt1_lp1280, src, dst);
+}
+template <typename FXConfig>
+inline void Bonsai<FXConfig>::tilt1_post(float &last1, float &last2, float *__restrict src,
+                                         float *__restrict dst)
+{
+    float tilt1_hp160 alignas(16)[FXConfig::blockSize] = {};
+    float tilt1_lp99 alignas(16)[FXConfig::blockSize] = {};
+    const float amp_db13_5 = 4.7315127124153629629634297;   // 1.122018456459045 ^ 13.5
+    const float amp_mdbm1_4 = -0.8511380359115372899247841; // -(1.122018456459045 ^ -1.4)
+    onepole_hp<FXConfig::blockSize>(last1, this->coef160, src, tilt1_hp160);
+    onepole_lp<FXConfig::blockSize>(last2, this->coef99, src, tilt1_lp99);
+    mul_inplace<FXConfig::blockSize>(tilt1_hp160, amp_mdbm1_4);
+    mul_inplace<FXConfig::blockSize>(tilt1_lp99, amp_db13_5);
+    sum3<FXConfig::blockSize>(tilt1_hp160, tilt1_lp99, src, dst);
+}
+template <typename FXConfig>
+inline void Bonsai<FXConfig>::tilt4_pre(float &last1, float &last2, float &last3, float &last4,
+                                        float *__restrict src, float *__restrict dst)
+{
+    float tilt1_hp4690 alignas(16)[FXConfig::blockSize] = {};
+    float tilt1_lp1280 alignas(16)[FXConfig::blockSize] = {};
+    const float amp_db13_5 = 4.7315127124153629629634297;   // 1.122018456459045 ^ 13.5
+    const float amp_mdbm1_7 = -0.8222426472597752553172857; // -(1.122018456459045 ^ -1.7)
+    onepole_hp<FXConfig::blockSize>(last1, this->coef4690, src, tilt1_hp4690);
+    onepole_lp<FXConfig::blockSize>(last2, this->coef1280, src, tilt1_lp1280);
+    mul_inplace<FXConfig::blockSize>(tilt1_hp4690, amp_db13_5);
+    mul_inplace<FXConfig::blockSize>(tilt1_lp1280, amp_mdbm1_7);
+    sum3<FXConfig::blockSize>(tilt1_hp4690, tilt1_lp1280, src, dst);
+}
+template <typename FXConfig>
+inline void Bonsai<FXConfig>::tilt4_post(float &last1, float &last2, float &last3, float &last4,
+                                         float *__restrict src, float *__restrict dst)
+{
+    float tilt1_hp160 alignas(16)[FXConfig::blockSize] = {};
+    float tilt1_lp99 alignas(16)[FXConfig::blockSize] = {};
+    const float amp_db13_5 = 4.7315127124153629629634297;   // 1.122018456459045 ^ 13.5
+    const float amp_mdbm1_4 = -0.8511380359115372899247841; // -(1.122018456459045 ^ -1.4)
+    onepole_hp<FXConfig::blockSize>(last1, this->coef160, src, tilt1_hp160);
+    onepole_lp<FXConfig::blockSize>(last2, this->coef99, src, tilt1_lp99);
+    mul_inplace<FXConfig::blockSize>(tilt1_hp160, amp_mdbm1_4);
+    mul_inplace<FXConfig::blockSize>(tilt1_lp99, amp_db13_5);
+    sum3<FXConfig::blockSize>(tilt1_hp160, tilt1_lp99, src, dst);
+}
+
 // 24 last slots
 template <typename FXConfig>
-inline void
-Bonsai<FXConfig>::tape_sat(float last[], int lastmin, const float coef4690, const float coef1280,
-                           const float coef160, const float coef99, const float coef3000,
-                           const float coef8000, float sat, int mode, float *__restrict srcL,
-                           float *__restrict srcR, float *__restrict dstL, float *__restrict dstR)
+inline void Bonsai<FXConfig>::tape_sat(float last[], int lastmin, const float coef3000,
+                                       const float coef8000, float sat, int mode,
+                                       float *__restrict srcL, float *__restrict srcR,
+                                       float *__restrict dstL, float *__restrict dstR)
 {
     float bufA alignas(16)[FXConfig::blockSize] = {};
     float bufB alignas(16)[FXConfig::blockSize] = {};
@@ -852,11 +896,9 @@ Bonsai<FXConfig>::tape_sat(float last[], int lastmin, const float coef4690, cons
     onepole_lp<FXConfig::blockSize>(last[lastmin + 3], coef20,
                                     this->dbToLinear(rerange01(sat, 0.f, 9.f)), pregain);
 
-    tilt1_pre<FXConfig::blockSize>(last[lastmin + 4], last[lastmin + 5], coef4690, coef1280, srcL,
-                                   bufA);
+    tilt1_pre(last[lastmin + 4], last[lastmin + 5], srcL, bufA);
     mul<FXConfig::blockSize>(bufA, pregain, bufA);
-    tilt1_pre<FXConfig::blockSize>(last[lastmin + 6], last[lastmin + 7], coef4690, coef1280, srcR,
-                                   bufC);
+    tilt1_pre(last[lastmin + 6], last[lastmin + 7], srcR, bufC);
     mul<FXConfig::blockSize>(bufC, pregain, bufC);
 
     switch ((b_dist_modes)mode)
@@ -882,15 +924,13 @@ Bonsai<FXConfig>::tape_sat(float last[], int lastmin, const float coef4690, cons
         clip_tanh78<FXConfig::blockSize>(level, bufC, bufC);
         break;
     }
-    tilt1_post<FXConfig::blockSize>(last[lastmin + 8], last[lastmin + 9], coef160, coef99, bufA,
-                                    bufB);
+    tilt1_post(last[lastmin + 8], last[lastmin + 9], bufA, bufB);
     mul<FXConfig::blockSize>(bufB, sat_halfsq_db, bufB);
     clip_tanh78<FXConfig::blockSize>(6.6666666666666666, 0.15, bufB, bufB); // 1/0.15
     high_shelf<FXConfig::blockSize>(last[lastmin + 10], coef3000, sat_invinvsq_block, bufB, bufA);
     high_shelf<FXConfig::blockSize>(last[lastmin + 11], coef8000, sat_invinvsq_block, bufA, dstL);
 
-    tilt1_post<FXConfig::blockSize>(last[lastmin + 12], last[lastmin + 13], coef160, coef99, bufC,
-                                    bufB);
+    tilt1_post(last[lastmin + 12], last[lastmin + 13], bufC, bufB);
     mul<FXConfig::blockSize>(bufB, sat_halfsq_db, bufB);
     clip_tanh78<FXConfig::blockSize>(6.6666666666666666, 0.15, bufB, bufB); // 1/0.15
     high_shelf<FXConfig::blockSize>(last[lastmin + 14], coef3000, sat_invinvsq_block, bufB, bufA);
@@ -1166,9 +1206,8 @@ inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__res
                hpL, hpR, bassL, bassR);
     // sum2<FXConfig::blockSize>(hpL, bassL, bassboostedL);
     // sum2<FXConfig::blockSize>(hpR, bassR, bassboostedR);
-    tape_sat(last, 34, coef4690, coef1280, coef160, coef99, coef3000, coef8000,
-             std::clamp(this->floatValue(b_tape_sat), 0.f, 1.f), this->intValue(b_tape_dist_mode),
-             bassL, bassR, satL, satR);
+    tape_sat(last, 34, coef3000, coef8000, std::clamp(this->floatValue(b_tape_sat), 0.f, 1.f),
+             this->intValue(b_tape_dist_mode), bassL, bassR, satL, satR);
     tape_noise(last, 58, coef20, coef50, coef500, coef1000, coef2000,
                this->floatValue(b_noise_sensitivity),
                this->dbToLinear(this->floatValue(b_noise_gain)), satL, satR, noiseL, noiseR);
