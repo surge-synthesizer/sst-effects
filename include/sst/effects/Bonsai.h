@@ -1022,17 +1022,6 @@ inline void Bonsai<FXConfig>::tape_sat(float last[], int lastmin, const float co
     onepole_lp<FXConfig::blockSize>(last[lastmin + 3], coef20,
                                     this->dbToLinear(rerange01(sat, 0.f, 9.f)), pregain);
 
-    // tilt4_pre(last[lastmin + 4], last[lastmin + 5], last[lastmin + 6], last[lastmin + 7], srcL,
-    //           dstL);
-    // tilt4_pre(last[lastmin + 8], last[lastmin + 9], last[lastmin + 10], last[lastmin + 11], srcR,
-    //           bufB);
-    // tilt4_post(last[lastmin + 12], last[lastmin + 13], last[lastmin + 14], last[lastmin + 15],
-    // srcR, dstR);
-    // tilt1_pre(last[lastmin + 4], last[lastmin + 5], srcL, dstL);
-    // tilt1_pre(last[lastmin + 14], last[lastmin + 15], srcR, bufB);
-    // tilt1_post(last[lastmin + 12], last[lastmin + 13], srcR, dstR);
-    // return;
-
     if (bias_filter == 1)
     {
         tilt4_pre(last[lastmin + 4], last[lastmin + 5], last[lastmin + 6], last[lastmin + 7], srcL,
@@ -1106,6 +1095,7 @@ inline void Bonsai<FXConfig>::bass_boost(float last[], int lastmin, const float 
 {
     float bufA alignas(16)[FXConfig::blockSize] = {};
     float bufB alignas(16)[FXConfig::blockSize] = {};
+    float bufC alignas(16)[FXConfig::blockSize] = {};
     float reused alignas(16)[FXConfig::blockSize] = {};
     float branch1 alignas(16)[FXConfig::blockSize] = {};
     float branch2 alignas(16)[FXConfig::blockSize] = {};
@@ -1136,12 +1126,23 @@ inline void Bonsai<FXConfig>::bass_boost(float last[], int lastmin, const float 
     float boost_block alignas(16)[FXConfig::blockSize] = {};
     onepole_lp<FXConfig::blockSize>(last[lastmin + 6], coef20, boost, boost_block);
 
-    onepole_hp<FXConfig::blockSize>(last[lastmin + 7], coef20, srcL, bufA);
+    switch (this->deformType(b_bass_boost))
+    {
+    case 1:
+        sum2<FXConfig::blockSize>(srcL, srcR, bufC);
+        mul<FXConfig::blockSize>(bufC, 0.5, bufC);
+        break;
+    case 0:
+    default:
+        sum2<FXConfig::blockSize>(srcL, bufC, bufC);
+        break;
+    }
+    onepole_hp<FXConfig::blockSize>(last[lastmin + 7], coef20, bufC, bufA);
     onepole_lp<FXConfig::blockSize>(last[lastmin + 8], coef50, bufA, bufB);
     clip_tanh78<FXConfig::blockSize>(lerp1_block, bufB, bufB);
     onepole_lp<FXConfig::blockSize>(last[lastmin + 9], coef50, bufB, bufA);
     mul<FXConfig::blockSize>(bufA, 20.f, branch1);
-    onepole_hp<FXConfig::blockSize>(last[lastmin + 10], coef30, srcL, bufA);
+    onepole_hp<FXConfig::blockSize>(last[lastmin + 10], coef30, bufC, bufA);
     onepole_lp<FXConfig::blockSize>(last[lastmin + 11], coef200, bufA, bufB);
     onepole_lp<FXConfig::blockSize>(last[lastmin + 12], coef200, bufB, reused);
     mul<FXConfig::blockSize>(reused, 5.f, branch2);
@@ -1166,39 +1167,50 @@ inline void Bonsai<FXConfig>::bass_boost(float last[], int lastmin, const float 
     // mul<FXConfig::blockSize>(bufA, rerange01(dist01, 1.25,
     // 0.75), bufA);
     onepole_lp<FXConfig::blockSize>(last[lastmin + 17], coef500, bufA, dstL);
-    sum2<FXConfig::blockSize>(srcL, dstL, dstL);
 
-    onepole_hp<FXConfig::blockSize>(last[lastmin + 18], coef20, srcR, bufA);
-    onepole_lp<FXConfig::blockSize>(last[lastmin + 19], coef50, bufA, bufB);
-    clip_tanh78<FXConfig::blockSize>(lerp1_block, bufB, bufB);
-    onepole_lp<FXConfig::blockSize>(last[lastmin + 20], coef50, bufB, bufA);
-    mul<FXConfig::blockSize>(bufA, 20.f, branch1);
-    onepole_hp<FXConfig::blockSize>(last[lastmin + 21], coef30, srcR, bufA);
-    onepole_lp<FXConfig::blockSize>(last[lastmin + 22], coef200, bufA, bufB);
-    onepole_lp<FXConfig::blockSize>(last[lastmin + 23], coef200, bufB, reused);
-    mul<FXConfig::blockSize>(reused, 5.f, branch2);
-    mul<FXConfig::blockSize>(reused, lerp2_block, bufA);
-    clampbi<FXConfig::blockSize>(0.01, reused, bufA);
-    onepole_hp<FXConfig::blockSize>(last[lastmin + 24], coef200, bufA, branch3);
-    mul<FXConfig::blockSize>(branch3, lerp3_block, branch3);
-    mul<FXConfig::blockSize>(reused, lerp4_block, bufB);
-    clip_tanh78<FXConfig::blockSize>(lerp5_block, bufB, bufB);
-    onepole_lp<FXConfig::blockSize>(last[lastmin + 25], coef200, bufB, bufA);
-    mul<FXConfig::blockSize>(bufA, 2.f, bufA);
-    sum2<FXConfig::blockSize>(branch3, bufA, bufB);
-    onepole_hp<FXConfig::blockSize>(last[lastmin + 26], coef30, bufB, bufA);
-    sum3<FXConfig::blockSize>(branch1, branch2, bufA, bufB);
-    mul<FXConfig::blockSize>(bufB, 0.16666666666666666666666, bufB);
-    // change the above constant to adjust the default gain, so the
-    // slider is negative less often previous value:
-    // 0.3333333333333333333333333
-    onepole_lp<FXConfig::blockSize>(last[lastmin + 27], coef500, bufB, bufA);
-    mul<FXConfig::blockSize>(bufA, boost_block, bufA);
-    clip_inv_sinh<FXConfig::blockSize>(lerp6_block, bufA, bufA);
-    // mul<FXConfig::blockSize>(bufA, rerange01(dist01, 1.25,
-    // 0.75), bufA);
-    onepole_lp<FXConfig::blockSize>(last[lastmin + 28], coef500, bufA, dstR);
-    sum2<FXConfig::blockSize>(srcR, dstR, dstR);
+    switch (this->deformType(b_bass_boost))
+    {
+    case 1:
+        sum2<FXConfig::blockSize>(srcR, dstL, dstR);
+        sum2<FXConfig::blockSize>(srcL, dstL, dstL);
+        break;
+    case 0:
+    default:
+        sum2<FXConfig::blockSize>(srcL, dstL, dstL);
+
+        onepole_hp<FXConfig::blockSize>(last[lastmin + 18], coef20, srcR, bufA);
+        onepole_lp<FXConfig::blockSize>(last[lastmin + 19], coef50, bufA, bufB);
+        clip_tanh78<FXConfig::blockSize>(lerp1_block, bufB, bufB);
+        onepole_lp<FXConfig::blockSize>(last[lastmin + 20], coef50, bufB, bufA);
+        mul<FXConfig::blockSize>(bufA, 20.f, branch1);
+        onepole_hp<FXConfig::blockSize>(last[lastmin + 21], coef30, srcR, bufA);
+        onepole_lp<FXConfig::blockSize>(last[lastmin + 22], coef200, bufA, bufB);
+        onepole_lp<FXConfig::blockSize>(last[lastmin + 23], coef200, bufB, reused);
+        mul<FXConfig::blockSize>(reused, 5.f, branch2);
+        mul<FXConfig::blockSize>(reused, lerp2_block, bufA);
+        clampbi<FXConfig::blockSize>(0.01, reused, bufA);
+        onepole_hp<FXConfig::blockSize>(last[lastmin + 24], coef200, bufA, branch3);
+        mul<FXConfig::blockSize>(branch3, lerp3_block, branch3);
+        mul<FXConfig::blockSize>(reused, lerp4_block, bufB);
+        clip_tanh78<FXConfig::blockSize>(lerp5_block, bufB, bufB);
+        onepole_lp<FXConfig::blockSize>(last[lastmin + 25], coef200, bufB, bufA);
+        mul<FXConfig::blockSize>(bufA, 2.f, bufA);
+        sum2<FXConfig::blockSize>(branch3, bufA, bufB);
+        onepole_hp<FXConfig::blockSize>(last[lastmin + 26], coef30, bufB, bufA);
+        sum3<FXConfig::blockSize>(branch1, branch2, bufA, bufB);
+        mul<FXConfig::blockSize>(bufB, 0.16666666666666666666666, bufB);
+        // change the above constant to adjust the default gain, so the
+        // slider is negative less often previous value:
+        // 0.3333333333333333333333333
+        onepole_lp<FXConfig::blockSize>(last[lastmin + 27], coef500, bufB, bufA);
+        mul<FXConfig::blockSize>(bufA, boost_block, bufA);
+        clip_inv_sinh<FXConfig::blockSize>(lerp6_block, bufA, bufA);
+        // mul<FXConfig::blockSize>(bufA, rerange01(dist01, 1.25,
+        // 0.75), bufA);
+        onepole_lp<FXConfig::blockSize>(last[lastmin + 28], coef500, bufA, dstR);
+        sum2<FXConfig::blockSize>(srcR, dstR, dstR);
+        break;
+    }
 }
 
 // 8 last slots
@@ -1378,49 +1390,6 @@ inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__res
         noiseL, noiseR, agedL, agedR);
     onepole_hp<FXConfig::blockSize>(last[98], coef10, agedL, outL);
     onepole_hp<FXConfig::blockSize>(last[99], coef10, agedR, outR);
-    // switch ((int)floor(8 * std::clamp(this->floatValue(b_tape_sat), 0.f, 1.f)))
-    // {
-    // case 0:
-    //     onepole_lp<FXConfig::blockSize>(last[3], coef20, scaledL, outL);
-    //     onepole_hp<FXConfig::blockSize>(last[4], coef20, scaledR, outR);
-    //     break;
-    // case 1:
-    //     onepole_lp<FXConfig::blockSize>(last[3], coef70, scaledL, outL);
-    //     onepole_hp<FXConfig::blockSize>(last[4], coef70, scaledR, outR);
-    //     break;
-    // case 2:
-    //     onepole_lp<FXConfig::blockSize>(last[3], coef200, scaledL, outL);
-    //     onepole_hp<FXConfig::blockSize>(last[4], coef200, scaledR, outR);
-    //     break;
-    // case 3:
-    //     onepole_lp<FXConfig::blockSize>(last[3], coef500, scaledL, outL);
-    //     onepole_hp<FXConfig::blockSize>(last[4], coef500, scaledR, outR);
-    //     break;
-    // case 4:
-    //     onepole_lp<FXConfig::blockSize>(last[3], coef900, scaledL, outL);
-    //     onepole_hp<FXConfig::blockSize>(last[4], coef900, scaledR, outR);
-    //     break;
-    // case 5:
-    //     onepole_lp<FXConfig::blockSize>(last[3], coef2000, scaledL, outL);
-    //     onepole_hp<FXConfig::blockSize>(last[4], coef2000, scaledR, outR);
-    //     break;
-    // case 6:
-    //     onepole_lp<FXConfig::blockSize>(last[3], coef6000, scaledL, outL);
-    //     onepole_hp<FXConfig::blockSize>(last[4], coef6000, scaledR, outR);
-    //     break;
-    // case 7:
-    //     onepole_lp<FXConfig::blockSize>(last[3], coef11000, scaledL, outL);
-    //     onepole_hp<FXConfig::blockSize>(last[4], coef11000, scaledR, outR);
-    //     break;
-    // case 8:
-    //     onepole_lp<FXConfig::blockSize>(last[3], coef22000, scaledL, outL);
-    //     onepole_hp<FXConfig::blockSize>(last[4], coef22000, scaledR, outR);
-    //     break;
-    // default:
-    //     onepole_lp<FXConfig::blockSize>(last[3], coef20, scaledL, outL);
-    //     onepole_hp<FXConfig::blockSize>(last[4], coef20, scaledR, outR);
-    //     break;
-    // }
     mul<FXConfig::blockSize>(outL, gainOut, outL);
     mul<FXConfig::blockSize>(outR, gainOut, outR);
     lerp<FXConfig::blockSize>(dataL, outL, mixVal, dataL);
