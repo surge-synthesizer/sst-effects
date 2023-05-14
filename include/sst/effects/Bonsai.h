@@ -32,33 +32,92 @@ namespace sst::effects
 {
 namespace sdsp = sst::basic_blocks::dsp;
 
+inline float freq_sr_to_alpha_reaktor(float freq, float sr)
+{
+    float in = fmin(0.5 * M_PI, fmax(0.001, freq) * (M_PI / sr));
+    float tanapprox = (((0.0388452 - 0.0896638 * in) * in + 1.00005) * in) /
+                      ((0.0404318 - 0.430871 * in) * in + 1);
+    return tanapprox / (tanapprox + 1);
+}
+template <size_t blockSize>
+inline void freq_sr_to_alpha_reaktor(float *__restrict freq, float sr, float *__restrict coef)
+{
+    const float pidivsr = M_PI / sr;
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        float in = fmin(0.5 * M_PI, fmax(0.001, freq[i]) * pidivsr);
+        float tanapprox = (((0.0388452 - 0.0896638 * in) * in + 1.00005) * in) /
+                          ((0.0404318 - 0.430871 * in) * in + 1);
+        coef[i] = tanapprox / (tanapprox + 1);
+    }
+}
+
 inline float freq_sr_to_alpha(float freq, float sr)
+{
+    const float w = (2.f * M_PI * freq) / sr;
+    const float twomcos = 2 - cos(w);
+    return 1 - (twomcos - sqrt(twomcos * twomcos - 1));
+}
+template <size_t blockSize>
+inline void freq_sr_to_alpha(float *__restrict freq, float sr, float *__restrict coef)
+{
+    const float twopi_dt = (2.f * M_PI) / sr;
+    for (auto i = 1U; i < blockSize; ++i)
+    {
+        const float w = twopi_dt * freq[i];
+        const float twomcos = 2 - cos(w);
+        coef[i] = 1 - (twomcos - sqrt(twomcos * twomcos - 1));
+    }
+}
+inline float freq_twopi_dt_to_alpha(float freq, float twopi_dt)
+{
+    const float w = twopi_dt * freq;
+    const float twomcos = 2 - cos(w);
+    return 1 - (twomcos - sqrt(twomcos * twomcos - 1));
+}
+template <size_t blockSize>
+inline void freq_twopi_dt_to_alpha(float *__restrict freq, float twopi_dt, float *__restrict coef)
+{
+    for (auto i = 0U; i < blockSize; ++i)
+    {
+        const float w = twopi_dt * freq[i];
+        const float twomcos = 2 - cos(w);
+        coef[i] = 1 - (twomcos - sqrt(twomcos * twomcos - 1));
+    }
+}
+
+inline float freq_sr_to_alpha_wrong_old(float freq, float sr)
 {
     const float freq2pi = 2.f * M_PI * freq;
     return freq2pi / (freq2pi + sr);
 }
 template <size_t blockSize>
-inline void freq_sr_to_alpha(float *__restrict freq, float sr, float *__restrict coef)
+inline void freq_sr_to_alpha_wrong_old(float *__restrict freq, float sr, float *__restrict coef)
 {
-    for (auto i = 1U; i < blockSize; ++i)
+    for (auto i = 0U; i < blockSize; ++i)
     {
         const float freq2pi = 2.f * M_PI * freq[i];
         coef[i] = freq2pi / (freq2pi + sr);
     }
 }
-inline float freq_sr2pi_to_alpha(float freq, float sr_div2pi) { return freq / (freq + sr_div2pi); }
-template <size_t blockSize>
-inline void freq_sr2pi_to_alpha(float *__restrict freq, float sr_div2pi, float *__restrict coef)
+inline float freq_sr2pi_to_alpha_wrong_old(float freq, float sr_div2pi)
 {
-    for (auto i = 1U; i < blockSize; ++i)
+    return freq / (freq + sr_div2pi);
+}
+template <size_t blockSize>
+inline void freq_sr2pi_to_alpha_wrong_old(float *__restrict freq, float sr_div2pi,
+                                          float *__restrict coef)
+{
+    for (auto i = 0U; i < blockSize; ++i)
     {
         coef[i] = freq[i] / (freq[i] + sr_div2pi);
     }
 }
 
+// doesn't cramp, but doesn't match the original reaktor version
 template <size_t blockSize>
-inline void onepole_lp(float &last, const float *__restrict coef, float *__restrict src,
-                       float *__restrict dst)
+inline void onepole_lp_different(float &last, const float *__restrict coef, float *__restrict src,
+                                 float *__restrict dst)
 {
     dst[0] = last + coef[0] * (src[0] - last);
     for (auto i = 1U; i < blockSize; ++i)
@@ -68,7 +127,8 @@ inline void onepole_lp(float &last, const float *__restrict coef, float *__restr
     last = dst[blockSize - 1];
 }
 template <size_t blockSize>
-inline void onepole_lp(float &last, const float coef, float *__restrict src, float *__restrict dst)
+inline void onepole_lp_different(float &last, const float coef, float *__restrict src,
+                                 float *__restrict dst)
 {
     dst[0] = last + coef * (src[0] - last);
     for (auto i = 1U; i < blockSize; ++i)
@@ -78,7 +138,7 @@ inline void onepole_lp(float &last, const float coef, float *__restrict src, flo
     last = dst[blockSize - 1];
 }
 template <size_t blockSize>
-inline void onepole_lp(float &last, const float coef, float src, float *__restrict dst)
+inline void onepole_lp_different(float &last, const float coef, float src, float *__restrict dst)
 {
     dst[0] = last + coef * (src - last);
     for (auto i = 1U; i < blockSize; ++i)
@@ -86,6 +146,47 @@ inline void onepole_lp(float &last, const float coef, float src, float *__restri
         dst[i] = dst[i - 1] + coef * (src - dst[i - 1]);
     }
     last = dst[blockSize - 1];
+}
+
+template <size_t blockSize>
+inline void onepole_lp(float &last, const float *__restrict coef, float *__restrict src,
+                       float *__restrict dst)
+{
+    float delta_scaled = (src[0] - last) * coef[0];
+    dst[0] = delta_scaled + last;
+    last = delta_scaled + dst[0];
+    for (auto i = 1U; i < blockSize; ++i)
+    {
+        delta_scaled = (src[i] - last) * coef[i];
+        dst[i] = delta_scaled + last;
+        last = delta_scaled + dst[i];
+    }
+}
+template <size_t blockSize>
+inline void onepole_lp(float &last, const float coef, float *__restrict src, float *__restrict dst)
+{
+    float delta_scaled = (src[0] - last) * coef;
+    dst[0] = delta_scaled + last;
+    last = delta_scaled + dst[0];
+    for (auto i = 1U; i < blockSize; ++i)
+    {
+        delta_scaled = (src[i] - last) * coef;
+        dst[i] = delta_scaled + last;
+        last = delta_scaled + dst[i];
+    }
+}
+template <size_t blockSize>
+inline void onepole_lp(float &last, const float coef, float src, float *__restrict dst)
+{
+    float delta_scaled = (src - last) * coef;
+    dst[0] = delta_scaled + last;
+    last = delta_scaled + dst[0];
+    for (auto i = 1U; i < blockSize; ++i)
+    {
+        delta_scaled = (src - last) * coef;
+        dst[i] = delta_scaled + last;
+        last = delta_scaled + dst[i];
+    }
 }
 
 template <size_t blockSize>
@@ -625,8 +726,8 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
     void initialize();
     void processBlock(float *__restrict L, float *__restrict R);
     void tape_sat(float last[], int lastmin, const float coef3000, const float coef8000, float sat,
-                  int mode, float *__restrict srcL, float *__restrict srcR, float *__restrict dstL,
-                  float *__restrict dstR);
+                  int mode, int bias_filter, float *__restrict srcL, float *__restrict srcR,
+                  float *__restrict dstL, float *__restrict dstR);
     void bass_boost(float last[], int lastmin, const float coef20, const float coef30,
                     const float coef50, const float coef200, const float coef500, float boost,
                     float dist, float *__restrict srcL, float *__restrict srcR,
@@ -704,30 +805,33 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
     int ringout_value = -1;
 
     float last[100] = {};
-    float sr_div2pi = Bonsai<FXConfig>::sampleRate() / (2 * M_PI);
-    const float coef0 = freq_sr2pi_to_alpha(0, sr_div2pi);
-    const float coef10 = freq_sr2pi_to_alpha(10, sr_div2pi);
-    const float coef20 = freq_sr2pi_to_alpha(20, sr_div2pi);
-    const float coef30 = freq_sr2pi_to_alpha(20, sr_div2pi);
-    const float coef50 = freq_sr2pi_to_alpha(50, sr_div2pi);
-    const float coef70 = freq_sr2pi_to_alpha(70, sr_div2pi);
-    const float coef99 = freq_sr2pi_to_alpha(99, sr_div2pi);
-    const float coef100 = freq_sr2pi_to_alpha(100, sr_div2pi);
-    const float coef160 = freq_sr2pi_to_alpha(160, sr_div2pi);
-    const float coef200 = freq_sr2pi_to_alpha(200, sr_div2pi);
-    const float coef500 = freq_sr2pi_to_alpha(500, sr_div2pi);
-    const float coef700 = freq_sr2pi_to_alpha(700, sr_div2pi);
-    const float coef900 = freq_sr2pi_to_alpha(900, sr_div2pi);
-    const float coef1000 = freq_sr2pi_to_alpha(1000, sr_div2pi);
-    const float coef1200 = freq_sr2pi_to_alpha(1200, sr_div2pi);
-    const float coef1280 = freq_sr2pi_to_alpha(1280, sr_div2pi);
-    const float coef1300 = freq_sr2pi_to_alpha(1300, sr_div2pi);
-    const float coef2000 = freq_sr2pi_to_alpha(2000, sr_div2pi);
-    const float coef3000 = freq_sr2pi_to_alpha(3000, sr_div2pi);
-    const float coef4690 = freq_sr2pi_to_alpha(4690, sr_div2pi);
-    const float coef6000 = freq_sr2pi_to_alpha(6000, sr_div2pi);
-    const float coef8000 = freq_sr2pi_to_alpha(8000, sr_div2pi);
-    const float coef11000 = freq_sr2pi_to_alpha(11000, sr_div2pi);
+    // float sr_div2pi = Bonsai<FXConfig>::sampleRate() / (2 * M_PI);
+    // float twopi_dt = (2.f * M_PI) / Bonsai<FXConfig>::sampleRate();
+    float sr = Bonsai<FXConfig>::sampleRate();
+    const float coef0 = freq_sr_to_alpha_reaktor(0, sr);
+    const float coef10 = freq_sr_to_alpha_reaktor(10, sr);
+    const float coef20 = freq_sr_to_alpha_reaktor(20, sr);
+    const float coef30 = freq_sr_to_alpha_reaktor(30, sr);
+    const float coef50 = freq_sr_to_alpha_reaktor(50, sr);
+    const float coef70 = freq_sr_to_alpha_reaktor(70, sr);
+    const float coef99 = freq_sr_to_alpha_reaktor(99, sr);
+    const float coef100 = freq_sr_to_alpha_reaktor(100, sr);
+    const float coef160 = freq_sr_to_alpha_reaktor(160, sr);
+    const float coef200 = freq_sr_to_alpha_reaktor(200, sr);
+    const float coef500 = freq_sr_to_alpha_reaktor(500, sr);
+    const float coef700 = freq_sr_to_alpha_reaktor(700, sr);
+    const float coef900 = freq_sr_to_alpha_reaktor(900, sr);
+    const float coef1000 = freq_sr_to_alpha_reaktor(1000, sr);
+    const float coef1200 = freq_sr_to_alpha_reaktor(1200, sr);
+    const float coef1280 = freq_sr_to_alpha_reaktor(1280, sr);
+    const float coef1300 = freq_sr_to_alpha_reaktor(1300, sr);
+    const float coef2000 = freq_sr_to_alpha_reaktor(2000, sr);
+    const float coef3000 = freq_sr_to_alpha_reaktor(3000, sr);
+    const float coef4690 = freq_sr_to_alpha_reaktor(4690, sr);
+    const float coef6000 = freq_sr_to_alpha_reaktor(6000, sr);
+    const float coef8000 = freq_sr_to_alpha_reaktor(8000, sr);
+    const float coef11000 = freq_sr_to_alpha_reaktor(11000, sr);
+    const float coef22000 = freq_sr_to_alpha_reaktor(22000, sr);
 };
 
 template <typename FXConfig> inline void Bonsai<FXConfig>::initialize()
@@ -846,35 +950,57 @@ template <typename FXConfig>
 inline void Bonsai<FXConfig>::tilt4_pre(float &last1, float &last2, float &last3, float &last4,
                                         float *__restrict src, float *__restrict dst)
 {
-    float tilt1_hp4690 alignas(16)[FXConfig::blockSize] = {};
-    float tilt1_lp1280 alignas(16)[FXConfig::blockSize] = {};
-    const float amp_db13_5 = 4.7315127124153629629634297;   // 1.122018456459045 ^ 13.5
-    const float amp_mdbm1_7 = -0.8222426472597752553172857; // -(1.122018456459045 ^ -1.7)
-    onepole_hp<FXConfig::blockSize>(last1, this->coef4690, src, tilt1_hp4690);
-    onepole_lp<FXConfig::blockSize>(last2, this->coef1280, src, tilt1_lp1280);
-    mul_inplace<FXConfig::blockSize>(tilt1_hp4690, amp_db13_5);
-    mul_inplace<FXConfig::blockSize>(tilt1_lp1280, amp_mdbm1_7);
-    sum3<FXConfig::blockSize>(tilt1_hp4690, tilt1_lp1280, src, dst);
+    float tilt4_hp11000 alignas(16)[FXConfig::blockSize] = {};
+    float tilt4_lp6000 alignas(16)[FXConfig::blockSize] = {};
+    float tilt4_lp10 alignas(16)[FXConfig::blockSize] = {};
+    float tilt4_lp3000 alignas(16)[FXConfig::blockSize] = {};
+    float middle alignas(16)[FXConfig::blockSize] = {};
+    onepole_hp<FXConfig::blockSize>(last1, this->coef11000, src, tilt4_hp11000);
+    onepole_lp<FXConfig::blockSize>(last2, this->coef6000, src, tilt4_lp6000);
+    mul_inplace<FXConfig::blockSize>(tilt4_hp11000, 7.94328262212024352979393793341);
+    // 1.122018456459045 ^ 18
+    mul_inplace<FXConfig::blockSize>(tilt4_lp6000, -0.17782793587577652847030553);
+    // -(1.122018456459045 ^ -15)
+    sum3<FXConfig::blockSize>(tilt4_hp11000, tilt4_lp6000, src, middle);
+    onepole_lp<FXConfig::blockSize>(last3, this->coef10, middle, tilt4_lp10);
+    onepole_lp<FXConfig::blockSize>(last4, this->coef3000, middle, tilt4_lp3000);
+    mul_inplace<FXConfig::blockSize>(tilt4_lp3000, -0.707945780301058559381685957);
+    // -(1.122018456459045 ^ -3)
+    sum3<FXConfig::blockSize>(tilt4_lp10, tilt4_lp3000, middle, dst);
+    mul_inplace<FXConfig::blockSize>(dst, 1.41253755276956870805933956974);
+    // -(1.122018456459045 ^ 3)
 }
 template <typename FXConfig>
 inline void Bonsai<FXConfig>::tilt4_post(float &last1, float &last2, float &last3, float &last4,
                                          float *__restrict src, float *__restrict dst)
 {
-    float tilt1_hp160 alignas(16)[FXConfig::blockSize] = {};
-    float tilt1_lp99 alignas(16)[FXConfig::blockSize] = {};
-    const float amp_db13_5 = 4.7315127124153629629634297;   // 1.122018456459045 ^ 13.5
-    const float amp_mdbm1_4 = -0.8511380359115372899247841; // -(1.122018456459045 ^ -1.4)
-    onepole_hp<FXConfig::blockSize>(last1, this->coef160, src, tilt1_hp160);
-    onepole_lp<FXConfig::blockSize>(last2, this->coef99, src, tilt1_lp99);
-    mul_inplace<FXConfig::blockSize>(tilt1_hp160, amp_mdbm1_4);
-    mul_inplace<FXConfig::blockSize>(tilt1_lp99, amp_db13_5);
-    sum3<FXConfig::blockSize>(tilt1_hp160, tilt1_lp99, src, dst);
+    float tilt4_hp1300 alignas(16)[FXConfig::blockSize] = {};
+    float tilt4_lp700 alignas(16)[FXConfig::blockSize] = {};
+    float tilt4_lp70 alignas(16)[FXConfig::blockSize] = {};
+    float tilt4_lp900 alignas(16)[FXConfig::blockSize] = {};
+    float middle alignas(16)[FXConfig::blockSize] = {};
+    onepole_hp<FXConfig::blockSize>(last1, this->coef1300, src, tilt4_hp1300);
+    onepole_lp<FXConfig::blockSize>(last2, this->coef700, src, tilt4_lp700);
+    mul_inplace<FXConfig::blockSize>(tilt4_hp1300, -0.91727593406718168170484262);
+    // -(1.122018456459045 ^ -0.75)
+    mul_inplace<FXConfig::blockSize>(tilt4_lp700, 0.251188637356033168493284101146);
+    // 1.122018456459045 ^ 18
+    sum3<FXConfig::blockSize>(tilt4_hp1300, tilt4_lp700, src, middle);
+    onepole_lp<FXConfig::blockSize>(last3, this->coef70, middle, tilt4_lp70);
+    onepole_lp<FXConfig::blockSize>(last4, this->coef900, middle, tilt4_lp900);
+    mul_inplace<FXConfig::blockSize>(tilt4_lp70, -3.1622777209631984827047496111);
+    // -(1.122018456459045 ^ 10)
+    mul_inplace<FXConfig::blockSize>(tilt4_lp900, 2.818382980029549413790645436973);
+    // -(1.122018456459045 ^ 9)
+    sum3<FXConfig::blockSize>(tilt4_lp70, tilt4_lp900, middle, dst);
+    mul_inplace<FXConfig::blockSize>(dst, 0.707945780301058559381685957);
+    // -(1.122018456459045 ^ -3)
 }
 
 // 24 last slots
 template <typename FXConfig>
 inline void Bonsai<FXConfig>::tape_sat(float last[], int lastmin, const float coef3000,
-                                       const float coef8000, float sat, int mode,
+                                       const float coef8000, float sat, int mode, int bias_filter,
                                        float *__restrict srcL, float *__restrict srcR,
                                        float *__restrict dstL, float *__restrict dstR)
 {
@@ -896,45 +1022,78 @@ inline void Bonsai<FXConfig>::tape_sat(float last[], int lastmin, const float co
     onepole_lp<FXConfig::blockSize>(last[lastmin + 3], coef20,
                                     this->dbToLinear(rerange01(sat, 0.f, 9.f)), pregain);
 
-    tilt1_pre(last[lastmin + 4], last[lastmin + 5], srcL, bufA);
+    // tilt4_pre(last[lastmin + 4], last[lastmin + 5], last[lastmin + 6], last[lastmin + 7], srcL,
+    //           dstL);
+    // tilt4_pre(last[lastmin + 8], last[lastmin + 9], last[lastmin + 10], last[lastmin + 11], srcR,
+    //           bufB);
+    // tilt4_post(last[lastmin + 12], last[lastmin + 13], last[lastmin + 14], last[lastmin + 15],
+    // srcR, dstR);
+    // tilt1_pre(last[lastmin + 4], last[lastmin + 5], srcL, dstL);
+    // tilt1_pre(last[lastmin + 14], last[lastmin + 15], srcR, bufB);
+    // tilt1_post(last[lastmin + 12], last[lastmin + 13], srcR, dstR);
+    // return;
+
+    if (bias_filter == 1)
+    {
+        tilt4_pre(last[lastmin + 4], last[lastmin + 5], last[lastmin + 6], last[lastmin + 7], srcL,
+                  bufA);
+        tilt4_pre(last[lastmin + 8], last[lastmin + 9], last[lastmin + 10], last[lastmin + 11],
+                  srcR, bufB);
+    }
+    else
+    {
+        tilt1_pre(last[lastmin + 4], last[lastmin + 5], srcL, bufA);
+        tilt1_pre(last[lastmin + 8], last[lastmin + 9], srcR, bufB);
+    }
     mul<FXConfig::blockSize>(bufA, pregain, bufA);
-    tilt1_pre(last[lastmin + 6], last[lastmin + 7], srcR, bufC);
-    mul<FXConfig::blockSize>(bufC, pregain, bufC);
+    mul<FXConfig::blockSize>(bufB, pregain, bufB);
 
     switch ((b_dist_modes)mode)
     {
     case bdm_inv_sinh:
         clip_inv_sinh<FXConfig::blockSize>(level, bufA, bufA);
-        clip_inv_sinh<FXConfig::blockSize>(level, bufC, bufC);
+        clip_inv_sinh<FXConfig::blockSize>(level, bufB, bufB);
         break;
     case bdm_tanh:
         clip_tanh78<FXConfig::blockSize>(level, bufA, bufA);
-        clip_tanh78<FXConfig::blockSize>(level, bufC, bufC);
+        clip_tanh78<FXConfig::blockSize>(level, bufB, bufB);
         break;
     case bdm_tanh_approx_foldback:
         clip_tanh_foldback<FXConfig::blockSize>(level, bufA, bufA);
-        clip_tanh_foldback<FXConfig::blockSize>(level, bufC, bufC);
+        clip_tanh_foldback<FXConfig::blockSize>(level, bufB, bufB);
         break;
     case bdm_sine:
         clip_sine_tanh<FXConfig::blockSize>(level, bufA, bufA);
-        clip_sine_tanh<FXConfig::blockSize>(level, bufC, bufC);
+        clip_sine_tanh<FXConfig::blockSize>(level, bufB, bufB);
         break;
     default:
         clip_tanh78<FXConfig::blockSize>(level, bufA, bufA);
-        clip_tanh78<FXConfig::blockSize>(level, bufC, bufC);
+        clip_tanh78<FXConfig::blockSize>(level, bufB, bufB);
         break;
     }
-    tilt1_post(last[lastmin + 8], last[lastmin + 9], bufA, bufB);
+    if (bias_filter == 1)
+    {
+        tilt4_post(last[lastmin + 12], last[lastmin + 13], last[lastmin + 14], last[lastmin + 15],
+                   bufB, bufC); // R
+        tilt4_post(last[lastmin + 16], last[lastmin + 17], last[lastmin + 18], last[lastmin + 19],
+                   bufA, bufB); // L
+    }
+    else
+    {
+        tilt1_post(last[lastmin + 12], last[lastmin + 13], bufB, bufC); // R
+        tilt1_post(last[lastmin + 16], last[lastmin + 17], bufA, bufB); // L
+    }
+    // tilt1_post(last[lastmin + 12], last[lastmin + 13], bufA, bufB);
     mul<FXConfig::blockSize>(bufB, sat_halfsq_db, bufB);
-    clip_tanh78<FXConfig::blockSize>(6.6666666666666666, 0.15, bufB, bufB); // 1/0.15
-    high_shelf<FXConfig::blockSize>(last[lastmin + 10], coef3000, sat_invinvsq_block, bufB, bufA);
-    high_shelf<FXConfig::blockSize>(last[lastmin + 11], coef8000, sat_invinvsq_block, bufA, dstL);
+    clip_inv_sinh<FXConfig::blockSize>(6.6666666666666666, 0.15, bufB, bufB); // 1/0.15
+    high_shelf<FXConfig::blockSize>(last[lastmin + 20], coef3000, sat_invinvsq_block, bufB, bufA);
+    high_shelf<FXConfig::blockSize>(last[lastmin + 21], coef8000, sat_invinvsq_block, bufA, dstL);
 
-    tilt1_post(last[lastmin + 12], last[lastmin + 13], bufC, bufB);
-    mul<FXConfig::blockSize>(bufB, sat_halfsq_db, bufB);
-    clip_tanh78<FXConfig::blockSize>(6.6666666666666666, 0.15, bufB, bufB); // 1/0.15
-    high_shelf<FXConfig::blockSize>(last[lastmin + 14], coef3000, sat_invinvsq_block, bufB, bufA);
-    high_shelf<FXConfig::blockSize>(last[lastmin + 15], coef8000, sat_invinvsq_block, bufA, dstR);
+    // tilt1_post(last[lastmin + 16], last[lastmin + 17], bufC, bufB);
+    mul<FXConfig::blockSize>(bufC, sat_halfsq_db, bufC);
+    clip_inv_sinh<FXConfig::blockSize>(6.6666666666666666, 0.15, bufC, bufC); // 1/0.15
+    high_shelf<FXConfig::blockSize>(last[lastmin + 22], coef3000, sat_invinvsq_block, bufC, bufB);
+    high_shelf<FXConfig::blockSize>(last[lastmin + 23], coef8000, sat_invinvsq_block, bufB, dstR);
 }
 
 // 29 last slots
@@ -998,12 +1157,14 @@ inline void Bonsai<FXConfig>::bass_boost(float last[], int lastmin, const float 
     onepole_hp<FXConfig::blockSize>(last[lastmin + 15], coef30, bufB, bufA);
     sum3<FXConfig::blockSize>(branch1, branch2, bufA, bufB);
     mul<FXConfig::blockSize>(bufB, 0.16666666666666666666666, bufB);
-    // change the above constant to adjust the default gain, so the slider is negative less often
-    // previous value: 0.3333333333333333333333333
+    // change the above constant to adjust the default gain, so the
+    // slider is negative less often previous value:
+    // 0.3333333333333333333333333
     onepole_lp<FXConfig::blockSize>(last[lastmin + 16], coef500, bufB, bufA);
     mul<FXConfig::blockSize>(bufA, boost_block, bufA);
-    clip_tanh78<FXConfig::blockSize>(lerp6_block, bufA, bufA);
-    // mul<FXConfig::blockSize>(bufA, rerange01(dist01, 1.25, 0.75), bufA);
+    clip_inv_sinh<FXConfig::blockSize>(lerp6_block, bufA, bufA);
+    // mul<FXConfig::blockSize>(bufA, rerange01(dist01, 1.25,
+    // 0.75), bufA);
     onepole_lp<FXConfig::blockSize>(last[lastmin + 17], coef500, bufA, dstL);
     sum2<FXConfig::blockSize>(srcL, dstL, dstL);
 
@@ -1028,12 +1189,14 @@ inline void Bonsai<FXConfig>::bass_boost(float last[], int lastmin, const float 
     onepole_hp<FXConfig::blockSize>(last[lastmin + 26], coef30, bufB, bufA);
     sum3<FXConfig::blockSize>(branch1, branch2, bufA, bufB);
     mul<FXConfig::blockSize>(bufB, 0.16666666666666666666666, bufB);
-    // change the above constant to adjust the default gain, so the slider is negative less often
-    // previous value: 0.3333333333333333333333333
+    // change the above constant to adjust the default gain, so the
+    // slider is negative less often previous value:
+    // 0.3333333333333333333333333
     onepole_lp<FXConfig::blockSize>(last[lastmin + 27], coef500, bufB, bufA);
     mul<FXConfig::blockSize>(bufA, boost_block, bufA);
-    clip_tanh78<FXConfig::blockSize>(lerp6_block, bufA, bufA);
-    // mul<FXConfig::blockSize>(bufA, rerange01(dist01, 1.25, 0.75), bufA);
+    clip_inv_sinh<FXConfig::blockSize>(lerp6_block, bufA, bufA);
+    // mul<FXConfig::blockSize>(bufA, rerange01(dist01, 1.25,
+    // 0.75), bufA);
     onepole_lp<FXConfig::blockSize>(last[lastmin + 28], coef500, bufA, dstR);
     sum2<FXConfig::blockSize>(srcR, dstR, dstR);
 }
@@ -1138,7 +1301,8 @@ inline void Bonsai<FXConfig>::age(float last[], int lastmin, const float coef0, 
     float coef_highcut alignas(16)[FXConfig::blockSize] = {};
     onepole_lp<FXConfig::blockSize>(
         last[lastmin + 1], coef20,
-        freq_sr_to_alpha(rerange01(dull_isq, 20000.f, 2000.f), this->sampleRate()), coef_highcut);
+        freq_sr_to_alpha_reaktor(rerange01(dull_isq, 20000.f, 2000.f), this->sampleRate()),
+        coef_highcut);
     float coef_lowcut alignas(16)[FXConfig::blockSize] = {};
     onepole_lp<FXConfig::blockSize>(last[lastmin + 2], coef20, rerange01(dull_sq, coef0, coef100),
                                     coef_lowcut);
@@ -1173,12 +1337,13 @@ inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__res
     float gainIn alignas(16)[FXConfig::blockSize] = {};
     float gainOut alignas(16)[FXConfig::blockSize] = {};
     float mixVal alignas(16)[FXConfig::blockSize] = {};
-    onepole_lp<FXConfig::blockSize>(last[0], coef20, this->dbToLinear(this->floatValue(b_gain_in)),
-                                    gainIn);
-    onepole_lp<FXConfig::blockSize>(last[1], coef20, this->dbToLinear(this->floatValue(b_gain_out)),
-                                    gainOut);
+    onepole_lp<FXConfig::blockSize>(last[0], coef20,
+                                    this->dbToLinear(this->floatValueExtended(b_gain_in)), gainIn);
+    onepole_lp<FXConfig::blockSize>(
+        last[1], coef20, this->dbToLinear(this->floatValueExtended(b_gain_out)), gainOut);
     onepole_lp<FXConfig::blockSize>(last[2], coef20, this->floatValue(b_mix), mixVal);
-    // out of order in the last array because that's easier than shifting everything
+    // out of order in the last array because that's easier than
+    // shifting everything
 
     float scaledL alignas(16)[FXConfig::blockSize] = {};
     float scaledR alignas(16)[FXConfig::blockSize] = {};
@@ -1186,8 +1351,6 @@ inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__res
     float hpR alignas(16)[FXConfig::blockSize] = {};
     float bassL alignas(16)[FXConfig::blockSize] = {};
     float bassR alignas(16)[FXConfig::blockSize] = {};
-    // float bassboostedL alignas(16)[FXConfig::blockSize] = {};
-    // float bassboostedR alignas(16)[FXConfig::blockSize] = {};
     float satL alignas(16)[FXConfig::blockSize] = {};
     float satR alignas(16)[FXConfig::blockSize] = {};
     float noiseL alignas(16)[FXConfig::blockSize] = {};
@@ -1202,19 +1365,62 @@ inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__res
     onepole_hp<FXConfig::blockSize>(last[3], coef10, scaledL, hpL);
     onepole_hp<FXConfig::blockSize>(last[4], coef10, scaledR, hpR);
     bass_boost(last, 5, coef20, coef30, coef50, coef200, coef500,
-               this->dbToLinear(this->floatValue(b_bass_boost)), this->floatValue(b_bass_distort),
-               hpL, hpR, bassL, bassR);
-    // sum2<FXConfig::blockSize>(hpL, bassL, bassboostedL);
-    // sum2<FXConfig::blockSize>(hpR, bassR, bassboostedR);
+               this->dbToLinear(this->floatValueExtended(b_bass_boost)),
+               this->floatValue(b_bass_distort), hpL, hpR, bassL, bassR);
     tape_sat(last, 34, coef3000, coef8000, std::clamp(this->floatValue(b_tape_sat), 0.f, 1.f),
-             this->intValue(b_tape_dist_mode), bassL, bassR, satL, satR);
+             this->intValue(b_tape_dist_mode), this->intValue(b_tape_bias_mode), bassL, bassR, satL,
+             satR);
     tape_noise(last, 58, coef20, coef50, coef500, coef1000, coef2000,
                this->floatValue(b_noise_sensitivity),
-               this->dbToLinear(this->floatValue(b_noise_gain)), satL, satR, noiseL, noiseR);
+               this->dbToLinear(this->floatValueExtended(b_noise_gain)), satL, satR, noiseL,
+               noiseR);
     age(last, 82, coef0, coef100, coef700, coef1200, coef2000, coef3000, this->floatValue(b_dull),
         noiseL, noiseR, agedL, agedR);
     onepole_hp<FXConfig::blockSize>(last[98], coef10, agedL, outL);
     onepole_hp<FXConfig::blockSize>(last[99], coef10, agedR, outR);
+    // switch ((int)floor(8 * std::clamp(this->floatValue(b_tape_sat), 0.f, 1.f)))
+    // {
+    // case 0:
+    //     onepole_lp<FXConfig::blockSize>(last[3], coef20, scaledL, outL);
+    //     onepole_hp<FXConfig::blockSize>(last[4], coef20, scaledR, outR);
+    //     break;
+    // case 1:
+    //     onepole_lp<FXConfig::blockSize>(last[3], coef70, scaledL, outL);
+    //     onepole_hp<FXConfig::blockSize>(last[4], coef70, scaledR, outR);
+    //     break;
+    // case 2:
+    //     onepole_lp<FXConfig::blockSize>(last[3], coef200, scaledL, outL);
+    //     onepole_hp<FXConfig::blockSize>(last[4], coef200, scaledR, outR);
+    //     break;
+    // case 3:
+    //     onepole_lp<FXConfig::blockSize>(last[3], coef500, scaledL, outL);
+    //     onepole_hp<FXConfig::blockSize>(last[4], coef500, scaledR, outR);
+    //     break;
+    // case 4:
+    //     onepole_lp<FXConfig::blockSize>(last[3], coef900, scaledL, outL);
+    //     onepole_hp<FXConfig::blockSize>(last[4], coef900, scaledR, outR);
+    //     break;
+    // case 5:
+    //     onepole_lp<FXConfig::blockSize>(last[3], coef2000, scaledL, outL);
+    //     onepole_hp<FXConfig::blockSize>(last[4], coef2000, scaledR, outR);
+    //     break;
+    // case 6:
+    //     onepole_lp<FXConfig::blockSize>(last[3], coef6000, scaledL, outL);
+    //     onepole_hp<FXConfig::blockSize>(last[4], coef6000, scaledR, outR);
+    //     break;
+    // case 7:
+    //     onepole_lp<FXConfig::blockSize>(last[3], coef11000, scaledL, outL);
+    //     onepole_hp<FXConfig::blockSize>(last[4], coef11000, scaledR, outR);
+    //     break;
+    // case 8:
+    //     onepole_lp<FXConfig::blockSize>(last[3], coef22000, scaledL, outL);
+    //     onepole_hp<FXConfig::blockSize>(last[4], coef22000, scaledR, outR);
+    //     break;
+    // default:
+    //     onepole_lp<FXConfig::blockSize>(last[3], coef20, scaledL, outL);
+    //     onepole_hp<FXConfig::blockSize>(last[4], coef20, scaledR, outR);
+    //     break;
+    // }
     mul<FXConfig::blockSize>(outL, gainOut, outL);
     mul<FXConfig::blockSize>(outR, gainOut, outR);
     lerp<FXConfig::blockSize>(dataL, outL, mixVal, dataL);
