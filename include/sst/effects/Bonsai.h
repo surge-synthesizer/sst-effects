@@ -566,7 +566,7 @@ inline void rerange01(float *__restrict in, float l2, float h2, float *__restric
     }
 }
 template <size_t blockSize>
-inline float rerange01(float *__restrict in, float *__restrict l2, float *__restrict h2,
+inline void rerange01(float *__restrict in, float *__restrict l2, float *__restrict h2,
                        float *__restrict src, float *__restrict dst)
 {
     for (auto i = 0U; i < blockSize; ++i)
@@ -586,7 +586,7 @@ inline void rerange1b(float *__restrict in, float l2, float h2, float *__restric
     }
 }
 template <size_t blockSize>
-inline float rerange1b(float *__restrict in, float *__restrict l2, float *__restrict h2,
+inline void rerange1b(float *__restrict in, float *__restrict l2, float *__restrict h2,
                        float *__restrict src, float *__restrict dst)
 {
     for (auto i = 0U; i < blockSize; ++i)
