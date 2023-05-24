@@ -28,7 +28,7 @@
 #include "sst/basic-blocks/dsp/FastMath.h"
 #include "sst/basic-blocks/tables/DbToLinearProvider.h"
 
-namespace sst::effects
+namespace sst::effects::bonsai
 {
 namespace sdsp = sst::basic_blocks::dsp;
 
@@ -715,7 +715,7 @@ template <size_t blockSize> inline void noise_ds4(float &last, float *__restrict
     }
 }
 
-template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
+template <typename FXConfig> struct Bonsai : core::EffectTemplateBase<FXConfig>
 {
     // static constexpr double MIDI_0_FREQ = 8.17579891564371;
     // or 440.0 * pow( 2.0, - (69.0/12.0) )
@@ -761,7 +761,7 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
 
     Bonsai(typename FXConfig::GlobalStorage *s, typename FXConfig::EffectStorage *e,
            typename FXConfig::ValueStorage *p)
-        : EffectTemplateBase<FXConfig>(s, e, p)
+        : core::EffectTemplateBase<FXConfig>(s, e, p)
     {
     }
 
@@ -1480,6 +1480,6 @@ inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__res
     lerp<FXConfig::blockSize>(dataR, outR, mixVal, dataR);
 }
 
-} // namespace sst::effects
+} // namespace sst::effects::bonsai
 
 #endif

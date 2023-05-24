@@ -101,7 +101,7 @@ TEST_CASE("SFINAE gives us extras")
 {
     SECTION("On Missing")
     {
-        auto ec = std::make_unique<sst::effects::EffectTemplateBase<NoExtraConfig>>(
+        auto ec = std::make_unique<sst::effects::core::EffectTemplateBase<NoExtraConfig>>(
             nullptr, nullptr, nullptr);
         REQUIRE(ec->floatValue(0) == 17.2f);
         REQUIRE(ec->floatValueExtended(0) == 17.2f);
@@ -113,8 +113,8 @@ TEST_CASE("SFINAE gives us extras")
 
     SECTION("On Not Missing")
     {
-        auto ec = std::make_unique<sst::effects::EffectTemplateBase<ExtraConfig>>(nullptr, nullptr,
-                                                                                  nullptr);
+        auto ec = std::make_unique<sst::effects::core::EffectTemplateBase<ExtraConfig>>(
+            nullptr, nullptr, nullptr);
         REQUIRE(ec->floatValue(0) == 17.2f);
         REQUIRE(ec->floatValueExtended(0) == 37.4f);
         REQUIRE(ec->temposyncInitialized() == false);

@@ -29,12 +29,12 @@
 #include "sst/basic-blocks/mechanics/block-ops.h"
 #include "sst/basic-blocks/mechanics/simd-ops.h"
 
-namespace sst::effects
+namespace sst::effects::reverb1
 {
 namespace sdsp = sst::basic_blocks::dsp;
 namespace mech = sst::basic_blocks::mechanics;
 
-template <typename FXConfig> struct Reverb1 : EffectTemplateBase<FXConfig>
+template <typename FXConfig> struct Reverb1 : core::EffectTemplateBase<FXConfig>
 {
     enum rev1_params
     {
@@ -127,7 +127,7 @@ template <typename FXConfig> struct Reverb1 : EffectTemplateBase<FXConfig>
     float out_tap alignas(16)[rev_taps];
     float predelay alignas(16)[max_rev_dly];
     int delay_time alignas(16)[rev_taps];
-    typename EffectTemplateBase<FXConfig>::lipol_ps_blocksz mix, width;
+    typename core::EffectTemplateBase<FXConfig>::lipol_ps_blocksz mix, width;
 
     void update_rtime();
     void update_rsize() { loadpreset(shape); }
@@ -146,7 +146,7 @@ template <typename FXConfig> struct Reverb1 : EffectTemplateBase<FXConfig>
     double modphase{0.0};
     int shape{0};
     float lastf[numParams];
-    typename EffectTemplateBase<FXConfig>::BiquadFilterType band1, locut, hicut;
+    typename core::EffectTemplateBase<FXConfig>::BiquadFilterType band1, locut, hicut;
     int ringout_time;
     int b{0};
 
@@ -156,7 +156,7 @@ template <typename FXConfig> struct Reverb1 : EffectTemplateBase<FXConfig>
 template <typename FXConfig>
 Reverb1<FXConfig>::Reverb1(typename FXConfig::GlobalStorage *s, typename FXConfig::EffectStorage *e,
                            typename FXConfig::ValueStorage *p)
-    : EffectTemplateBase<FXConfig>(s, e, p), band1(s), locut(s), hicut(s)
+    : core::EffectTemplateBase<FXConfig>(s, e, p), band1(s), locut(s), hicut(s)
 {
 }
 
@@ -423,6 +423,6 @@ template <typename FXConfig> inline void Reverb1<FXConfig>::update_rtime()
     ringout_time = (int)t;
 }
 
-} // namespace sst::effects
+} // namespace sst::effects::reverb1
 
 #endif

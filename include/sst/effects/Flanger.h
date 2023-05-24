@@ -26,11 +26,11 @@
 #include "sst/basic-blocks/dsp/Lag.h"
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
 
-namespace sst::effects
+namespace sst::effects::flanger
 {
 namespace sdsp = sst::basic_blocks::dsp;
 
-template <typename FXConfig> struct Flanger : EffectTemplateBase<FXConfig>
+template <typename FXConfig> struct Flanger : core::EffectTemplateBase<FXConfig>
 {
     static constexpr double MIDI_0_FREQ = 8.17579891564371; // or 440.0 * pow( 2.0, - (69.0/12.0 ) )
 
@@ -79,7 +79,7 @@ template <typename FXConfig> struct Flanger : EffectTemplateBase<FXConfig>
 
     Flanger(typename FXConfig::GlobalStorage *s, typename FXConfig::EffectStorage *e,
             typename FXConfig::ValueStorage *p)
-        : EffectTemplateBase<FXConfig>(s, e, p)
+        : core::EffectTemplateBase<FXConfig>(s, e, p)
     {
     }
 
@@ -602,6 +602,6 @@ inline void Flanger<FXConfig>::processBlock(float *__restrict dataL, float *__re
     this->applyWidth(dataL, dataR, width);
 }
 
-} // namespace sst::effects
+} // namespace sst::effects::flanger
 
 #endif

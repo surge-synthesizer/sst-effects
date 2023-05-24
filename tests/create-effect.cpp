@@ -109,8 +109,8 @@ template <typename T> struct Tester
 
 TEST_CASE("Can Create Types")
 {
-    SECTION("Flanger") { Tester<sst::effects::Flanger<TestConfig>>::TestFX(); }
-    SECTION("Reverb1") { Tester<sst::effects::Reverb1<TestConfig>>::TestFX(); }
-    SECTION("Delay") { Tester<sst::effects::Delay<TestConfig>>::TestFX(); }
-    SECTION("Bonsai") { Tester<sst::effects::Bonsai<TestConfig>>::TestFX(); }
+    SECTION("Flanger") { Tester<sst::effects::flanger::Flanger<TestConfig>>::TestFX(); }
+    SECTION("Reverb1") { Tester<sst::effects::reverb1::Reverb1<TestConfig>>::TestFX(); }
+    SECTION("Delay") { Tester<sst::effects::delay::Delay<TestConfig>>::TestFX(); }
+    SECTION("Bonsai") { Tester<sst::effects::bonsai::Bonsai<TestConfig>>::TestFX(); }
 }
