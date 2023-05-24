@@ -26,6 +26,7 @@
 #include "sst/effects/Delay.h"
 #include "sst/effects/Flanger.h"
 #include "sst/effects/Reverb1.h"
+#include "sst/effects/Bonsai.h"
 
 struct TestConfig
 {
@@ -111,4 +112,5 @@ TEST_CASE("Can Create Types")
     SECTION("Flanger") { Tester<sst::effects::Flanger<TestConfig>>::TestFX(); }
     SECTION("Reverb1") { Tester<sst::effects::Reverb1<TestConfig>>::TestFX(); }
     SECTION("Delay") { Tester<sst::effects::Delay<TestConfig>>::TestFX(); }
+    SECTION("Bonsai") { Tester<sst::effects::Bonsai<TestConfig>>::TestFX(); }
 }

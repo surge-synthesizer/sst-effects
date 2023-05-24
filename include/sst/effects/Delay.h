@@ -22,6 +22,7 @@
 #define INCLUDE_SST_EFFECTS_DELAY_H
 
 #include <cstring>
+#include <cmath>
 #include <utility>
 
 #include "EffectCore.h"
@@ -222,7 +223,7 @@ template <typename FXConfig> inline void Delay<FXConfig>::setvars(bool init)
         }
     }
 
-    float fb = amp_to_linear(abs(fbp));
+    float fb = amp_to_linear(std::fabs(fbp));
     float cf = amp_to_linear(this->floatValue(dly_crossfeed));
 
     feedback.set_target_smoothed(fb);

@@ -656,7 +656,8 @@ inline void lerp(float *__restrict src1, float *__restrict src2, float *__restri
     }
 }
 
-template <size_t blockSize> inline void abs(float *__restrict src, float *__restrict dst)
+// TODO - move this to basic blocks as abs
+template <size_t blockSize> inline void blockabs(float *__restrict src, float *__restrict dst)
 {
     for (auto i = 0U; i < blockSize; ++i)
     {
@@ -1041,12 +1042,12 @@ inline void shelf_gain(float &last, float coef, float *__restrict pre,
     float bufB alignas(16)[blockSize] = {};
     mul<blockSize>(pre, postdistgain, bufA);
     mul<blockSize>(bufA, 6.f, bufA);
-    abs<blockSize>(bufA, bufA);
+    blockabs<blockSize>(bufA, bufA);
     mul<blockSize>(post, 6.f, bufB);
-    abs<blockSize>(bufB, bufB);
+    blockabs<blockSize>(bufB, bufB);
     minus2<blockSize>(bufB, bufA, bufB);
     onepole_lp<blockSize>(last, coef, bufB, bufA);
-    abs<blockSize>(bufA, bufA);
+    blockabs<blockSize>(bufA, bufA);
     sum2<blockSize>(bufA, 1.f, bufA);
     div<blockSize>(1.f, bufA, bufA);
     mul<blockSize>(bufA, bufA, dstsq);
@@ -1312,7 +1313,7 @@ Bonsai<FXConfig>::noise_channel(float last[], int lastmin, float *__restrict sen
     unit_delay<FXConfig::blockSize>(last[lastmin + 5], bufA, bufC);
     minus2<FXConfig::blockSize>(bufA, bufC, bufB);
     mul<FXConfig::blockSize>(bufB, sr_scaled, bufC);
-    abs<FXConfig::blockSize>(bufC, bufB);
+    blockabs<FXConfig::blockSize>(bufC, bufB);
     minus2<FXConfig::blockSize>(bufB, threshold, bufB);
     max<FXConfig::blockSize>(bufB, 0.f, bufB);
     mul<FXConfig::blockSize>(bufB, bufB, bufB);
