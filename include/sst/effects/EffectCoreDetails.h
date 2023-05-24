@@ -25,7 +25,7 @@
 #include <type_traits>
 #include <iostream>
 
-namespace sst::effects::details
+namespace sst::effects::core::details
 {
 
 // Thanks Jatin!
@@ -52,6 +52,6 @@ HAS_MEMBER(temposyncInitialized);
 HAS_MEMBER(temposyncRatioInv);
 HAS_MEMBER(deformType);
 
-} // namespace sst::effects::details
+} // namespace sst::effects::core::details
 
 #endif // SURGE_EFFECTCOREDETAILS_H

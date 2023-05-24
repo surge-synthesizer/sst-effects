@@ -21,7 +21,7 @@
 #ifndef INCLUDE_SST_EFFECTS_CONCRETECONFIG_H
 #define INCLUDE_SST_EFFECTS_CONCRETECONFIG_H
 
-namespace sst::effects
+namespace sst::effects::core
 {
 /**
  * ConcreteConfig is a simple implementation of the Configuration protocol which
@@ -98,6 +98,6 @@ struct ConcreteConfig
 
     static inline float dbToLinear(GlobalStorage *s, float f) { return 1; }
 };
-} // namespace sst::effects
+} // namespace sst::effects::core
 
 #endif // SURGE_CONCRETECONFIG_H

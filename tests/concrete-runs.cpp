@@ -50,8 +50,8 @@ template <typename T> struct Tester
 
         INFO("Starting test with concrete implementation " << T::effectName);
 
-        auto gs = sst::effects::ConcreteConfig::GlobalStorage(48000);
-        auto es = sfx::ConcreteConfig::EffectStorage();
+        auto gs = sst::effects::core::ConcreteConfig::GlobalStorage(48000);
+        auto es = sfx::core::ConcreteConfig::EffectStorage();
 
         auto fx = std::make_unique<FX>(&gs, &es, nullptr);
 
@@ -61,14 +61,14 @@ template <typename T> struct Tester
 
         fx->initialize();
 
-        float L alignas(16)[sfx::ConcreteConfig::blockSize],
-            R alignas(16)[sfx::ConcreteConfig::blockSize];
+        float L alignas(16)[sfx::core::ConcreteConfig::blockSize],
+            R alignas(16)[sfx::core::ConcreteConfig::blockSize];
 
         float phase = 0.f;
         float dphase = 1.0 / 317.4;
         for (int blocks = 0; blocks < 1000; ++blocks)
         {
-            for (int s = 0; s < sfx::ConcreteConfig::blockSize; ++s)
+            for (int s = 0; s < sfx::core::ConcreteConfig::blockSize; ++s)
             {
                 L[s] = 0.6 * (phase * 2 - 1);
                 R[s] = 0.57 * (phase > 0.7 ? 1 : -1);
@@ -79,7 +79,7 @@ template <typename T> struct Tester
 
             fx->processBlock(L, R);
 
-            for (int s = 0; s < sfx::ConcreteConfig::blockSize; ++s)
+            for (int s = 0; s < sfx::core::ConcreteConfig::blockSize; ++s)
             {
                 REQUIRE(fabs(L[s]) < 2.0);
                 REQUIRE(fabs(R[s]) < 2.0);
@@ -90,8 +90,8 @@ template <typename T> struct Tester
 
 TEST_CASE("Can Run Types with Concrete Config")
 {
-    SECTION("Flanger") { Tester<sfx::Flanger<sfx::ConcreteConfig>>::TestFX(); }
-    SECTION("Reverb1") { Tester<sfx::Reverb1<sfx::ConcreteConfig>>::TestFX(); }
-    SECTION("Delay") { Tester<sfx::Delay<sfx::ConcreteConfig>>::TestFX(); }
-    SECTION("Bonsai") { Tester<sfx::Bonsai<sfx::ConcreteConfig>>::TestFX(); }
+    SECTION("Flanger") { Tester<sfx::flanger::Flanger<sfx::core::ConcreteConfig>>::TestFX(); }
+    SECTION("Reverb1") { Tester<sfx::reverb1::Reverb1<sfx::core::ConcreteConfig>>::TestFX(); }
+    SECTION("Delay") { Tester<sfx::delay::Delay<sfx::core::ConcreteConfig>>::TestFX(); }
+    SECTION("Bonsai") { Tester<sfx::bonsai::Bonsai<sfx::core::ConcreteConfig>>::TestFX(); }
 }

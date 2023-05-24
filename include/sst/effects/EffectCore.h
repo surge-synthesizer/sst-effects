@@ -82,7 +82,7 @@
 
 #include <type_traits>
 
-namespace sst::effects
+namespace sst::effects::core
 {
 // Todo: as we port consider this FXConfig::BaseClass being a bit more configurable.
 template <typename FXConfig> struct EffectTemplateBase : public FXConfig::BaseClass
@@ -242,6 +242,6 @@ template <typename FXConfig> struct EffectTemplateBase : public FXConfig::BaseCl
         sdsp::decodeMS<FXConfig::blockSize>(M, S, L, R);
     }
 };
-} // namespace sst::effects
+} // namespace sst::effects::core
 
 #endif

@@ -37,12 +37,12 @@
 
 #include "sst/basic-blocks/tables/SincTableProvider.h"
 
-namespace sst::effects
+namespace sst::effects::delay
 {
 namespace sdsp = sst::basic_blocks::dsp;
 namespace mech = sst::basic_blocks::mechanics;
 
-template <typename FXConfig> struct Delay : EffectTemplateBase<FXConfig>
+template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
 {
     enum delay_params
     {
@@ -78,7 +78,7 @@ template <typename FXConfig> struct Delay : EffectTemplateBase<FXConfig>
 
     Delay(typename FXConfig::GlobalStorage *s, typename FXConfig::EffectStorage *e,
           typename FXConfig::ValueStorage *p)
-        : EffectTemplateBase<FXConfig>(s, e, p), lp(s), hp(s)
+        : core::EffectTemplateBase<FXConfig>(s, e, p), lp(s), hp(s)
     {
         // We should no longer need this
         mix.set_blocksize(FXConfig::blockSize);
@@ -167,8 +167,8 @@ template <typename FXConfig> struct Delay : EffectTemplateBase<FXConfig>
     // TODO - we've wanted a sample rate adjustable max for a while.
     // Still don't have it here.
     static constexpr int max_delay_length{1 << 18};
-    typename EffectTemplateBase<FXConfig>::lipol_ps_blocksz feedback, crossfeed, aligpan, pan, mix,
-        width;
+    typename core::EffectTemplateBase<FXConfig>::lipol_ps_blocksz feedback, crossfeed, aligpan, pan,
+        mix, width;
     float buffer alignas(
         16)[2][max_delay_length + sst::basic_blocks::tables::SurgeSincTableProvider::FIRipol_N];
 
@@ -176,7 +176,7 @@ template <typename FXConfig> struct Delay : EffectTemplateBase<FXConfig>
     bool inithadtempo;
     float envf;
     int wpos;
-    typename EffectTemplateBase<FXConfig>::BiquadFilterType lp, hp;
+    typename core::EffectTemplateBase<FXConfig>::BiquadFilterType lp, hp;
     double lfophase;
     float LFOval;
     bool LFOdirection, FBsign;
@@ -430,5 +430,5 @@ template <typename FXConfig> inline void Delay<FXConfig>::processBlock(float *da
     wpos += FXConfig::blockSize;
     wpos = wpos & (max_delay_length - 1);
 }
-} // namespace sst::effects
+} // namespace sst::effects::delay
 #endif // SURGE_DELAY_H
