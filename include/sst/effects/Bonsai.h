@@ -567,7 +567,7 @@ inline void rerange01(float *__restrict in, float l2, float h2, float *__restric
 }
 template <size_t blockSize>
 inline void rerange01(float *__restrict in, float *__restrict l2, float *__restrict h2,
-                       float *__restrict src, float *__restrict dst)
+                      float *__restrict src, float *__restrict dst)
 {
     for (auto i = 0U; i < blockSize; ++i)
     {
@@ -587,7 +587,7 @@ inline void rerange1b(float *__restrict in, float l2, float h2, float *__restric
 }
 template <size_t blockSize>
 inline void rerange1b(float *__restrict in, float *__restrict l2, float *__restrict h2,
-                       float *__restrict src, float *__restrict dst)
+                      float *__restrict src, float *__restrict dst)
 {
     for (auto i = 0U; i < blockSize; ++i)
     {
@@ -799,9 +799,12 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
         switch ((b_params)idx)
         {
         case b_bass_boost:
-            return result.withName("Amount").withRange(0.f, 1.f).withDefault(0.25f);
+            return result.withName("Amount").asDecibelNarrow().extendable().deformable();
         case b_bass_distort:
-            return result.withName("Distort").withRange(0.f, 3.f).withDefault(1.f);
+            return result.withName("Distort")
+                .withRange(0.f, 3.f)
+                .withDefault(1.f)
+                .withLinearScaleFormatting("dB");
         case b_tape_bias_mode:
             return result.withType(pmd::INT)
                 .withName("Bias Filter")
@@ -809,7 +812,7 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
                 .withDefault(0)
                 .withUnorderedMapFormatting({{0, "Tilt - Type 1"}, {1, "Pull Mids - Type 4"}});
         case b_tape_sat:
-            return result.withName("Saturation").withRange(0.f, 1.f).withDefault(0.25f);
+            return result.withName("Saturation").asPercent().withDefault(0.25f);
         case b_tape_dist_mode:
             return result.withType(pmd::INT)
                 .withName("Dist Mode")
@@ -820,11 +823,16 @@ template <typename FXConfig> struct Bonsai : EffectTemplateBase<FXConfig>
                                              {bdm_tanh_approx_foldback, "Foldback"},
                                              {bdm_sine, "Sine-Tanh Combo"}});
         case b_noise_sensitivity:
-            return result.withName("Sensitivity").withRange(0.f, 1.f).withDefault(0.25f);
+            return result.withName("Sensitivity").asPercent().withDefault(0.25f);
         case b_noise_gain:
-            return result.withName("Gain").asDecibelNarrow().withDefault(0.f);
+            // Gain is a decibel narrow with a lowered top range
+            return result.withName("Gain")
+                .asDecibelNarrow()
+                .withRange(-24, 12)
+                .withDefault(0.f)
+                .extendable();
         case b_dull:
-            return result.withName("Dull").withRange(0.f, 1.f).withDefault(0.f);
+            return result.withName("Dull").asPercent().withDefault(0.f);
         case b_gain_in:
             return result.withName("Input Gain").asDecibelNarrow().withDefault(0.f);
         case b_gain_out:
