@@ -22,6 +22,7 @@
 #define INCLUDE_SST_EFFECTS_DELAY_H
 
 #include <cstring>
+#include <cmath>
 #include <utility>
 
 #include "EffectCore.h"
