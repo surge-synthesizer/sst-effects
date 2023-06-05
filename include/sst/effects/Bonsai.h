@@ -723,9 +723,9 @@ template <typename FXConfig> struct Bonsai : core::EffectTemplateBase<FXConfig>
     enum b_dist_modes
     {
         bdm_inv_sinh = 0,
-        bdm_tanh = 1,
-        bdm_tanh_approx_foldback = 2,
-        bdm_sine = 3,
+        bdm_tanh,
+        bdm_tanh_approx_foldback,
+        bdm_sine,
     };
 
     enum b_params
@@ -802,41 +802,36 @@ template <typename FXConfig> struct Bonsai : core::EffectTemplateBase<FXConfig>
             return result.withName("Amount").asDecibelNarrow().extendable().deformable();
         case b_bass_distort:
             return result.withName("Distort")
-                .withRange(0.f, 3.f)
-                .withDefault(1.f)
-                .withLinearScaleFormatting("dB");
+                .withRange(0.f, 1.f)
+                .withDefault(0.25f)
+                .withLinearScaleFormatting("%", 100.f);
         case b_tape_bias_mode:
             return result.withType(pmd::INT)
                 .withName("Bias Filter")
                 .withRange(0, 1)
                 .withDefault(0)
-                .withUnorderedMapFormatting({{0, "Tilt - Type 1"}, {1, "Pull Mids - Type 4"}});
+                .withUnorderedMapFormatting({{0, "Tilt"}, {1, "Pull Mids"}});
         case b_tape_sat:
-            return result.withName("Saturation").asPercent().withDefault(0.25f);
+            return result.withName("Amount").asPercent().withDefault(0.25f);
         case b_tape_dist_mode:
             return result.withType(pmd::INT)
-                .withName("Dist Mode")
+                .withName("Type")
                 .withRange(bdm_inv_sinh, bdm_sine)
-                .withDefault(bdm_tanh)
-                .withUnorderedMapFormatting({{bdm_inv_sinh, "Inverse Sinh"},
-                                             {bdm_tanh, "Tanh"},
-                                             {bdm_tanh_approx_foldback, "Foldback"},
-                                             {bdm_sine, "Sine-Tanh Combo"}});
+                .withDefault(bdm_inv_sinh)
+                .withUnorderedMapFormatting({{bdm_inv_sinh, "Gentle"},
+                                             {bdm_tanh, "Normal"},
+                                             {bdm_tanh_approx_foldback, "Hard"},
+                                             {bdm_sine, "Harsh"}});
         case b_noise_sensitivity:
             return result.withName("Sensitivity").asPercent().withDefault(0.25f);
         case b_noise_gain:
-            // Gain is a decibel narrow with a lowered top range
-            return result.withName("Gain")
-                .asDecibelNarrow()
-                .withRange(-24, 12)
-                .withDefault(0.f)
-                .extendable();
+            return result.withName("Gain").asDecibelNarrow().withRange(-24, 24).withDefault(0.f);
         case b_dull:
             return result.withName("Dull").asPercent().withDefault(0.f);
         case b_gain_in:
-            return result.withName("Input Gain").asDecibelNarrow().withDefault(0.f);
+            return result.withName("Gain").asDecibelNarrow().withDefault(0.f);
         case b_gain_out:
-            return result.withName("Output Gain").asDecibelNarrow().withDefault(0.f);
+            return result.withName("Gain").asDecibelNarrow().withDefault(0.f);
         case b_mix:
             return result.withName("Mix").asPercent().withDefault(1.f);
         case b_num_params:
@@ -1464,13 +1459,12 @@ inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__res
     onepole_hp<FXConfig::blockSize>(last[3], coef10, scaledL, hpL);
     onepole_hp<FXConfig::blockSize>(last[4], coef10, scaledR, hpR);
     bass_boost(last, 5, this->dbToLinear(this->floatValueExtended(b_bass_boost)),
-               this->floatValue(b_bass_distort), hpL, hpR, bassL, bassR);
+               this->floatValue(b_bass_distort) * 3.f, hpL, hpR, bassL, bassR);
     tape_sat(last, 34, std::clamp(this->floatValue(b_tape_sat), 0.f, 1.f),
              this->intValue(b_tape_dist_mode), this->intValue(b_tape_bias_mode), bassL, bassR, satL,
              satR);
     tape_noise(last, 60, this->floatValue(b_noise_sensitivity),
-               this->dbToLinear(this->floatValueExtended(b_noise_gain)), satL, satR, noiseL,
-               noiseR);
+               this->dbToLinear(this->floatValue(b_noise_gain)), satL, satR, noiseL, noiseR);
     age(last, 84, this->floatValue(b_dull), noiseL, noiseR, agedL, agedR);
     onepole_hp<FXConfig::blockSize>(last[100], coef10, agedL, outL);
     onepole_hp<FXConfig::blockSize>(last[101], coef10, agedR, outR);
