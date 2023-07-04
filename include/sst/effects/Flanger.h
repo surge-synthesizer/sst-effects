@@ -450,12 +450,10 @@ inline void Flanger<FXConfig>::processBlock(float *__restrict dataL, float *__re
         feedbackScale *= 0.7;
     }
 
-    if (fbv < 0)
-        fbv = fbv;
-    else if (fbv > 1)
-        fbv = fbv;
-    else
+    if (fbv > 0 && fbv < 1)
+    {
         fbv = sqrt(fbv);
+    }
 
     feedback.newValue(feedbackScale * fbv);
     fb_hf_damping.newValue(0.4 * this->floatValue(fl_damping));
