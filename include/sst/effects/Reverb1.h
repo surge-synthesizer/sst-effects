@@ -309,7 +309,7 @@ inline void Reverb1<FXConfig>::processBlock(float *__restrict dataL, float *__re
     // scale width
     this->applyWidth(wetL, wetR, width);
 
-    mix.fade_2_blocks_to(dataL, wetL, dataR, wetR, dataL, dataR, this->blockSize_quad);
+    mix.fade_2_blocks_inplace(dataL, wetL, dataR, wetR, this->blockSize_quad);
 }
 
 template <typename FXConfig> inline void Reverb1<FXConfig>::loadpreset(int id)

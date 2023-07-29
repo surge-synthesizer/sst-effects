@@ -355,8 +355,8 @@ template <typename FXConfig> inline void Delay<FXConfig>::processBlock(float *da
     // negative feedback
     if (FBsign)
     {
-        mech::mul_block<FXConfig::blockSize>(tbufferL, -1.f, tbufferL);
-        mech::mul_block<FXConfig::blockSize>(tbufferR, -1.f, tbufferR);
+        mech::mul_block<FXConfig::blockSize>(tbufferL, -1.f);
+        mech::mul_block<FXConfig::blockSize>(tbufferR, -1.f);
     }
 
     // feedback path clipping modes
@@ -425,7 +425,7 @@ template <typename FXConfig> inline void Delay<FXConfig>::processBlock(float *da
     // scale width
     this->applyWidth(tbufferL, tbufferR, width);
 
-    mix.fade_2_blocks_to(dataL, tbufferL, dataR, tbufferR, dataL, dataR, this->blockSize_quad);
+    mix.fade_2_blocks_inplace(dataL, tbufferL, dataR, tbufferR, this->blockSize_quad);
 
     wpos += FXConfig::blockSize;
     wpos = wpos & (max_delay_length - 1);
