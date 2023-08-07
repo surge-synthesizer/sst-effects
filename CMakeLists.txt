@@ -14,21 +14,21 @@ if (${SST_EFFECTS_BUILD_TESTS})
                 GITHUB_REPOSITORY surge-synthesizer/sst-basic-blocks
                 GIT_TAG main
                 )
-    endif()
+    endif ()
 
     if (NOT TARGET sst-filters)
         CPMAddPackage(NAME sst-filters
                 GITHUB_REPOSITORY surge-synthesizer/sst-filters
                 GIT_TAG main
                 )
-    endif()
+    endif ()
 
     if (NOT TARGET fmt)
         CPMAddPackage(NAME fmt
                 GITHUB_REPOSITORY fmtlib/fmt
                 GIT_TAG master
                 )
-    endif()
+    endif ()
 
     if (NOT TARGET simde)
         CPMAddPackage(NAME simde
@@ -37,11 +37,12 @@ if (${SST_EFFECTS_BUILD_TESTS})
                 )
         add_library(simde INTERFACE)
         target_include_directories(simde INTERFACE ${simde_SOURCE_DIR})
-    endif()
+    endif ()
 
     add_executable(${PROJECT_NAME}-test
             tests/sst-effects-test.cpp
             tests/create-effect.cpp
+            tests/create-voice-effect.cpp
             tests/concrete-runs.cpp
             tests/sfinae-test.cpp
             )
