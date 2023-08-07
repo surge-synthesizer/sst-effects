@@ -213,16 +213,14 @@ inline void sum2(float *__restrict one, float two, float *__restrict dst)
         dst[i] = one[i] + two;
     }
 }
-template <size_t blockSize>
-inline void sum2(float *__restrict srcDst, float *__restrict plus)
+template <size_t blockSize> inline void sum2(float *__restrict srcDst, float *__restrict plus)
 {
     for (auto i = 0U; i < blockSize; ++i)
     {
         srcDst[i] = srcDst[i] + plus[i];
     }
 }
-template <size_t blockSize>
-inline void sum2(float *__restrict srcDst, float plus)
+template <size_t blockSize> inline void sum2(float *__restrict srcDst, float plus)
 {
     for (auto i = 0U; i < blockSize; ++i)
     {
@@ -256,8 +254,7 @@ inline void minus2(float *__restrict one, float *__restrict two, float *__restri
     }
 }
 
-template <size_t blockSize>
-inline void minus2(float *__restrict sdst, float *__restrict two)
+template <size_t blockSize> inline void minus2(float *__restrict sdst, float *__restrict two)
 {
     for (auto i = 0U; i < blockSize; ++i)
     {
@@ -282,8 +279,7 @@ inline void mul(float *__restrict src1, float *__restrict src2, float *__restric
     }
 }
 
-template <size_t blockSize>
-inline void mul(float *__restrict src1, float *__restrict src2)
+template <size_t blockSize> inline void mul(float *__restrict src1, float *__restrict src2)
 {
     for (auto i = 0U; i < blockSize; ++i)
     {
@@ -291,15 +287,13 @@ inline void mul(float *__restrict src1, float *__restrict src2)
     }
 }
 
-template <size_t blockSize>
-inline void mul(float *__restrict src1, float by)
+template <size_t blockSize> inline void mul(float *__restrict src1, float by)
 {
     for (auto i = 0U; i < blockSize; ++i)
     {
         src1[i] = src1[i] * by;
     }
 }
-
 
 template <size_t blockSize>
 inline void div(float *__restrict src1, float src2, float *__restrict dst)
@@ -394,7 +388,7 @@ inline float clip_inv_sinh(float invlevel, float level, float src)
     return logf(abs2x + sqrt(abs2x * abs2x + 1)) * 0.5 * sgn(scaledown) * level;
 }
 template <size_t blockSize>
-inline void clip_inv_sinh(float invlevel, float level, float * src, float * dst)
+inline void clip_inv_sinh(float invlevel, float level, float *src, float *dst)
 {
     for (auto i = 0U; i < blockSize; ++i)
     {
@@ -403,8 +397,7 @@ inline void clip_inv_sinh(float invlevel, float level, float * src, float * dst)
         dst[i] = logf(abs2x + sqrt(abs2x * abs2x + 1)) * 0.5 * sgn(scaledown) * level;
     }
 }
-template <size_t blockSize>
-inline void clip_inv_sinh(float level, float * src, float *dst)
+template <size_t blockSize> inline void clip_inv_sinh(float level, float *src, float *dst)
 {
     const float invlevel = 1 / level;
     for (auto i = 0U; i < blockSize; ++i)
@@ -414,8 +407,7 @@ inline void clip_inv_sinh(float level, float * src, float *dst)
         dst[i] = logf(abs2x + sqrt(abs2x * abs2x + 1)) * 0.5 * sgn(scaledown) * level;
     }
 }
-template <size_t blockSize>
-inline void clip_inv_sinh(float * level, float * src, float *dst)
+template <size_t blockSize> inline void clip_inv_sinh(float *level, float *src, float *dst)
 {
     for (auto i = 0U; i < blockSize; ++i)
     {
@@ -461,15 +453,14 @@ inline float fasttanh78(float x, float invlevel, float level)
     return fasttanh78(x * invlevel) * level;
 }
 template <size_t blockSize>
-inline void clip_tanh78(float invlevel, float level, float * src, float *dst)
+inline void clip_tanh78(float invlevel, float level, float *src, float *dst)
 {
     for (auto i = 0U; i < blockSize; ++i)
     {
         dst[i] = fasttanh78(invlevel * src[i]) * level;
     }
 }
-template <size_t blockSize>
-inline void clip_tanh78(float level, float * src, float *dst)
+template <size_t blockSize> inline void clip_tanh78(float level, float *src, float *dst)
 {
     const float invlevel = 1 / level;
     for (auto i = 0U; i < blockSize; ++i)
@@ -477,8 +468,7 @@ inline void clip_tanh78(float level, float * src, float *dst)
         dst[i] = fasttanh78(invlevel * src[i]) * level;
     }
 }
-template <size_t blockSize>
-inline void clip_tanh78(float * level, float * src, float * dst)
+template <size_t blockSize> inline void clip_tanh78(float *level, float *src, float *dst)
 {
     for (auto i = 0U; i < blockSize; ++i)
     {
@@ -516,9 +506,7 @@ inline void clip_tanh_foldback(float level, float *__restrict src, float *__rest
         dst[i] = fasttanh_foldback(invlevel * src[i]) * level;
     }
 }
-template <size_t blockSize>
-inline void clip_tanh_foldback(float * level, float * src,
-                               float * dst)
+template <size_t blockSize> inline void clip_tanh_foldback(float *level, float *src, float *dst)
 {
     for (auto i = 0U; i < blockSize; ++i)
     {
@@ -555,8 +543,7 @@ inline void clip_sine_tanh(float level, float *__restrict src, float *__restrict
         dst[i] = clip_sine_tanh(src[i] * invlevel) * level;
     }
 }
-template <size_t blockSize>
-inline void clip_sine_tanh(float * level, float * src, float * dst)
+template <size_t blockSize> inline void clip_sine_tanh(float *level, float *src, float *dst)
 {
     for (auto i = 0U; i < blockSize; ++i)
     {
@@ -683,8 +670,7 @@ inline void max(float *__restrict src, float value, float *__restrict dst)
     }
 }
 
-template <size_t blockSize>
-inline void max(float *__restrict srcdst, float value)
+template <size_t blockSize> inline void max(float *__restrict srcdst, float value)
 {
     for (auto i = 0U; i < blockSize; ++i)
     {
@@ -719,7 +705,6 @@ inline void lerp(float *__restrict srcDest, float *__restrict src2, float *__res
     }
 }
 
-
 // TODO - move this to basic blocks as abs
 template <size_t blockSize> inline void blockabs(float *__restrict src, float *__restrict dst)
 {
@@ -729,7 +714,7 @@ template <size_t blockSize> inline void blockabs(float *__restrict src, float *_
     }
 }
 
-template <size_t blockSize> inline void blockabs(float * src)
+template <size_t blockSize> inline void blockabs(float *src)
 {
     for (auto i = 0U; i < blockSize; ++i)
     {
@@ -1125,9 +1110,9 @@ inline void shelf_gain(float &last, float coef, float *__restrict pre,
     blockabs<blockSize>(bufA);
     sum2<blockSize>(bufA, 1.f);
     // div<blockSize>(1.f, bufA, bufA);
-    //mul<blockSize>(bufA, bufA, dstsq);
-    //mul<blockSize>(dstsq, bufA, dstcb);
-    for (int i=0; i<blockSize; ++i)
+    // mul<blockSize>(bufA, bufA, dstsq);
+    // mul<blockSize>(dstsq, bufA, dstcb);
+    for (int i = 0; i < blockSize; ++i)
     {
         bufA[i] = 1.0 / bufA[i];
         dstsq[i] = bufA[i] * bufA[i];
@@ -1398,7 +1383,7 @@ Bonsai<FXConfig>::noise_channel(float last[], int lastmin, float *__restrict sen
     minus2<FXConfig::blockSize>(bufB, threshold);
     max<FXConfig::blockSize>(bufB, 0.f);
     // mul<FXConfig::blockSize>(bufB, bufB, bufB);
-    for (int i=0; i<FXConfig::blockSize; ++i)
+    for (int i = 0; i < FXConfig::blockSize; ++i)
     {
         bufB[i] = bufB[i] * bufB[i];
     }
