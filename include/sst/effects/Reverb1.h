@@ -314,9 +314,10 @@ inline void Reverb1<FXConfig>::processBlock(float *__restrict dataL, float *__re
 
 template <typename FXConfig> inline void Reverb1<FXConfig>::loadpreset(int id)
 {
-    shape = id;
+    if (shape != id)
+        clear_buffers();
 
-    clear_buffers();
+    shape = id;
 
     switch (id)
     {
