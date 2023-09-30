@@ -356,7 +356,7 @@ fxdata->p[ph_mod_rate].deactivated = false;
 
     float L alignas(16)[FXConfig::blockSize], R alignas(16)[FXConfig::blockSize];
 
-    sst::basic_blocks::dsp::lipol<float, true> feedback, tone;
+    sst::basic_blocks::dsp::lipol<float, FXConfig::blockSize, true> feedback, tone;
     static constexpr int max_stages = 16;
     static constexpr int default_stages = 4;
     int n_stages = default_stages;
@@ -371,7 +371,7 @@ fxdata->p[ph_mod_rate].deactivated = false;
     float legacy_freq[4] = {1.5 / 12, 19.5 / 12, 35 / 12, 50 / 12};
     float legacy_span[4] = {2.0, 1.5, 1.0, 0.5};
 
-    sst::basic_blocks::modulators::FXModControl modLFOL, modLFOR;
+    sst::basic_blocks::modulators::FXModControl<FXConfig::blockSize> modLFOL, modLFOR;
 };
 } // namespace sst::effects::phaser
 
