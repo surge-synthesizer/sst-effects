@@ -46,6 +46,10 @@ if (${SST_EFFECTS_BUILD_TESTS})
             tests/concrete-runs.cpp
             tests/sfinae-test.cpp
             )
+
+    if (MSVC)
+        target_compile_definitions(${PROJECT_NAME}-test PUBLIC /wd4244)
+    endif()
     target_link_libraries(${PROJECT_NAME}-test PUBLIC simde sst-basic-blocks sst-filters fmt ${PROJECT_NAME})
     target_compile_definitions(${PROJECT_NAME}-test PUBLIC _USE_MATH_DEFINES=1)
     target_compile_definitions(${PROJECT_NAME}-test PRIVATE CATCH_CONFIG_DISABLE_EXCEPTIONS=1)
