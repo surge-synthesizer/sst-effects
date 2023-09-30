@@ -846,7 +846,8 @@ template <typename FXConfig> struct Bonsai : core::EffectTemplateBase<FXConfig>
 
     void suspendProcessing() { initialize(); }
     int getRingoutDecay() const { return ringout_value; }
-
+    void onSampleRateChanged() { initialize(); }
+    
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
         assert(idx >= 0 && idx < numParams);

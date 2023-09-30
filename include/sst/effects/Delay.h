@@ -89,7 +89,8 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
 
     void suspendProcessing() { initialize(); }
     int getRingoutDecay() const { return ringout_time; }
-
+    void onSampleRateChanged() { initialize(); }
+    
     void initialize();
     void processBlock(float *__restrict L, float *__restrict R);
 
