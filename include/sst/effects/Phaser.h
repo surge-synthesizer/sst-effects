@@ -114,6 +114,13 @@ template <typename FXConfig> struct Phaser : core::EffectTemplateBase<FXConfig>
             delete biquad[i];
     }
 
+    void onSampleRateChanged()
+    {
+        modLFOL.setSampleRate(this->sampleRate());
+        modLFOR.setSampleRate(this->sampleRate());
+        initialize();
+    }
+
     void suspendProcessing() { initialize(); }
     int getRingoutDecay() const
     {

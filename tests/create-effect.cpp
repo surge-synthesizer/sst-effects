@@ -99,6 +99,7 @@ template <typename T> struct Tester
     static_assert(std::is_same<decltype(&T::getRingoutDecay), int (T::*)() const>::value);
     static_assert(std::is_same<decltype(&T::paramAt),
                                sst::basic_blocks::params::ParamMetaData (T::*)(int) const>::value);
+    static_assert(std::is_same<decltype(&T::onSampleRateChanged), void (T::*)()>::value);
 
     static void TestFX()
     {
