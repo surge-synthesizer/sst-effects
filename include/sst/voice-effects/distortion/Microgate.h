@@ -32,7 +32,7 @@ namespace sst::voice_effects::distortion
 template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<VFXConfig>
 {
     static constexpr const char *effectName{"BitCrusher"};
-    
+
     static constexpr int microgateBufferSize{4096};
     static constexpr int microgateBlockSize{microgateBufferSize * sizeof(float) * 2};
 

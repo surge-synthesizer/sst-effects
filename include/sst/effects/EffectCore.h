@@ -241,6 +241,8 @@ template <typename FXConfig> struct EffectTemplateBase : public FXConfig::BaseCl
         width.multiply_block(S, FXConfig::blockSize >> 2);
         sdsp::decodeMS<FXConfig::blockSize>(M, S, L, R);
     }
+
+    static constexpr int slowrate{8}, slowrate_m1{slowrate - 1};
 };
 } // namespace sst::effects::core
 
