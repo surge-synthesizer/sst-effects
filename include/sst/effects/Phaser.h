@@ -246,7 +246,7 @@ template <typename FXConfig> struct Phaser : core::EffectTemplateBase<FXConfig>
         hp.coeff_HP(hp.calc_omega((hpCutoff / 12.0) - 2.f), 0.707);
     }
 
-    void processBlock(float *dataL, float *dataR)
+    void processBlock(float *__restrict dataL, float *__restrict dataR)
     {
         if (bi == 0)
         {
