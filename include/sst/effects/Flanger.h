@@ -89,7 +89,7 @@ template <typename FXConfig> struct Flanger : core::EffectTemplateBase<FXConfig>
     void suspendProcessing() { initialize(); }
     int getRingoutDecay() const { return ringout_value; }
     void onSampleRateChanged() { initialize(); }
-    
+
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
         assert(idx >= 0 && idx < numParams);
@@ -123,6 +123,7 @@ template <typename FXConfig> struct Flanger : core::EffectTemplateBase<FXConfig>
                 .withRange(-7, 9)
                 .withDefault(-2.f)
                 .temposyncable()
+                .withTemposyncMultiplier(-1)
                 .withATwoToTheBFormatting(1, 1, "Hz")
                 .withDecimalPlaces(3);
         case fl_depth:
