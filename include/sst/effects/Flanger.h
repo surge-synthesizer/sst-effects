@@ -218,12 +218,6 @@ template <typename FXConfig> inline void Flanger<FXConfig>::initialize()
         sin_lfo_table[i] = sin(2.0 * M_PI * i / LFO_TABLE_SIZE);
 
         saw_lfo_table[i] = 0;
-
-        // http://www.cs.cmu.edu/~music/icm-online/readings/panlaws/
-        double panAngle = 1.0 * i / (LFO_TABLE_SIZE - 1) * M_PI / 2.0;
-        auto piby2 = M_PI / 2.0;
-        auto lW = sqrt((piby2 - panAngle) / piby2 * cos(panAngle));
-        auto rW = sqrt(panAngle * sin(panAngle) / piby2);
     }
     haveProcessed = false;
 }
