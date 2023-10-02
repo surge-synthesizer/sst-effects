@@ -146,9 +146,9 @@ template <typename FXConfig> struct EffectTemplateBase : public FXConfig::BaseCl
         return static_cast<typename FXConfig::BaseClass *>(this);
     }
 
-    inline const typename FXConfig::BaseClass *const asBase() const
+    inline typename FXConfig::BaseClass *const asBase() const
     {
-        return static_cast<const typename FXConfig::BaseClass *const>(this);
+        return static_cast<typename FXConfig::BaseClass *const>(this);
     }
 
     inline float floatValue(int idx) const
