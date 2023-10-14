@@ -196,6 +196,8 @@ template <typename FXConfig> inline void Reverb1<FXConfig>::initialize()
         delay_pan_R[t] = sqrt(0.5 + 0.495 * xbp);
     }
     delay_pos = 0;
+
+    clear_buffers();
 }
 
 template <typename FXConfig>
