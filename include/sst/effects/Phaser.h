@@ -344,11 +344,11 @@ fxdata->p[ph_mod_rate].deactivated = false;
                 .asInt()
                 .withName("Waveform")
                 .withRange(0, 5)
-                .withUnorderedMapFormatting({{0, "Sin"},
+                .withUnorderedMapFormatting({{0, "Sine"},
                                              {1, "Triangle"},
                                              {2, "Saw"},
                                              {3, "Noise"},
-                                             {4, "Sample and Hold"},
+                                             {4, "Sample & Hold"},
                                              {5, "Square"}})
                 .withDefault(0);
         default:
