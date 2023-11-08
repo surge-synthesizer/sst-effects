@@ -883,7 +883,10 @@ template <typename FXConfig> struct Bonsai : core::EffectTemplateBase<FXConfig>
         case b_noise_sensitivity:
             return result.withName("Sensitivity").asPercent().withDefault(0.25f);
         case b_noise_gain:
-            return result.withName("Gain").asDecibelNarrow().withRange(-24, 24).withDefault(0.f);
+            return result.withName("Gain")
+                .asLinearDecibel(-96, 0)
+                .withDefault(0.f)
+                .withCustomMinDisplay("-inf");
         case b_dull:
             return result.withName("Dull").asPercent().withDefault(0.f);
         case b_gain_in:
@@ -1499,10 +1502,10 @@ inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__res
     float gainIn alignas(16)[FXConfig::blockSize] = {};
     float gainOut alignas(16)[FXConfig::blockSize] = {};
     float mixVal alignas(16)[FXConfig::blockSize] = {};
-    onepole_lp<FXConfig::blockSize>(last[0], coef20,
-                                    this->dbToLinear(this->floatValueExtended(b_gain_in)), gainIn);
     onepole_lp<FXConfig::blockSize>(
-        last[1], coef20, this->dbToLinear(this->floatValueExtended(b_gain_out)), gainOut);
+        last[0], coef20, this->dbToLinear(this->floatValueExtended(b_gain_in) - 24), gainIn);
+    onepole_lp<FXConfig::blockSize>(
+        last[1], coef20, this->dbToLinear(this->floatValueExtended(b_gain_out) + 20), gainOut);
     onepole_lp<FXConfig::blockSize>(last[2], coef20, this->floatValue(b_mix), mixVal);
     // out of order in the last array because that's easier than
     // shifting everything
@@ -1526,6 +1529,7 @@ inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__res
     mul<FXConfig::blockSize>(dataR, gainIn, scaledR);
     onepole_hp<FXConfig::blockSize>(last[3], coef10, scaledL, hpL);
     onepole_hp<FXConfig::blockSize>(last[4], coef10, scaledR, hpR);
+
     bass_boost(last, 5, this->dbToLinear(this->floatValueExtended(b_bass_boost)),
                this->floatValue(b_bass_distort) * 3.f, hpL, hpR, bassL, bassR);
     tape_sat(last, 34, std::clamp(this->floatValue(b_tape_sat), 0.f, 1.f),
@@ -1536,6 +1540,7 @@ inline void Bonsai<FXConfig>::processBlock(float *__restrict dataL, float *__res
     age(last, 84, this->floatValue(b_dull), noiseL, noiseR, agedL, agedR);
     onepole_hp<FXConfig::blockSize>(last[100], coef10, agedL, outL);
     onepole_hp<FXConfig::blockSize>(last[101], coef10, agedR, outR);
+
     mul<FXConfig::blockSize>(outL, gainOut);
     mul<FXConfig::blockSize>(outR, gainOut);
     lerp<FXConfig::blockSize>(dataL, outL, mixVal);
