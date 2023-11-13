@@ -884,9 +884,10 @@ template <typename FXConfig> struct Bonsai : core::EffectTemplateBase<FXConfig>
             return result.withName("Sensitivity").asPercent().withDefault(0.25f);
         case b_noise_gain:
             return result.withName("Gain")
-                    .asLinearDecibel(-60, 0) //-96 made most of the range useless
-                    .withDefault(-15.f) // And 0 was a bit drastic as default here 
-                    //.withCustomMinDisplay("-inf"); And this wasn't working anyway, which is fine.
+                    .asLinearDecibel(-24,24) //-96 was useless, the noise is inaudible below -24 anyway. 
+                                             // and >0 amounts have a different sound, no reason to remove that.  
+                    .withDefault(-12.f) // 0 was a bit annoying as init default though 
+                    //.withCustomMinDisplay("-inf"); And this isn't needed then
         case b_dull:
             return result.withName("Dull").asPercent().withDefault(0.f);
         case b_gain_in:
