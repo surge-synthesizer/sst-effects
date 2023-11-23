@@ -124,6 +124,7 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
                 .withLinearScaleFormatting("cents", 100.0)
                 .withType(pmd::FLOAT)
                 .withRange(0, 2)
+                .withExtendFactors(6.f)
                 .withDefault(0);
 
         case dly_lowcut:
@@ -241,7 +242,7 @@ template <typename FXConfig> inline void Delay<FXConfig>::setvars(bool init)
     }
 
     float lfo_increment =
-        (0.00000000001f + powf(2, this->floatValue(dly_mod_depth) * (1.f / 12.f)) - 1.f) *
+        (0.00000000001f + powf(2, this->floatValueExtended(dly_mod_depth) * (1.f / 12.f)) - 1.f) *
         FXConfig::blockSize;
     // small bias to avoid denormals
 
