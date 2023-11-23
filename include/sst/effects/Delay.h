@@ -88,7 +88,7 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
     }
 
     void suspendProcessing() { initialize(); }
-    int getRingoutDecay() const { return ringout_time; }
+    int getRingoutDecay() const { return -1; }
     void onSampleRateChanged() { initialize(); }
 
     void initialize();
@@ -113,7 +113,11 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
                 .withDeformationCount(num_dly_clipping_modes);
 
         case dly_crossfeed:
-            return pmd().asPercent().withName("Crossfeed");
+            return pmd()
+                .asPercent()
+                .withName("Crossfeed")
+                .withExtendFactors(2.f, -1.f)
+                .withDefault(0.f);
 
         case dly_mod_rate:
             return pmd().asLfoRate().withName("Rate");
@@ -121,17 +125,22 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
         case dly_mod_depth:
             return pmd()
                 .withName("Depth")
-                .withLinearScaleFormatting("cents", 100.0)
+                .withLinearScaleFormatting("cents", 100.f)
                 .withType(pmd::FLOAT)
-                .withRange(0, 2)
+                .withRange(0.f, 2.f)
                 .withExtendFactors(6.f)
-                .withDefault(0);
+                .withDefault(0.f);
 
         case dly_lowcut:
-            return pmd().asAudibleFrequency().withName("Low Cut").deactivatable().withDefault(-60);
+            return pmd().asAudibleFrequency().withName("Low Cut").deactivatable().withDefault(
+                -60.f);
 
         case dly_highcut:
-            return pmd().asAudibleFrequency().withName("High Cut").deactivatable().withDefault(70);
+            return pmd()
+                .asAudibleFrequency()
+                .withName("High Cut")
+                .deactivatable()
+                .withDefault(70.f);
         case dly_input_channel:
             return pmd()
                 .asPercentBipolar()
@@ -182,7 +191,7 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
     double lfophase;
     float LFOval;
     bool LFOdirection, FBsign;
-    int ringout_time;
+    // int ringout_time;
 };
 
 template <typename FXConfig> inline void Delay<FXConfig>::initialize()
@@ -191,7 +200,7 @@ template <typename FXConfig> inline void Delay<FXConfig>::initialize()
     memset(buffer[1], 0, (max_delay_length + this->sincTable.FIRipol_N) * sizeof(float));
     wpos = 0;
     lfophase = 0.0;
-    ringout_time = 100000;
+    // ringout_time = 100000;
     envf = 0.f;
     LFOval = 0.f;
     LFOdirection = true;
@@ -226,7 +235,7 @@ template <typename FXConfig> inline void Delay<FXConfig>::setvars(bool init)
     }
 
     float fb = amp_to_linear(std::fabs(fbp));
-    float cf = amp_to_linear(this->floatValue(dly_crossfeed));
+    float cf = amp_to_linear(this->floatValueExtended(dly_crossfeed));
 
     feedback.set_target_smoothed(fb);
     crossfeed.set_target_smoothed(cf);
@@ -268,19 +277,6 @@ template <typename FXConfig> inline void Delay<FXConfig>::setvars(bool init)
     {
         timeL.instantize();
         timeR.instantize();
-    }
-
-    const float db96 = powf(10.f, 0.05f * -96.f);
-    float maxfb = std::max(db96, fb + cf);
-
-    if (maxfb < 1.f)
-    {
-        float f = this->blockSize_inv * std::max(timeL.v, timeR.v) * (1.f + log(db96) / log(maxfb));
-        ringout_time = (int)f;
-    }
-    else
-    {
-        ringout_time = -1;
     }
 
     mix.set_target_smoothed(this->floatValue(dly_mix));
