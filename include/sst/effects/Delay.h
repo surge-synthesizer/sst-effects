@@ -116,6 +116,7 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
             return pmd()
                 .asPercent()
                 .withName("Crossfeed")
+                .extendable()
                 .withExtendFactors(2.f, -1.f)
                 .withDefault(0.f);
 
@@ -128,6 +129,7 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
                 .withLinearScaleFormatting("cents", 100.f)
                 .withType(pmd::FLOAT)
                 .withRange(0.f, 2.f)
+                .extendable()
                 .withExtendFactors(6.f)
                 .withDefault(0.f);
 
