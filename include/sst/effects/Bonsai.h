@@ -883,9 +883,7 @@ template <typename FXConfig> struct Bonsai : core::EffectTemplateBase<FXConfig>
         case b_noise_sensitivity:
             return result.withName("Sensitivity").asPercent().withDefault(0.25f);
         case b_noise_gain:
-            return result.withName("Gain")
-                .asLinearDecibel(-24, 24)
-                .withDefault(-12.f);
+            return result.withName("Gain").asLinearDecibel(-24, 24).withDefault(-12.f);
         case b_dull:
             return result.withName("Dull").asPercent().withDefault(0.f);
         case b_gain_in:
@@ -935,6 +933,8 @@ template <typename FXConfig> struct Bonsai : core::EffectTemplateBase<FXConfig>
 
 template <typename FXConfig> inline void Bonsai<FXConfig>::initialize()
 {
+    memset(last, 0, sizeof(last));
+
     last[60] = 1; // noise mid seed
     last[61] = 2; // noise side seed
 }
