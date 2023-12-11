@@ -23,6 +23,13 @@ if (${SST_EFFECTS_BUILD_TESTS})
                 )
     endif ()
 
+    if (NOT TARGET sst-waveshapers)
+        CPMAddPackage(NAME sst-waveshapers
+                GITHUB_REPOSITORY surge-synthesizer/sst-waveshapers
+                GIT_TAG main
+        )
+    endif ()
+
     if (NOT TARGET fmt)
         CPMAddPackage(NAME fmt
                 GITHUB_REPOSITORY fmtlib/fmt
@@ -55,7 +62,7 @@ if (${SST_EFFECTS_BUILD_TESTS})
                 /wd4101
                 /wd4305)
     endif()
-    target_link_libraries(${PROJECT_NAME}-test PUBLIC simde sst-basic-blocks sst-filters fmt ${PROJECT_NAME})
+    target_link_libraries(${PROJECT_NAME}-test PUBLIC simde sst-basic-blocks sst-filters sst-waveshapers fmt ${PROJECT_NAME})
     target_compile_definitions(${PROJECT_NAME}-test PUBLIC _USE_MATH_DEFINES=1)
     target_compile_definitions(${PROJECT_NAME}-test PRIVATE CATCH_CONFIG_DISABLE_EXCEPTIONS=1)
 
