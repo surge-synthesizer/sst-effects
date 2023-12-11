@@ -48,6 +48,11 @@ template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig:
         return static_cast<typename VFXConfig::BaseClass *>(this);
     }
 
+    const typename VFXConfig::BaseClass *asBase() const
+    {
+        return static_cast<const typename VFXConfig::BaseClass *>(this);
+    }
+
     /*
      * Params
      */
@@ -64,7 +69,22 @@ template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig:
         "Implement getFloatParam");
 
     void setFloatParam(int i, float f) { VFXConfig::setFloatParam(asBase(), i, f); }
-    float getFloatParam(int i) { return VFXConfig::getFloatParam(asBase(), i); }
+    float getFloatParam(int i) const { return VFXConfig::getFloatParam(asBase(), i); }
+
+    static_assert(std::is_same<decltype(VFXConfig::setIntParam(
+                                   std::declval<typename VFXConfig::BaseClass *>(),
+                                   std::declval<size_t>(), std::declval<int>())),
+                               void>::value,
+                  "Implement setIntParam");
+
+    static_assert(
+        std::is_same<decltype(VFXConfig::getIntParam(
+                         std::declval<typename VFXConfig::BaseClass *>(), std::declval<size_t>())),
+                     int>::value,
+        "Implement getIntParam");
+
+    void setIntParam(int i, int f) { VFXConfig::setIntParam(asBase(), i, f); }
+    int getIntParam(int i) const { return VFXConfig::getIntParam(asBase(), i); }
 
     /*
      * Conversions

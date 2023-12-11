@@ -23,6 +23,7 @@
 
 #include "sst/voice-effects/distortion/BitCrusher.h"
 #include "sst/voice-effects/distortion/Microgate.h"
+#include "sst/voice-effects/waveshaper/WaveShaper.h"
 
 struct VTestConfig
 {
@@ -31,11 +32,15 @@ struct VTestConfig
     };
     static constexpr int blockSize{16};
     static void setFloatParam(BaseClass *, int, float) {}
-    static float getFloatParam(BaseClass *, int) { return 0.f; }
-    static float dbToLinear(BaseClass *, float f) { return 1.f; }
-    static float equalNoteToPitch(BaseClass *, float f) { return 0.f; }
-    static float getSampleRate(BaseClass *) { return 48000.f; }
-    static float getSampleRateInv(BaseClass *) { return 1.0 / 48000.f; }
+    static float getFloatParam(const BaseClass *, int) { return 0.f; }
+
+    static void setIntParam(BaseClass *, int, int) {}
+    static int getIntParam(const BaseClass *, int) { return 0.f; }
+
+    static float dbToLinear(const BaseClass *, float f) { return 1.f; }
+    static float equalNoteToPitch(const BaseClass *, float f) { return 0.f; }
+    static float getSampleRate(const BaseClass *) { return 48000.f; }
+    static float getSampleRateInv(const BaseClass *) { return 1.0 / 48000.f; }
 
     static void preReservePool(BaseClass *, size_t) {}
     static uint8_t *checkoutBlock(BaseClass *, size_t) { return nullptr; }
@@ -60,5 +65,9 @@ TEST_CASE("Can Create Voice FX")
     SECTION("BitCrusher")
     {
         VTester<sst::voice_effects::distortion::BitCrusher<VTestConfig>>::TestVFX();
+    }
+    SECTION("WaveShaper")
+    {
+        VTester<sst::voice_effects::waveshaper::WaveShaper<VTestConfig>>::TestVFX();
     }
 }
