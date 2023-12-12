@@ -139,6 +139,21 @@ template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig:
     void preReservePool(size_t s) { VFXConfig::preReservePool(asBase(), s); }
     uint8_t *checkoutBlock(size_t s) { return VFXConfig::checkoutBlock(asBase(), s); }
     void returnBlock(uint8_t *d, size_t s) { VFXConfig::returnBlock(asBase(), d, s); }
+
+    template <typename T> void initToParamMetadataDefault(T *that)
+    {
+        for (int i = 0; i < T::numFloatParams; ++i)
+        {
+            that->setFloatParam(i, that->paramAt(i).defaultVal);
+        }
+        if constexpr (T::numIntParams)
+        {
+            for (int i = 0; i < T::numIntParams; ++i)
+            {
+                that->setIntParam(i, that->intParamAt(i).defaultVal);
+            }
+        }
+    }
 };
 } // namespace sst::voice_effects::core
 

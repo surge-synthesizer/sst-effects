@@ -96,7 +96,7 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
                 .withRange(0, 2)
                 .withName("Type")
                 .withUnorderedMapFormatting({{0, "Soft"}, {1, "OJD"}, {2, "WCFold"}})
-                .withDefault(0);
+                .withDefault(1);
         case WaveShaperIntParams::oversample:
             return pmd().asBool().withName("OverSample").withDefault(0);
         default:
@@ -106,14 +106,7 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
         return pmd().asInt().withRange(0, 1).withName("Error");
     }
 
-    void initVoiceEffectParams()
-    {
-        this->setFloatParam((int)WaveShaperFloatParams::drive, 0.f);
-        this->setFloatParam((int)WaveShaperFloatParams::bias, 0.f);
-        this->setFloatParam((int)WaveShaperFloatParams::postgain, 0.f);
-
-        this->setIntParam((int)WaveShaperIntParams::type, 1); // force to ojd for now
-    }
+    void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     template <bool stereo>
     void processInternalOS(float *datainL, float *datainR, float *dataoutL, float *dataoutR)

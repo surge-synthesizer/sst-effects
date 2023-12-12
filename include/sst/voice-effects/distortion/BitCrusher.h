@@ -58,15 +58,19 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
         switch ((bc_fparams)idx)
         {
         case bc_samplerate:
-            return pmd().asAudibleFrequency().withRange(-12, 80).withName("sampleRate");
+            return pmd()
+                .asAudibleFrequency()
+                .withRange(-12, 80)
+                .withName("sampleRate")
+                .withDefault(7.5);
         case bc_bitdepth:
-            return pmd().asPercent().withName("bitdepth");
+            return pmd().asPercent().withName("bitdepth").withDefault(1.f);
         case bc_zeropoint:
-            return pmd().asPercent().withName("zeropoint");
+            return pmd().asPercent().withName("zeropoint").withDefault(0.f);
         case bc_cutoff:
-            return pmd().asAudibleFrequency().withName("cutoff");
+            return pmd().asAudibleFrequency().withName("cutoff").withDefault(5.f);
         case bc_resonance:
-            return pmd().asPercent().withName("resonance");
+            return pmd().asPercent().withName("resonance").withDefault(0.f);
         default:
             break;
         }
@@ -74,14 +78,7 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
         return pmd().withName("Unknown " + std::to_string(idx));
     }
 
-    void initVoiceEffectParams()
-    {
-        this->setFloatParam(bc_samplerate, 7.5f);
-        this->setFloatParam(bc_bitdepth, 1.f);
-        this->setFloatParam(bc_zeropoint, 0.f);
-        this->setFloatParam(bc_cutoff, 5.0f);
-        this->setFloatParam(bc_resonance, 0.f);
-    }
+    void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
