@@ -70,13 +70,13 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
         switch ((mg_fparams)idx)
         {
         case mg_hold:
-            return pmd().asLog2SecondsRange(-8, 5, -3).withName("hold");
+            return pmd().asLog2SecondsRange(-8, 5, -3).withName("hold").withDefault(-3.f);
         case mg_loop:
-            return pmd().asPercent().withName("loop");
+            return pmd().asPercent().withName("loop").withDefault(0.5f);
         case mg_threshold:
-            return pmd().asLinearDecibel().withName("threshold");
+            return pmd().asLinearDecibel().withName("threshold").withDefault(-12.f);
         case mg_reduction:
-            return pmd().asLinearDecibel().withName("reduction");
+            return pmd().asLinearDecibel().withName("reduction").withDefault(-96.f);
         case mg_num_params:
             break;
         }
@@ -96,13 +96,7 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
         }
     }
 
-    void initVoiceEffectParams()
-    {
-        this->setFloatParam(0, -3.f);
-        this->setFloatParam(1, 0.5f);
-        this->setFloatParam(2, -12.f);
-        this->setFloatParam(3, -96.f);
-    }
+    void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
