@@ -146,7 +146,7 @@ template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig:
         {
             that->setFloatParam(i, that->paramAt(i).defaultVal);
         }
-        if constexpr (T::numIntParams)
+        if constexpr (T::numIntParams > 0)
         {
             for (int i = 0; i < T::numIntParams; ++i)
             {
