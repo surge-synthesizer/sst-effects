@@ -22,7 +22,7 @@
 #define INCLUDE_SST_VOICE_EFFECTS_WAVESHAPER_WAVESHAPER_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
-#include "sst/basic-blocks/dsp/BlockInterpolators.h"
+#include "sst/basic-blocks/dsp/Lag.h"
 #include "sst/waveshapers.h"
 #include "sst/filters/HalfRateFilter.h"
 
@@ -106,6 +106,18 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
         return pmd().asInt().withRange(0, 1).withName("Error");
     }
 
+    void initVoiceEffect()
+    {
+        auto lr = 0.006f;
+        mBiasLag.setRate(lr);
+        mDriveLag.setRate(lr);
+        mGainLag.setRate(lr);
+
+        // Approx
+        mBiasLagOS.setRate(lr * 0.5f);
+        mDriveLagOS.setRate(lr * 0.5f);
+        mGainLagOS.setRate(lr * 0.5f);
+    }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     template <bool stereo>
@@ -116,9 +128,9 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
         auto bias = this->getFloatParam((int)WaveShaperFloatParams::bias);
         auto gain = this->dbToLinear(this->getFloatParam((int)WaveShaperFloatParams::postgain));
 
-        mDriveLipOS.newValue(drv);
-        mBiasLipOS.newValue(bias);
-        mGainLipOS.newValue(gain);
+        mDriveLagOS.newValue(drv);
+        mBiasLagOS.newValue(bias);
+        mGainLagOS.newValue(gain);
 
         float inOSL alignas(16)[VFXConfig::blockSize * 2];
         float inOSR alignas(16)[VFXConfig::blockSize * 2];
@@ -137,19 +149,19 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
         float resa alignas(16)[4];
         for (auto i = 0U; i < VFXConfig::blockSize * 2; ++i)
         {
-            auto mdrv = _mm_set1_ps(mDriveLipOS.v);
+            auto mdrv = _mm_set1_ps(mDriveLagOS.v);
 
             __m128 val;
 
-            val = _mm_set_ps(0.f, 0.f, 2 * inOSR[i] + mBiasLipOS.v, 2 * inOSL[i] + mBiasLipOS.v);
+            val = _mm_set_ps(0.f, 0.f, 2 * inOSR[i] + mBiasLagOS.v, 2 * inOSL[i] + mBiasLagOS.v);
             auto res = mWSOp(&mWss, val, mdrv);
-            res = _mm_mul_ps(res, _mm_set1_ps(mGainLipOS.v));
+            res = _mm_mul_ps(res, _mm_set1_ps(mGainLagOS.v));
             _mm_store_ps(resa, res);
             outOSL[i] = resa[0];
             outOSR[i] = resa[1];
-            mDriveLipOS.process();
-            mBiasLipOS.process();
-            mGainLipOS.process();
+            mDriveLagOS.process();
+            mBiasLagOS.process();
+            mGainLagOS.process();
         }
 
         if (stereo)
@@ -173,36 +185,36 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
         auto bias = this->getFloatParam((int)WaveShaperFloatParams::bias);
         auto gain = this->dbToLinear(this->getFloatParam((int)WaveShaperFloatParams::postgain));
 
-        mDriveLip.newValue(drv);
-        mBiasLip.newValue(bias);
-        mGainLip.newValue(gain);
+        mDriveLag.newValue(drv);
+        mBiasLag.newValue(bias);
+        mGainLag.newValue(gain);
 
         float resa alignas(16)[4];
         for (auto i = 0U; i < VFXConfig::blockSize; ++i)
         {
-            auto mdrv = _mm_set1_ps(mDriveLip.v);
+            auto mdrv = _mm_set1_ps(mDriveLag.v);
 
             __m128 val;
 
             if constexpr (stereo)
             {
-                val = _mm_set_ps(0.f, 0.f, datainR[i] + mBiasLip.v, datainL[i] + mBiasLip.v);
+                val = _mm_set_ps(0.f, 0.f, datainR[i] + mBiasLag.v, datainL[i] + mBiasLag.v);
             }
             else
             {
-                val = _mm_set_ps(0.f, 0.f, 0.f, datainL[i] + mBiasLip.v);
+                val = _mm_set_ps(0.f, 0.f, 0.f, datainL[i] + mBiasLag.v);
             }
             auto res = mWSOp(&mWss, val, mdrv);
-            res = _mm_mul_ps(res, _mm_set1_ps(mGainLip.v));
+            res = _mm_mul_ps(res, _mm_set1_ps(mGainLag.v));
             _mm_store_ps(resa, res);
             dataoutL[i] = resa[0];
             if constexpr (stereo)
             {
                 dataoutR[i] = resa[1];
             }
-            mDriveLip.process();
-            mBiasLip.process();
-            mGainLip.process();
+            mDriveLag.process();
+            mBiasLag.process();
+            mGainLag.process();
         }
     }
 
@@ -290,9 +302,8 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
     sst::waveshapers::WaveshaperType mWSType;
     sst::waveshapers::QuadWaveshaperState mWss;
     sst::waveshapers::QuadWaveshaperPtr mWSOp{nullptr};
-    sst::basic_blocks::dsp::lipol<float, VFXConfig::blockSize, true> mDriveLip, mBiasLip, mGainLip;
-    sst::basic_blocks::dsp::lipol<float, VFXConfig::blockSize << 1, true> mDriveLipOS, mBiasLipOS,
-        mGainLipOS;
+    sst::basic_blocks::dsp::SurgeLag<float, true> mDriveLag, mBiasLag, mGainLag;
+    sst::basic_blocks::dsp::SurgeLag<float, true> mDriveLagOS, mBiasLagOS, mGainLagOS;
     sst::filters::HalfRate::HalfRateFilter mHalfRateUp, mHalfRateDown;
 };
 } // namespace sst::voice_effects::waveshaper

@@ -22,32 +22,34 @@
 #define INCLUDE_SST_VOICE_EFFECTS_DISTORTION_MICROGATE_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
+#include "sst/basic-blocks/dsp/Lag.h"
 #include "../VoiceEffectCore.h"
 
 #include "sst/basic-blocks/mechanics/block-ops.h"
+
 namespace mech = sst::basic_blocks::mechanics;
 
 namespace sst::voice_effects::distortion
 {
 template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"BitCrusher"};
+    static constexpr const char *effectName{"MicroGate"};
 
     static constexpr int microgateBufferSize{4096};
     static constexpr int microgateBlockSize{microgateBufferSize * sizeof(float) * 2};
 
-    enum mg_fparams
+    enum struct MicroGateParams
     {
-        mg_hold,
-        mg_loop,
-        mg_threshold,
-        mg_reduction,
+        hold,
+        loop,
+        threshold,
+        reduction,
 
-        mg_num_params
+        num_params
     };
 
-    static constexpr int numFloatParams{mg_num_params};
-    static constexpr int numIntParams{0};
+    static constexpr uint16_t numFloatParams{(uint16_t)MicroGateParams::num_params};
+    static constexpr uint16_t numIntParams{0};
 
     MicroGate() : core::VoiceEffectTemplateBase<VFXConfig>()
     {
@@ -62,22 +64,22 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
         }
     }
 
-    basic_blocks::params::ParamMetaData paramAt(int idx) const
+    basic_blocks::params::ParamMetaData paramAt(uint16_t idx) const
     {
-        assert(idx >= 0 && idx < mg_num_params);
+        assert(idx >= 0 && idx < (int)MicroGateParams::num_params);
         using pmd = basic_blocks::params::ParamMetaData;
 
-        switch ((mg_fparams)idx)
+        switch ((MicroGateParams)idx)
         {
-        case mg_hold:
+        case MicroGateParams::hold:
             return pmd().asLog2SecondsRange(-8, 5, -3).withName("hold").withDefault(-3.f);
-        case mg_loop:
+        case MicroGateParams::loop:
             return pmd().asPercent().withName("loop").withDefault(0.5f);
-        case mg_threshold:
+        case MicroGateParams::threshold:
             return pmd().asLinearDecibel().withName("threshold").withDefault(-12.f);
-        case mg_reduction:
+        case MicroGateParams::reduction:
             return pmd().asLinearDecibel().withName("reduction").withDefault(-96.f);
-        case mg_num_params:
+        case MicroGateParams::num_params:
             break;
         }
 
@@ -106,10 +108,14 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
         mech::copy_from_to<blockSize>(datainR, dataoutR);
 
         // TODO fixme
-        float threshold = this->dbToLinear(this->getFloatParam(2));
-        float reduction = this->dbToLinear(this->getFloatParam(3));
+        float threshold = this->dbToLinear(this->getFloatParam((int)MicroGateParams::threshold));
+        float reduction = this->dbToLinear(this->getFloatParam((int)MicroGateParams::reduction));
+        mReductionLag.newValue(reduction);
+
         int ihtime = (int)(float)(this->getSampleRate() *
-                                  this->equalNoteToPitch(12 * this->getFloatParam(0)));
+                                  this->equalNoteToPitch(
+                                      12 * this->getFloatParam((int)MicroGateParams::hold)));
+        float loopParam = this->getFloatParam((int)MicroGateParams::loop);
 
         for (int k = 0; k < blockSize; k++)
         {
@@ -131,8 +137,7 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
             if ((!(onesampledelay[0] * datainL[k] > 0)) && (datainL[k] > 0))
             {
                 gate_zc_sync[0] = gate_state;
-                int looplimit =
-                    (int)(float)(4 + 3900 * this->getFloatParam(1) * this->getFloatParam(1));
+                int looplimit = (int)(float)(4 + 3900 * loopParam * loopParam);
                 if (bufpos[0] > looplimit)
                 {
                     is_recording[0] = false;
@@ -142,8 +147,7 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
             if ((!(onesampledelay[1] * datainR[k] > 0)) && (datainR[k] > 0))
             {
                 gate_zc_sync[1] = gate_state;
-                int looplimit =
-                    (int)(float)(4 + 3900 * this->getFloatParam(1) * this->getFloatParam(1));
+                int looplimit = (int)(float)(4 + 3900 * loopParam * loopParam);
                 if (bufpos[1] > looplimit)
                 {
                     is_recording[1] = false;
@@ -168,7 +172,7 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
                 }
             }
             else
-                dataoutL[k] *= reduction;
+                dataoutL[k] *= mReductionLag.v;
 
             if (gate_zc_sync[1])
             {
@@ -185,9 +189,10 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
                 }
             }
             else
-                dataoutR[k] *= reduction;
+                dataoutR[k] *= mReductionLag.v;
 
             holdtime--;
+            mReductionLag.process();
         }
     }
 
@@ -198,6 +203,8 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
     float *loopbuffer[2]{nullptr, nullptr};
     int bufpos[2]{0, 0}, buflength[2]{0, 0};
     bool is_recording[2]{false, false};
+
+    sst::basic_blocks::dsp::SurgeLag<float, true> mReductionLag;
 };
 } // namespace sst::voice_effects::distortion
 
