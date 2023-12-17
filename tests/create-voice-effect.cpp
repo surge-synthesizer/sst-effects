@@ -24,6 +24,7 @@
 #include "sst/voice-effects/distortion/BitCrusher.h"
 #include "sst/voice-effects/distortion/Microgate.h"
 #include "sst/voice-effects/waveshaper/WaveShaper.h"
+#include "sst/voice-effects/pitch/PitchRing.h"
 
 struct VTestConfig
 {
@@ -70,4 +71,5 @@ TEST_CASE("Can Create Voice FX")
     {
         VTester<sst::voice_effects::waveshaper::WaveShaper<VTestConfig>>::TestVFX();
     }
+    SECTION("PitchRing") { VTester<sst::voice_effects::pitch::PitchRing<VTestConfig>>::TestVFX(); }
 }
