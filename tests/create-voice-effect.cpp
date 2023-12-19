@@ -25,6 +25,10 @@
 #include "sst/voice-effects/distortion/Microgate.h"
 #include "sst/voice-effects/waveshaper/WaveShaper.h"
 #include "sst/voice-effects/pitch/PitchRing.h"
+#include "sst/voice-effects/generator/GenPulseSync.h"
+#include "sst/voice-effects/generator/GenSin.h"
+#include "sst/voice-effects/generator/GenSaw.h"
+#include "sst/voice-effects/generator/GenPhaseMod.h"
 
 struct VTestConfig
 {
@@ -49,10 +53,10 @@ struct VTestConfig
 };
 template <typename T> struct VTester
 {
-    static void TestVFX()
+    template <class... Args> static void TestVFX(Args &&...a)
     {
         INFO("Starting test with instantiation : " << T::effectName);
-        auto fx = std::make_unique<T>();
+        auto fx = std::make_unique<T>(std::forward<Args>(a)...);
         REQUIRE(fx);
     };
 };
@@ -72,4 +76,15 @@ TEST_CASE("Can Create Voice FX")
         VTester<sst::voice_effects::waveshaper::WaveShaper<VTestConfig>>::TestVFX();
     }
     SECTION("PitchRing") { VTester<sst::voice_effects::pitch::PitchRing<VTestConfig>>::TestVFX(); }
+    SECTION("GenSin") { VTester<sst::voice_effects::generator::GenSin<VTestConfig>>::TestVFX(); }
+    SECTION("GenSaw") { VTester<sst::voice_effects::generator::GenSaw<VTestConfig>>::TestVFX(); }
+    SECTION("GenPhaseMod")
+    {
+        VTester<sst::voice_effects::generator::GenPhaseMod<VTestConfig>>::TestVFX();
+    }
+    SECTION("GenPulseSync")
+    {
+        sst::basic_blocks::tables::ShortcircuitSincTableProvider s;
+        VTester<sst::voice_effects::generator::GenPulseSync<VTestConfig>>::TestVFX(s);
+    }
 }
