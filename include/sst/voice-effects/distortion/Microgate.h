@@ -61,6 +61,7 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
         if (loopbuffer[0])
         {
             VFXConfig::returnBlock(this, (uint8_t *)loopbuffer[0], microgateBlockSize);
+            loopbuffer[0] = nullptr;
         }
     }
 
@@ -88,7 +89,6 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
 
     void initVoiceEffect()
     {
-        assert(!loopbuffer[0]); // in theory we should never double init the same instance
         if (!loopbuffer[0])
         {
             auto data = VFXConfig::checkoutBlock(this, microgateBlockSize);
