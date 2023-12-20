@@ -29,6 +29,7 @@
 #include "sst/voice-effects/generator/GenSin.h"
 #include "sst/voice-effects/generator/GenSaw.h"
 #include "sst/voice-effects/generator/GenPhaseMod.h"
+#include "sst/voice-effects/eq/Eq2BandParametric.h"
 
 struct VTestConfig
 {
@@ -86,5 +87,9 @@ TEST_CASE("Can Create Voice FX")
     {
         sst::basic_blocks::tables::ShortcircuitSincTableProvider s;
         VTester<sst::voice_effects::generator::GenPulseSync<VTestConfig>>::TestVFX(s);
+    }
+    SECTION("ParmEQ")
+    {
+        VTester<sst::voice_effects::eq::Eq2BandParametric<VTestConfig>>::TestVFX();
     }
 }
