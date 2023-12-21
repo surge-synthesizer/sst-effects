@@ -22,7 +22,6 @@
 #define INCLUDE_SST_VOICE_EFFECTS_PITCH_PITCHRING_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
-#include "sst/basic-blocks/dsp/Lag.h"
 #include "sst/basic-blocks/dsp/HilbertTransform.h"
 #include "sst/basic-blocks/dsp/QuadratureOscillators.h"
 
@@ -31,7 +30,6 @@
 #include <iostream>
 
 #include "sst/basic-blocks/mechanics/block-ops.h"
-namespace mech = sst::basic_blocks::mechanics;
 
 namespace sst::voice_effects::pitch
 {
@@ -91,10 +89,6 @@ template <typename VFXConfig> struct PitchRing : core::VoiceEffectTemplateBase<V
 
     void initVoiceEffect()
     {
-        auto lr = 0.006f;
-        mRateLag.setRate(lr);
-        mFeedbackLag.setRate(lr);
-
         mHilbertStereo.setSampleRate(this->getSampleRate());
         mHilbertMono.setSampleRate(this->getSampleRate());
     }
@@ -103,19 +97,16 @@ template <typename VFXConfig> struct PitchRing : core::VoiceEffectTemplateBase<V
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
     {
-        mRateLag.newValue(this->getFloatParam((int)PitchRingFloatParams::coarse) +
-                          this->getFloatParam((int)PitchRingFloatParams::fine));
-        mFeedbackLag.newValue(this->getFloatParam((int)PitchRingFloatParams::feedback));
+        auto rate = this->getFloatParam((int)PitchRingFloatParams::coarse) +
+                    this->getFloatParam((int)PitchRingFloatParams::fine);
+        mSinOsc.setRate(2.0 * M_PI * rate * this->getSampleRateInv());
 
-        mSinOsc.setRate(2.0 * M_PI * mRateLag.v * this->getSampleRateInv());
-
-        mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
-        mech::copy_from_to<VFXConfig::blockSize>(datainR, dataoutR);
+        auto fbp = this->getFloatParam((int)PitchRingFloatParams::feedback) * 0.75;
+        mFeedbackLerp.newValue(fbp);
 
         for (auto i = 0U; i < VFXConfig::blockSize; ++i)
         {
-            auto fb = mFeedbackLag.v;
-            fb = fb * fb * fb;
+            auto fb = mFeedbackLerp.v;
 
             auto iL = datainL[i] + fb * mPrior[0];
             auto iR = datainR[i] + fb * mPrior[1];
@@ -132,8 +123,7 @@ template <typename VFXConfig> struct PitchRing : core::VoiceEffectTemplateBase<V
             dataoutL[i] = mPrior[0];
             dataoutR[i] = mPrior[1];
 
-            mRateLag.process();
-            mFeedbackLag.process();
+            mFeedbackLerp.process();
         }
     }
 
@@ -146,7 +136,7 @@ template <typename VFXConfig> struct PitchRing : core::VoiceEffectTemplateBase<V
     sst::basic_blocks::dsp::HilbertTransformMonoFloat mHilbertMono;
     sst::basic_blocks::dsp::QuadratureOscillator<float> mSinOsc;
 
-    sst::basic_blocks::dsp::SurgeLag<float, true> mRateLag, mFeedbackLag;
+    sst::basic_blocks::dsp::lipol<float, VFXConfig::blockSize, true> mFeedbackLerp;
 };
 } // namespace sst::voice_effects::pitch
 

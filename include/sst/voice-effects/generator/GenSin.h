@@ -22,7 +22,7 @@
 #define INCLUDE_SST_VOICE_EFFECTS_GENERATOR_GENSIN_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
-#include "sst/basic-blocks/dsp/Lag.h"
+#include "sst/basic-blocks/dsp/BlockInterpolators.h"
 #include "sst/basic-blocks/dsp/QuadratureOscillators.h"
 
 #include "../VoiceEffectCore.h"
@@ -95,20 +95,20 @@ template <typename VFXConfig> struct GenSin : core::VoiceEffectTemplateBase<VFXC
                          this->note_to_pitch_ignoring_tuning(
                              this->getFloatParam((int)GenSinFloatParams::offset) + pitch) *
                          this->getSampleRateInv());
-        mLevelLag.newValue(
-            std::clamp(this->getFloatParam((int)GenSinFloatParams::level), 0.f, 1.f));
-
+        auto levT = std::clamp(this->getFloatParam((int)GenSinFloatParams::level), 0.f, 1.f);
+        levT = levT * levT * levT;
+        mLevelLerp.set_target(levT);
         for (int k = 0; k < VFXConfig::blockSize; k++)
         {
-            dataoutL[k] = mQuadOsc.v * mLevelLag.v * mLevelLag.v * mLevelLag.v;
+            dataoutL[k] = mQuadOsc.v;
             mQuadOsc.step();
-            mLevelLag.process();
         }
+        mLevelLerp.multiply_block(dataoutL);
     }
 
   protected:
     sst::basic_blocks::dsp::QuadratureOscillator<float> mQuadOsc;
-    sst::basic_blocks::dsp::SurgeLag<float, true> mLevelLag;
+    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> mLevelLerp;
 };
 } // namespace sst::voice_effects::generator
 

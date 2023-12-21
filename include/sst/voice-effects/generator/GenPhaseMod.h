@@ -22,7 +22,6 @@
 #define INCLUDE_SST_VOICE_EFFECTS_GENERATOR_GENPHASEMOD_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
-#include "sst/basic-blocks/dsp/Lag.h"
 #include "sst/basic-blocks/dsp/FastMath.h"
 #include "sst/filters/HalfRateFilter.h"
 

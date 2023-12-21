@@ -24,9 +24,6 @@
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "../VoiceEffectCore.h"
 
-#include "sst/basic-blocks/mechanics/block-ops.h"
-namespace mech = sst::basic_blocks::mechanics;
-
 namespace sst::voice_effects::distortion
 {
 template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<VFXConfig>

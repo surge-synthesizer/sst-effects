@@ -22,12 +22,10 @@
 #define INCLUDE_SST_VOICE_EFFECTS_DISTORTION_MICROGATE_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
-#include "sst/basic-blocks/dsp/Lag.h"
+#include "sst/basic-blocks/dsp/BlockInterpolators.h"
 #include "../VoiceEffectCore.h"
 
 #include "sst/basic-blocks/mechanics/block-ops.h"
-
-namespace mech = sst::basic_blocks::mechanics;
 
 namespace sst::voice_effects::distortion
 {
@@ -103,6 +101,8 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
     {
+        namespace mech = sst::basic_blocks::mechanics;
+
         constexpr int blockSize{VFXConfig::blockSize};
         mech::copy_from_to<blockSize>(datainL, dataoutL);
         mech::copy_from_to<blockSize>(datainR, dataoutR);
@@ -110,7 +110,7 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
         // TODO fixme
         float threshold = this->dbToLinear(this->getFloatParam((int)MicroGateParams::threshold));
         float reduction = this->dbToLinear(this->getFloatParam((int)MicroGateParams::reduction));
-        mReductionLag.newValue(reduction);
+        mReductionLerp.newValue(reduction);
 
         int ihtime = (int)(float)(this->getSampleRate() *
                                   this->equalNoteToPitch(
@@ -172,7 +172,7 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
                 }
             }
             else
-                dataoutL[k] *= mReductionLag.v;
+                dataoutL[k] *= mReductionLerp.v;
 
             if (gate_zc_sync[1])
             {
@@ -189,10 +189,10 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
                 }
             }
             else
-                dataoutR[k] *= mReductionLag.v;
+                dataoutR[k] *= mReductionLerp.v;
 
             holdtime--;
-            mReductionLag.process();
+            mReductionLerp.process();
         }
     }
 
@@ -204,7 +204,7 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
     int bufpos[2]{0, 0}, buflength[2]{0, 0};
     bool is_recording[2]{false, false};
 
-    sst::basic_blocks::dsp::SurgeLag<float, true> mReductionLag;
+    sst::basic_blocks::dsp::lipol<float, VFXConfig::blockSize, true> mReductionLerp;
 };
 } // namespace sst::voice_effects::distortion
 
