@@ -22,7 +22,6 @@
 #define INCLUDE_SST_VOICE_EFFECTS_EQ_EQ2BANDPARAMETRIC_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
-#include "sst/basic-blocks/dsp/Lag.h"
 #include "sst/basic-blocks/dsp/QuadratureOscillators.h"
 
 #include "../VoiceEffectCore.h"

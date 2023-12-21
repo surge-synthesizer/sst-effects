@@ -22,7 +22,7 @@
 #define INCLUDE_SST_VOICE_EFFECTS_GENERATOR_GENPULSESYNC_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
-#include "sst/basic-blocks/dsp/Lag.h"
+#include "sst/basic-blocks/dsp/BlockInterpolators.h"
 #include "sst/filters/HalfRateFilter.h"
 #include "sst/basic-blocks/mechanics/block-ops.h"
 #include "sst/basic-blocks/tables/SincTableProvider.h"
@@ -118,11 +118,11 @@ template <typename VFXConfig> struct GenPulseSync : core::VoiceEffectTemplateBas
 
     void processMonoToMono(float *datainL, float *dataoutL, float pitch)
     {
-        mTuneLag.newValue(this->getFloatParam((int)GenPulseSyncFloatParams::tune));
-        mWidthLag.newValue(this->getFloatParam((int)GenPulseSyncFloatParams::width));
-        mSyncLag.newValue(this->getFloatParam((int)GenPulseSyncFloatParams::sync));
-        mLevelLag.newValue(this->getFloatParam((int)GenPulseSyncFloatParams::level));
-        mPitchLag.newValue(pitch);
+        mTuneLerp.newValue(this->getFloatParam((int)GenPulseSyncFloatParams::tune));
+        mWidthLerp.newValue(this->getFloatParam((int)GenPulseSyncFloatParams::width));
+        mSyncLerp.newValue(this->getFloatParam((int)GenPulseSyncFloatParams::sync));
+        mLevelLerp.newValue(this->getFloatParam((int)GenPulseSyncFloatParams::level));
+        mPitchLerp.newValue(pitch);
 
         if (mFirstRun)
         {
@@ -148,17 +148,17 @@ template <typename VFXConfig> struct GenPulseSync : core::VoiceEffectTemplateBas
             while (mOscState < 0)
                 this->convolute();
             mOscOut = mOscOut * kIntegratorHPF + mOscBuffer[mBufPos];
-            dataoutL[k] = mOscOut * mLevelLag.v * mLevelLag.v * mLevelLag.v;
+            dataoutL[k] = mOscOut * mLevelLerp.v * mLevelLerp.v * mLevelLerp.v;
             mOscBuffer[mBufPos] = 0.f;
 
             mBufPos++;
             mBufPos = mBufPos & (VFXConfig::blockSize - 1);
 
-            mWidthLag.process();
-            mSyncLag.process();
-            mTuneLag.process();
-            mLevelLag.process();
-            mPitchLag.process();
+            mWidthLerp.process();
+            mSyncLerp.process();
+            mTuneLerp.process();
+            mLevelLerp.process();
+            mPitchLerp.process();
         }
     }
 
@@ -171,8 +171,9 @@ template <typename VFXConfig> struct GenPulseSync : core::VoiceEffectTemplateBas
         if (mSyncState < mOscState)
         {
             ipos = (int32_t)(((kLarge + mSyncState) >> 16) & 0xFFFFFFFF);
-            double t = std::max(0.5, samplerate / (440.0 * this->note_to_pitch_ignoring_tuning(
-                                                               (double)mPitchLag.v + mTuneLag.v)));
+            double t =
+                std::max(0.5, samplerate / (440.0 * this->note_to_pitch_ignoring_tuning(
+                                                        (double)mPitchLerp.v + mTuneLerp.v)));
             int64_t syncrate = (int64_t)(double)(65536.0 * 16777216.0 * t);
             mOscState = mSyncState;
             mSyncState += syncrate;
@@ -197,11 +198,11 @@ template <typename VFXConfig> struct GenPulseSync : core::VoiceEffectTemplateBas
             mPolarity = false;
 
         // add time until next statechange
-        double width = (0.5 - 0.499f * std::clamp(mWidthLag.v, 0.01f, 0.99f));
+        double width = (0.5 - 0.499f * std::clamp(mWidthLerp.v, 0.01f, 0.99f));
         double t = std::max(
             0.5,
             samplerate / (440.0 * this->note_to_pitch_ignoring_tuning(
-                                      (double)mPitchLag.v +
+                                      (double)mPitchLerp.v +
                                       this->getFloatParam((int)GenPulseSyncFloatParams::tune) +
                                       this->getFloatParam((int)GenPulseSyncFloatParams::sync))));
         if (mPolarity)
@@ -225,7 +226,8 @@ template <typename VFXConfig> struct GenPulseSync : core::VoiceEffectTemplateBas
     float mOscOut{0};
     size_t mBufPos{0};
 
-    sst::basic_blocks::dsp::SurgeLag<float> mPitchLag, mTuneLag, mWidthLag, mSyncLag, mLevelLag;
+    sst::basic_blocks::dsp::lipol<float, VFXConfig::blockSize, true> mPitchLerp, mTuneLerp,
+        mWidthLerp, mSyncLerp, mLevelLerp;
 };
 } // namespace sst::voice_effects::generator
 

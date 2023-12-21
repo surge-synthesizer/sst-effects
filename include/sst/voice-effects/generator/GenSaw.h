@@ -22,7 +22,7 @@
 #define INCLUDE_SST_VOICE_EFFECTS_GENERATOR_GENSAW_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
-#include "sst/basic-blocks/dsp/Lag.h"
+#include "sst/basic-blocks/dsp/BlockInterpolators.h"
 #include "sst/basic-blocks/dsp/DPWSawPulseOscillator.h"
 
 #include "../VoiceEffectCore.h"
@@ -94,21 +94,22 @@ template <typename VFXConfig> struct GenSaw : core::VoiceEffectTemplateBase<VFXC
                                  this->note_to_pitch_ignoring_tuning(
                                      this->getFloatParam((int)GenSawFloatParams::offset) + pitch),
                              this->getSampleRateInv());
-        mLevelLag.newValue(
-            std::clamp(this->getFloatParam((int)GenSawFloatParams::level), 0.f, 1.f));
+        auto levT = std::clamp(this->getFloatParam((int)GenSawFloatParams::level), 0.f, 1.f);
+        levT = levT * levT * levT;
+        mLevelLerp.set_target(levT);
 
         for (int k = 0; k < VFXConfig::blockSize; k++)
         {
-            auto sv = mSawOsc.step();
-
-            dataoutL[k] = mLevelLag.v * mLevelLag.v * mLevelLag.v * sv;
-            mLevelLag.process();
+            dataoutL[k] = mSawOsc.step();
         }
+        mLevelLerp.multiply_block(dataoutL);
     }
 
   protected:
-    sst::basic_blocks::dsp::DPWSawOscillator<> mSawOsc;
-    sst::basic_blocks::dsp::SurgeLag<float, true> mLevelLag;
+    sst::basic_blocks::dsp::DPWSawOscillator<
+        sst::basic_blocks::dsp::BlockInterpSmoothingStrategy<VFXConfig::blockSize>>
+        mSawOsc;
+    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> mLevelLerp;
 };
 } // namespace sst::voice_effects::generator
 
