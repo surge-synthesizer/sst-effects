@@ -170,6 +170,16 @@ struct EqNBandParametric : core::VoiceEffectTemplateBase<VFXConfig>
         }
     }
 
+    float getFrequencyGraph(float f)
+    {
+        auto res = 1.f;
+        for (int i = 0; i < NBands; ++i)
+        {
+            res *= mParametric[i].plot_magnitude(f);
+        }
+        return res;
+    }
+
   protected:
     std::array<float, NBands * 3> mLastParam{};
     std::array<int, NBands> mLastIParam{};
