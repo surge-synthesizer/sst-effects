@@ -29,7 +29,7 @@
 #include "sst/voice-effects/generator/GenSin.h"
 #include "sst/voice-effects/generator/GenSaw.h"
 #include "sst/voice-effects/generator/GenPhaseMod.h"
-#include "sst/voice-effects/eq/Eq2BandParametric.h"
+#include "sst/voice-effects/eq/EqNBandParametric.h"
 
 struct VTestConfig
 {
@@ -90,6 +90,8 @@ TEST_CASE("Can Create Voice FX")
     }
     SECTION("ParmEQ")
     {
-        VTester<sst::voice_effects::eq::Eq2BandParametric<VTestConfig>>::TestVFX();
+        VTester<sst::voice_effects::eq::EqNBandParametric<VTestConfig, 1>>::TestVFX();
+        VTester<sst::voice_effects::eq::EqNBandParametric<VTestConfig, 2>>::TestVFX();
+        VTester<sst::voice_effects::eq::EqNBandParametric<VTestConfig, 3>>::TestVFX();
     }
 }
