@@ -29,6 +29,7 @@
 #include "sst/voice-effects/generator/GenSin.h"
 #include "sst/voice-effects/generator/GenSaw.h"
 #include "sst/voice-effects/generator/GenPhaseMod.h"
+#include "sst/voice-effects/generator/GenCorrelatedNoise.h"
 #include "sst/voice-effects/eq/EqNBandParametric.h"
 
 struct VTestConfig
@@ -82,6 +83,10 @@ TEST_CASE("Can Create Voice FX")
     SECTION("GenPhaseMod")
     {
         VTester<sst::voice_effects::generator::GenPhaseMod<VTestConfig>>::TestVFX();
+    }
+    SECTION("GenCorrelatedNoise")
+    {
+        VTester<sst::voice_effects::generator::GenCorrelatedNoise<VTestConfig>>::TestVFX();
     }
     SECTION("GenPulseSync")
     {
