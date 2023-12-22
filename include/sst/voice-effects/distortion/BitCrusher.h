@@ -120,7 +120,7 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
 
   protected:
     float time[2]{0.f, 0.f}, level[2]{0.f, 0.f};
-    typename sst::filters::Biquad::BiquadFilter<BitCrusher<VFXConfig>, VFXConfig::blockSize> lp;
+    typename core::VoiceEffectTemplateBase<VFXConfig>::BiquadFilterType lp;
 };
 } // namespace sst::voice_effects::distortion
 

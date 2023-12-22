@@ -103,6 +103,14 @@ template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig:
         "Implement getEqualNoteToPitch");
     float equalNoteToPitch(float f) { return VFXConfig::equalNoteToPitch(asBase(), f); }
     float note_to_pitch_ignoring_tuning(float f) { return equalNoteToPitch(f); }
+    static float noteToPitchIgnoringTuning(VoiceEffectTemplateBase<VFXConfig> *that, float f)
+    {
+        return that->note_to_pitch_ignoring_tuning(f);
+    }
+    static float sampleRateInv(VoiceEffectTemplateBase<VFXConfig> *that)
+    {
+        return that->getSampleRateInv();
+    }
 
     static_assert(std::is_same<decltype(VFXConfig::getSampleRate(
                                    std::declval<typename VFXConfig::BaseClass *>())),
@@ -154,6 +162,10 @@ template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig:
             }
         }
     }
+
+    using BiquadFilterType =
+        sst::filters::Biquad::BiquadFilter<VoiceEffectTemplateBase<VFXConfig>, VFXConfig::blockSize,
+                                           VoiceEffectTemplateBase<VFXConfig>>;
 };
 } // namespace sst::voice_effects::core
 
