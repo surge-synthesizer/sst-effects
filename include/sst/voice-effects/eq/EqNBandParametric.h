@@ -161,7 +161,7 @@ struct EqNBandParametric : core::VoiceEffectTemplateBase<VFXConfig>
             for (int i = 0; i < NBands; ++i)
             {
                 auto bs = i * 3;
-                mParametric[0].coeff_orfanidisEQ(mParametric[i].calc_omega(param[1 + bs] / 12.f),
+                mParametric[i].coeff_orfanidisEQ(mParametric[i].calc_omega(param[1 + bs] / 12.f),
                                                  param[2 + bs], this->dbToLinear(param[0 + bs]),
                                                  calc_GB_type_B(iparam[0 + bs], param[0 + bs]), 1);
             }
@@ -183,9 +183,8 @@ struct EqNBandParametric : core::VoiceEffectTemplateBase<VFXConfig>
   protected:
     std::array<float, NBands * 3> mLastParam{};
     std::array<int, NBands> mLastIParam{};
-    using filter_t = sst::filters::Biquad::BiquadFilter<EqNBandParametric<VFXConfig, NBands>,
-                                                        VFXConfig::blockSize>;
-    std::array<filter_t, NBands> mParametric;
+    std::array<typename core::VoiceEffectTemplateBase<VFXConfig>::BiquadFilterType, NBands>
+        mParametric;
 };
 
 } // namespace sst::voice_effects::eq
