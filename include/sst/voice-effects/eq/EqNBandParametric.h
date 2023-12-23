@@ -163,7 +163,7 @@ struct EqNBandParametric : core::VoiceEffectTemplateBase<VFXConfig>
                 auto bs = i * 3;
                 mParametric[i].coeff_orfanidisEQ(mParametric[i].calc_omega(param[1 + bs] / 12.f),
                                                  param[2 + bs], this->dbToLinear(param[0 + bs]),
-                                                 calc_GB_type_B(iparam[0 + bs], param[0 + bs]), 1);
+                                                 calc_GB_type_B(iparam[0 + i], param[0 + bs]), 1);
             }
             mLastParam = param;
             mLastIParam = iparam;
