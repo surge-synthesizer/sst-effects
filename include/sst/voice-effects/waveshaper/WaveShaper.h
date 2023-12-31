@@ -90,12 +90,20 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
         switch ((WaveShaperIntParams)idx)
         {
         case WaveShaperIntParams::type:
+        {
+            std::unordered_map<int, std::string> names;
+            for (int i = 0; i < (int)sst::waveshapers::WaveshaperType::n_ws_types; ++i)
+            {
+                names[i] = sst::waveshapers::wst_names[i];
+            }
+            names[(int)sst::waveshapers::WaveshaperType::n_ws_types] = "Error";
             return pmd()
                 .asInt()
-                .withRange(0, 2)
+                .withRange(0, (int)sst::waveshapers::WaveshaperType::n_ws_types - 1)
                 .withName("Type")
-                .withUnorderedMapFormatting({{0, "Soft"}, {1, "OJD"}, {2, "WCFold"}})
+                .withUnorderedMapFormatting(names)
                 .withDefault(1);
+        }
         case WaveShaperIntParams::oversample:
             return pmd().asBool().withName("OverSample").withDefault(0);
         default:
@@ -258,18 +266,7 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
         if (this->getIntParam((int)WaveShaperIntParams::type) != mTypeParamVal)
         {
             mTypeParamVal = this->getIntParam((int)WaveShaperIntParams::type);
-            switch (mTypeParamVal)
-            {
-            case 0:
-                mWSType = sst::waveshapers::WaveshaperType::wst_soft;
-                break;
-            case 1:
-                mWSType = sst::waveshapers::WaveshaperType::wst_ojd;
-                break;
-            case 2:
-                mWSType = sst::waveshapers::WaveshaperType::wst_westfold;
-                break;
-            }
+            mWSType = (sst::waveshapers::WaveshaperType)mTypeParamVal;
 
             float R[sst::waveshapers::n_waveshaper_registers];
             sst::waveshapers::initializeWaveshaperRegister(mWSType, R);
