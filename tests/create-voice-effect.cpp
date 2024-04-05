@@ -31,6 +31,7 @@
 #include "sst/voice-effects/generator/GenPhaseMod.h"
 #include "sst/voice-effects/generator/GenCorrelatedNoise.h"
 #include "sst/voice-effects/eq/EqNBandParametric.h"
+#include "sst/voice-effects/eq/MorphEQ.h"
 
 struct VTestConfig
 {
@@ -99,4 +100,5 @@ TEST_CASE("Can Create Voice FX")
         VTester<sst::voice_effects::eq::EqNBandParametric<VTestConfig, 2>>::TestVFX();
         VTester<sst::voice_effects::eq::EqNBandParametric<VTestConfig, 3>>::TestVFX();
     }
+    SECTION("MorphEQ") { VTester<sst::voice_effects::eq::MorphEQ<VTestConfig>>::TestVFX(); }
 }
