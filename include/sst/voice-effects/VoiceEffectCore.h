@@ -95,6 +95,10 @@ template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig:
                      float>::value,
         "Implement dbToLinear");
     float dbToLinear(float f) { return VFXConfig::dbToLinear(asBase(), f); }
+    static float dbToLinear(typename VFXConfig::BaseClass *b, float f)
+    {
+        return VFXConfig::dbToLinear(b, f);
+    }
 
     static_assert(
         std::is_same<decltype(VFXConfig::equalNoteToPitch(

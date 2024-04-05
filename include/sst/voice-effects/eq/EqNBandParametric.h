@@ -35,7 +35,7 @@ namespace sst::voice_effects::eq
 template <typename VFXConfig, int NBands>
 struct EqNBandParametric : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Generate Sin"};
+    static constexpr const char *effectName{"EQNBand"};
 
     static constexpr int numFloatParams{3 * NBands};
     static constexpr int numIntParams{NBands};
