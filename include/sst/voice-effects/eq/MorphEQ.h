@@ -30,8 +30,6 @@
 #include <iostream>
 #include <array>
 
-#include "sst/basic-blocks/mechanics/block-ops.h"
-
 namespace sst::voice_effects::eq
 {
 template <typename VFXConfig> struct MorphEQ : core::VoiceEffectTemplateBase<VFXConfig>
