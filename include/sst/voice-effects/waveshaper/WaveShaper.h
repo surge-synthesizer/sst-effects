@@ -24,7 +24,6 @@
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
 #include "sst/waveshapers.h"
-#include "sst/filters/HalfRateFilter.h"
 
 #include "../VoiceEffectCore.h"
 
@@ -49,17 +48,13 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
     enum struct WaveShaperIntParams : uint32_t
     {
         type,
-        oversample,
         num_params
     };
 
     static constexpr int numFloatParams{(int)WaveShaperFloatParams::num_params};
     static constexpr int numIntParams{(int)WaveShaperIntParams::num_params};
 
-    WaveShaper()
-        : core::VoiceEffectTemplateBase<VFXConfig>(), mHalfRateUp(6, true), mHalfRateDown(6, true)
-    {
-    }
+    WaveShaper() : core::VoiceEffectTemplateBase<VFXConfig>() {}
 
     ~WaveShaper() {}
 
@@ -104,8 +99,6 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
                 .withUnorderedMapFormatting(names)
                 .withDefault(1);
         }
-        case WaveShaperIntParams::oversample:
-            return pmd().asBool().withName("OverSample").withDefault(0);
         default:
             break;
         }
@@ -115,63 +108,6 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
 
     void initVoiceEffect() {}
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
-
-    template <bool stereo>
-    void processInternalOS(float *datainL, float *datainR, float *dataoutL, float *dataoutR)
-    {
-        // Todo: Smooth
-        auto drv = this->dbToLinear(this->getFloatParam((int)WaveShaperFloatParams::drive));
-        auto bias = this->getFloatParam((int)WaveShaperFloatParams::bias);
-        auto gain = this->dbToLinear(this->getFloatParam((int)WaveShaperFloatParams::postgain));
-
-        mDriveLerpOS.newValue(drv);
-        mBiasLerpOS.newValue(bias);
-        mGainLerpOS.newValue(gain);
-
-        float inOSL alignas(16)[VFXConfig::blockSize * 2];
-        float inOSR alignas(16)[VFXConfig::blockSize * 2];
-        float outOSL alignas(16)[VFXConfig::blockSize * 2];
-        float outOSR alignas(16)[VFXConfig::blockSize * 2];
-
-        if (stereo)
-        {
-            mHalfRateUp.process_block_U2(datainL, datainR, inOSL, inOSR, VFXConfig::blockSize * 2);
-        }
-        else
-        {
-            mHalfRateUp.process_block_U2(datainL, datainL, inOSL, inOSR, VFXConfig::blockSize * 2);
-        }
-
-        float resa alignas(16)[4];
-        for (auto i = 0U; i < VFXConfig::blockSize * 2; ++i)
-        {
-            auto mdrv = _mm_set1_ps(mDriveLerpOS.v);
-
-            __m128 val;
-
-            val = _mm_set_ps(0.f, 0.f, 2 * inOSR[i] + mBiasLerpOS.v, 2 * inOSL[i] + mBiasLerpOS.v);
-            auto res = mWSOp(&mWss, val, mdrv);
-            res = _mm_mul_ps(res, _mm_set1_ps(mGainLerpOS.v));
-            _mm_store_ps(resa, res);
-            outOSL[i] = resa[0];
-            outOSR[i] = resa[1];
-            mDriveLerpOS.process();
-            mBiasLerpOS.process();
-            mGainLerpOS.process();
-        }
-
-        if (stereo)
-        {
-            mHalfRateDown.process_block_D2(outOSL, outOSR, VFXConfig::blockSize * 2, dataoutL,
-                                           dataoutR);
-        }
-        else
-        {
-            // Use the OS input as a scratch output buffer
-            mHalfRateDown.process_block_D2(outOSL, outOSR, VFXConfig::blockSize * 2, dataoutL,
-                                           inOSL);
-        }
-    }
 
     template <bool stereo>
     void processInternal(float *datainL, float *datainR, float *dataoutL, float *dataoutR)
@@ -228,14 +164,7 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
             return;
         }
 
-        if (mOversample)
-        {
-            processInternalOS<true>(datainL, datainR, dataoutL, dataoutR);
-        }
-        else
-        {
-            processInternal<true>(datainL, datainR, dataoutL, dataoutR);
-        }
+        processInternal<true>(datainL, datainR, dataoutL, dataoutR);
     }
 
     void processMonoToMono(float *datainL, float *dataoutL, float pitch)
@@ -246,19 +175,11 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
 
         if (!mWSOp)
         {
-
             mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
             return;
         }
 
-        if (mOversample)
-        {
-            processInternalOS<false>(datainL, nullptr, dataoutL, nullptr);
-        }
-        else
-        {
-            processInternal<false>(datainL, nullptr, dataoutL, nullptr);
-        }
+        processInternal<false>(datainL, nullptr, dataoutL, nullptr);
     }
 
     void checkType()
@@ -277,26 +198,15 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
             mWss.init = _mm_cmpeq_ps(_mm_setzero_ps(), _mm_setzero_ps());
             mWSOp = sst::waveshapers::GetQuadWaveshaper(mWSType);
         }
-        auto los = this->getIntParam((int)WaveShaperIntParams::oversample) != 0;
-        if (los != mOversample)
-        {
-            mOversample = los;
-            mHalfRateDown.reset();
-            mHalfRateUp.reset();
-        }
     }
 
   protected:
     int mTypeParamVal{-1};
-    bool mOversample{false};
     sst::waveshapers::WaveshaperType mWSType;
     sst::waveshapers::QuadWaveshaperState mWss;
     sst::waveshapers::QuadWaveshaperPtr mWSOp{nullptr};
     sst::basic_blocks::dsp::lipol<float, VFXConfig::blockSize, true> mDriveLerp, mBiasLerp,
         mGainLerp;
-    sst::basic_blocks::dsp::lipol<float, VFXConfig::blockSize * 2, true> mDriveLerpOS, mBiasLerpOS,
-        mGainLerpOS;
-    sst::filters::HalfRate::HalfRateFilter mHalfRateUp, mHalfRateDown;
 };
 } // namespace sst::voice_effects::waveshaper
 
