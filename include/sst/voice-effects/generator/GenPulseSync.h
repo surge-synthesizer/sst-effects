@@ -23,7 +23,6 @@
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
-#include "sst/filters/HalfRateFilter.h"
 #include "sst/basic-blocks/mechanics/block-ops.h"
 #include "sst/basic-blocks/tables/SincTableProvider.h"
 
