@@ -33,6 +33,7 @@
 #include "sst/voice-effects/eq/EqNBandParametric.h"
 #include "sst/voice-effects/eq/MorphEQ.h"
 #include "sst/voice-effects/eq/EqGraphic6Band.h"
+#include "sst/voice-effects/delay/FauxStereo.h"
 
 struct VTestConfig
 {
@@ -105,5 +106,11 @@ TEST_CASE("Can Create Voice FX")
     SECTION("GraphicEQ")
     {
         VTester<sst::voice_effects::eq::EqGraphic6Band<VTestConfig>>::TestVFX();
+    }
+
+    SECTION("FauxStereo")
+    {
+        sst::basic_blocks::tables::SurgeSincTableProvider s;
+        VTester<sst::voice_effects::delay::FauxStereo<VTestConfig>>::TestVFX(s);
     }
 }
