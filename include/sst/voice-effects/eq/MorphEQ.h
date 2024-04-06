@@ -216,7 +216,7 @@ template <typename VFXConfig> struct MorphEQ : core::VoiceEffectTemplateBase<VFX
     };
     static constexpr const char *effectName{"Morph EQ"};
 
-    static constexpr int numFloatParams{4};
+    static constexpr int numFloatParams{5};
     static constexpr int numIntParams{2};
 
     MorphEQ() : core::VoiceEffectTemplateBase<VFXConfig>()
@@ -238,14 +238,16 @@ template <typename VFXConfig> struct MorphEQ : core::VoiceEffectTemplateBase<VFX
         case 0:
             return pmd().asPercent().withName("Morph").withDefault(0);
         case 1:
+        case 2:
             return pmd()
                 .asFloat()
                 .withDefault(0.f)
                 .withRange(-5, 5)
-                .withName("Freq")
+                .withName("Freq " + std::to_string(idx))
                 .withLinearScaleFormatting("octaves")
                 .withDefault(0);
-        case 2:
+
+        case 3:
             return pmd()
                 .asFloat()
                 .withName("Gain")
@@ -253,7 +255,7 @@ template <typename VFXConfig> struct MorphEQ : core::VoiceEffectTemplateBase<VFX
                 .withRange(-24, 24)
                 .withLinearScaleFormatting("dB");
 
-        case 3:
+        case 4:
             return pmd()
                 .asFloat()
                 .withRange(-1, 1)
@@ -381,29 +383,33 @@ template <typename VFXConfig> struct MorphEQ : core::VoiceEffectTemplateBase<VFX
 
             if (mActive[0])
             {
-                mParametric[0].coeff_HP(mParametric[0].calc_omega(s0.bands[0].freq * morph_m1 +
-                                                                  s1.bands[0].freq * morph +
-                                                                  param[1]),
-                                        Q);
+                mParametric[0].coeff_HP(
+                    mParametric[0].calc_omega((s0.bands[0].freq + param[1]) * morph_m1 +
+                                              (s1.bands[0].freq + param[2]) * morph),
+                    Q);
                 if (includeInternal)
                 {
-                    mParametricC0[0].coeff_HP(mParametricC0[0].calc_omega(s0.bands[0].freq), Q);
+                    mParametricC0[0].coeff_HP(
+                        mParametricC0[0].calc_omega(s0.bands[0].freq + param[1]), Q);
                     mParametricC0[0].coeff_instantize();
-                    mParametricC1[0].coeff_HP(mParametricC1[0].calc_omega(s1.bands[0].freq), Q);
+                    mParametricC1[0].coeff_HP(
+                        mParametricC1[0].calc_omega(s1.bands[0].freq + param[2]), Q);
                     mParametricC1[0].coeff_instantize();
                 }
             }
             if (mActive[7])
             {
-                mParametric[7].coeff_LP2B(mParametric[7].calc_omega(s0.bands[7].freq * morph_m1 +
-                                                                    s1.bands[7].freq * morph +
-                                                                    param[1]),
-                                          Q);
+                mParametric[7].coeff_LP2B(
+                    mParametric[7].calc_omega((s0.bands[7].freq + param[1]) * morph_m1 +
+                                              (s1.bands[7].freq + param[2]) * morph),
+                    Q);
                 if (includeInternal)
                 {
-                    mParametricC0[7].coeff_LP2B(mParametricC0[7].calc_omega(s0.bands[7].freq), Q);
+                    mParametricC0[7].coeff_LP2B(
+                        mParametricC0[7].calc_omega(s0.bands[7].freq + param[1]), Q);
                     mParametricC0[7].coeff_instantize();
-                    mParametricC1[7].coeff_LP2B(mParametricC1[7].calc_omega(s1.bands[7].freq), Q);
+                    mParametricC1[7].coeff_LP2B(
+                        mParametricC1[7].calc_omega(s1.bands[7].freq + param[2]), Q);
                     mParametricC1[7].coeff_instantize();
                 }
             }
@@ -412,18 +418,20 @@ template <typename VFXConfig> struct MorphEQ : core::VoiceEffectTemplateBase<VFX
                 if (mActive[i])
                 {
                     mParametric[i].coeff_peakEQ(
-                        mParametric[i].calc_omega(s0.bands[i].freq * morph_m1 +
-                                                  s1.bands[i].freq * morph + param[1]),
-                        std::max(s0.bands[i].BW * morph_m1 + s1.bands[i].BW * morph + param[3],
+                        mParametric[i].calc_omega((s0.bands[i].freq + param[1]) * morph_m1 +
+                                                  (s1.bands[i].freq + param[2]) * morph),
+                        std::max(s0.bands[i].BW * morph_m1 + s1.bands[i].BW * morph + param[4],
                                  0.001f),
-                        s0.bands[i].gain * morph_m1 + s1.bands[i].gain * morph + param[2]);
+                        s0.bands[i].gain * morph_m1 + s1.bands[i].gain * morph + param[3]);
 
                     if (includeInternal)
                     {
-                        mParametricC0[i].coeff_peakEQ(mParametricC0[i].calc_omega(s0.bands[i].freq),
-                                                      s0.bands[i].BW, s0.bands[i].gain);
-                        mParametricC1[i].coeff_peakEQ(mParametricC0[i].calc_omega(s1.bands[i].freq),
-                                                      s1.bands[i].BW, s1.bands[i].gain);
+                        mParametricC0[i].coeff_peakEQ(
+                            mParametricC0[i].calc_omega(s0.bands[i].freq + param[1]),
+                            s0.bands[i].BW, s0.bands[i].gain);
+                        mParametricC1[i].coeff_peakEQ(
+                            mParametricC0[i].calc_omega(s1.bands[i].freq + param[2]),
+                            s1.bands[i].BW, s1.bands[i].gain);
                         mParametricC0[i].coeff_instantize();
                         mParametricC1[i].coeff_instantize();
                     }
@@ -478,8 +486,8 @@ template <typename VFXConfig> struct MorphEQ : core::VoiceEffectTemplateBase<VFX
     }
 
   protected:
-    std::array<float, 4> mLastParam{};
-    std::array<int, 2> mLastIParam{};
+    std::array<float, numFloatParams> mLastParam{};
+    std::array<int, numIntParams> mLastIParam{};
     std::array<typename core::VoiceEffectTemplateBase<VFXConfig>::BiquadFilterType, numFilters>
         mParametric;
 
