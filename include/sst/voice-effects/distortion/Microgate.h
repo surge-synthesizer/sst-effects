@@ -33,7 +33,7 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
 {
     static constexpr const char *effectName{"MicroGate"};
 
-    static constexpr int microgateBufferSize{4096};
+    static constexpr int microgateBufferSize{8192};
     static constexpr int microgateBlockSize{microgateBufferSize * sizeof(float) * 2};
 
     enum struct MicroGateParams
@@ -107,7 +107,6 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
         mech::copy_from_to<blockSize>(datainL, dataoutL);
         mech::copy_from_to<blockSize>(datainR, dataoutR);
 
-        // TODO fixme
         float threshold = this->dbToLinear(this->getFloatParam((int)MicroGateParams::threshold));
         float reduction = this->dbToLinear(this->getFloatParam((int)MicroGateParams::reduction));
         mReductionLerp.newValue(reduction);
@@ -137,7 +136,8 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
             if ((!(onesampledelay[0] * datainL[k] > 0)) && (datainL[k] > 0))
             {
                 gate_zc_sync[0] = gate_state;
-                int looplimit = (int)(float)(4 + 3900 * loopParam * loopParam);
+                int looplimit =
+                    (int)(float)(4 + 3900 * loopParam * loopParam * this->getSampleRate() / 48000);
                 if (bufpos[0] > looplimit)
                 {
                     is_recording[0] = false;
@@ -147,7 +147,8 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
             if ((!(onesampledelay[1] * datainR[k] > 0)) && (datainR[k] > 0))
             {
                 gate_zc_sync[1] = gate_state;
-                int looplimit = (int)(float)(4 + 3900 * loopParam * loopParam);
+                int looplimit =
+                    (int)(float)(4 + 3900 * loopParam * loopParam * this->getSampleRate() / 48000);
                 if (bufpos[1] > looplimit)
                 {
                     is_recording[1] = false;
@@ -168,7 +169,9 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
                     dataoutL[k] = loopbuffer[0][bufpos[0] & (microgateBufferSize - 1)];
                     bufpos[0]++;
                     if (bufpos[0] >= buflength[0])
+                    {
                         bufpos[0] = 0;
+                    }
                 }
             }
             else
