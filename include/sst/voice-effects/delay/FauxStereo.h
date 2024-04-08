@@ -113,6 +113,13 @@ template <typename VFXConfig> struct FauxStereo : core::VoiceEffectTemplateBase<
             shortLineBuffers = this->checkoutBlock(sizeof(short_line));
             shortDelays = new (shortLineBuffers) short_line(sSincTable);
         }
+
+        auto amp = this->getFloatParam(0);
+        auto dly = this->getFloatParam(1);
+        auto msp = this->getFloatParam(2);
+        lipolAmp.set_target_instant(this->dbToLinear(amp));
+        lipolSource.set_target_instant(std::clamp(msp, 0.f, 1.f));
+        lipolDelay.set_target_instant(std::clamp(dly / 1000.0f, 0.f, 0.1f));
     }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
