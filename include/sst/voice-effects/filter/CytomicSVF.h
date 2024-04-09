@@ -111,7 +111,7 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
             auto R = datainR[i];
             sst::filters::CytomicSVF::step(cySvf, L, R);
             dataoutL[i] = L;
-            dataoutR[i] = L;
+            dataoutR[i] = R;
         }
     }
 
