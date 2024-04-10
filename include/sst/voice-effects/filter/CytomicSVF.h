@@ -57,7 +57,17 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
         switch (idx)
         {
         case 0:
-            return pmd().asAudibleFrequency().withName("Freq").withDefault(0);
+            if (keytrackOn)
+            {
+                return pmd()
+                    .asFloat()
+                    .withRange(-48, 48)
+                    .withName("Offset")
+                    .withDefault(0)
+                    .withLinearScaleFormatting("semitones");
+            }
+            return pmd().asAudibleFrequency().withName("Cutoff").withDefault(0);
+
         case 1:
             return pmd()
                 .asPercent()
@@ -104,7 +114,7 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
     {
-        calc_coeffs();
+        calc_coeffs(pitch);
         for (int i = 0; i < VFXConfig::blockSize; ++i)
         {
             auto L = datainL[i];
@@ -117,7 +127,7 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
 
     void processMonoToMono(float *datainL, float *dataoutL, float pitch)
     {
-        calc_coeffs();
+        calc_coeffs(pitch);
         for (int i = 0; i < VFXConfig::blockSize; ++i)
         {
             auto L = datainL[i];
@@ -127,7 +137,7 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
         }
     }
 
-    void calc_coeffs()
+    void calc_coeffs(float pitch = 0.f)
     {
         std::array<float, numFloatParams> param;
         std::array<int, numIntParams> iparam;
@@ -135,6 +145,10 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
         for (int i = 0; i < numFloatParams; i++)
         {
             param[i] = this->getFloatParam(i);
+            if (i == 0 && keytrackOn)
+            {
+                param[i] += pitch;
+            }
             diff = diff || (mLastParam[i] != param[i]);
         }
         for (int i = 0; i < numIntParams; ++i)
@@ -142,6 +156,8 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
             iparam[i] = this->getIntParam(i);
             idiff = idiff || (mLastIParam[i] != iparam[i]);
         }
+        idiff |= (wasKeytrackOn != keytrackOn);
+        wasKeytrackOn = keytrackOn;
 
         if (diff || idiff)
         {
@@ -151,6 +167,7 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
             }
             auto mode = (sst::filters::CytomicSVF::Mode)(iparam[0]);
             auto freq = 440.0 * this->note_to_pitch_ignoring_tuning(param[0]);
+
             auto res = std::clamp(param[1], 0.f, 1.f);
             auto shelf = this->dbToLinear(param[2]);
             cySvf.setCoeff(mode, freq, res, this->getSampleRateInv(), shelf);
@@ -182,7 +199,16 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
         return rmsOut / rmsIn;
     }
 
+    bool enableKeytrack(bool b)
+    {
+        auto res = (b != keytrackOn);
+        keytrackOn = b;
+        return res;
+    }
+    bool getKeytrack() const { return keytrackOn; }
+
   protected:
+    bool keytrackOn{false}, wasKeytrackOn{false};
     std::array<float, numFloatParams> mLastParam{};
     std::array<int, numIntParams> mLastIParam{};
     sst::filters::CytomicSVF cySvf;
