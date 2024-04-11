@@ -65,9 +65,9 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
         case bc_zeropoint:
             return pmd().asPercent().withName("zeropoint").withDefault(0.f);
         case bc_cutoff:
-            return pmd().asAudibleFrequency().withName("cutoff").withDefault(5.f);
+            return pmd().asAudibleFrequency().withName("cutoff");
         case bc_resonance:
-            return pmd().asPercent().withName("resonance").withDefault(0.f);
+            return pmd().asPercent().withName("resonance").withDefault(0.707f);
         default:
             break;
         }
@@ -113,8 +113,8 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
             dataoutR[k] = level[1];
         }
 
-        lp.coeff_LP2B(lp.calc_omega(this->getFloatParam(bc_cutoff)),
-                      lp.calc_v1_Q(this->getFloatParam(bc_resonance)));
+        lp.coeff_LP2B(lp.calc_omega(this->getFloatParam(bc_cutoff) / 12.f),
+                      std::clamp(this->getFloatParam(bc_resonance), 0.001f, 0.999f));
         lp.process_block(dataoutL, dataoutR);
     }
 
