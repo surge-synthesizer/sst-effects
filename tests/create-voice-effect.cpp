@@ -36,6 +36,7 @@
 #include "sst/voice-effects/delay/FauxStereo.h"
 #include "sst/voice-effects/filter/CytomicSVF.h"
 #include "sst/voice-effects/filter/SurgeBiquads.h"
+#include "sst/voice-effects/filter/SSTFilters.h"
 
 struct VTestConfig
 {
@@ -124,5 +125,10 @@ TEST_CASE("Can Create Voice FX")
     SECTION("SurgeBiquads")
     {
         VTester<sst::voice_effects::filter::SurgeBiquads<VTestConfig>>::TestVFX();
+    }
+
+    SECTION("SSTFilters")
+    {
+        VTester<sst::voice_effects::filter::SSTFilters<VTestConfig>>::TestVFX();
     }
 }
