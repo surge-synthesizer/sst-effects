@@ -35,6 +35,7 @@
 #include "sst/voice-effects/eq/MorphEQ.h"
 #include "sst/voice-effects/eq/EqGraphic6Band.h"
 #include "sst/voice-effects/delay/FauxStereo.h"
+#include "sst/voice-effects/delay/ShortDelay.h"
 #include "sst/voice-effects/filter/CytomicSVF.h"
 #include "sst/voice-effects/filter/SurgeBiquads.h"
 #include "sst/voice-effects/filter/SSTFilters.h"
@@ -121,6 +122,12 @@ TEST_CASE("Can Create Voice FX")
     {
         sst::basic_blocks::tables::SurgeSincTableProvider s;
         VTester<sst::voice_effects::delay::FauxStereo<VTestConfig>>::TestVFX(s);
+    }
+
+    SECTION("ShortDelay")
+    {
+        sst::basic_blocks::tables::SurgeSincTableProvider s;
+        VTester<sst::voice_effects::delay::ShortDelay<VTestConfig>>::TestVFX(s);
     }
 
     SECTION("CytomicSVF")
