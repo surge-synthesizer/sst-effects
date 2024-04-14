@@ -115,26 +115,13 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
                        float pitch)
     {
         calc_coeffs(pitch);
-        for (int i = 0; i < VFXConfig::blockSize; ++i)
-        {
-            auto L = datainL[i];
-            auto R = datainR[i];
-            sst::filters::CytomicSVF::step(cySvf, L, R);
-            dataoutL[i] = L;
-            dataoutR[i] = R;
-        }
+        cySvf.processBlock<VFXConfig::blockSize>(datainL, datainR, dataoutL, dataoutR);
     }
 
     void processMonoToMono(float *datainL, float *dataoutL, float pitch)
     {
         calc_coeffs(pitch);
-        for (int i = 0; i < VFXConfig::blockSize; ++i)
-        {
-            auto L = datainL[i];
-            auto R = 0.f;
-            sst::filters::CytomicSVF::step(cySvf, L, R);
-            dataoutL[i] = L;
-        }
+        cySvf.processBlock<VFXConfig::blockSize>(datainL, dataoutL);
     }
 
     void calc_coeffs(float pitch = 0.f)
@@ -170,33 +157,16 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
 
             auto res = std::clamp(param[1], 0.f, 1.f);
             auto shelf = this->dbToLinear(param[2]);
-            cySvf.setCoeff(mode, freq, res, this->getSampleRateInv(), shelf);
+            cySvf.setCoeffForBlock<VFXConfig::blockSize>(mode, freq, res, this->getSampleRateInv(),
+                                                         shelf);
 
             mLastParam = param;
             mLastIParam = iparam;
         }
-    }
-
-    float getFrequencyGraph(float f)
-    {
-        // This sucks. Lets do it right soon OK!
-        calc_coeffs();
-
-        auto freq = f * this->getSampleRate();
-        float rmsIn{0}, rmsOut{0};
-        int npoints = this->getSampleRate() * 0.07;
-        for (int i = 0; i < npoints; ++i)
+        else
         {
-            auto t = i * this->getSampleRateInv();
-            float sinv = sin(2 * M_PI * t * freq);
-            float s = sinv;
-            sst::filters::CytomicSVF::step(cySvf, s, s);
-            rmsIn += sinv * sinv;
-            rmsOut += s * s;
+            cySvf.retainCoeffForBlock<VFXConfig::blockSize>();
         }
-        rmsIn = sqrt(rmsIn / npoints);
-        rmsOut = sqrt(rmsOut / npoints);
-        return rmsOut / rmsIn;
     }
 
     bool enableKeytrack(bool b)
