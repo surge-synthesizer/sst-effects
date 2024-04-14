@@ -224,7 +224,9 @@ template <typename VFXConfig> struct SSTFilters : core::VoiceEffectTemplateBase<
 
         for (int f = 0; f < sst::filters::n_cm_coeffs; ++f)
         {
-            coefMaker.C[f] = qfus.C[f][0];
+            float res alignas(16)[4];
+            _mm_store_ps(res, qfus.C[f]);
+            coefMaker.C[f] = res[0];
         }
 
         coefMaker.MakeCoeffs(
