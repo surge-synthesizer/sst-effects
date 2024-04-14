@@ -23,6 +23,7 @@
 
 #include "sst/voice-effects/distortion/BitCrusher.h"
 #include "sst/voice-effects/distortion/Microgate.h"
+#include "sst/voice-effects/distortion/Slewer.h"
 #include "sst/voice-effects/waveshaper/WaveShaper.h"
 #include "sst/voice-effects/pitch/PitchRing.h"
 #include "sst/voice-effects/generator/GenPulseSync.h"
@@ -42,16 +43,18 @@ struct VTestConfig
 {
     struct BaseClass
     {
+        std::array<float, 256> fb{};
+        std::array<int, 256> ib{};
     };
     static constexpr int blockSize{16};
-    static void setFloatParam(BaseClass *, int, float) {}
-    static float getFloatParam(const BaseClass *, int) { return 0.f; }
+    static void setFloatParam(BaseClass *b, int i, float f) { b->fb[i] = f; }
+    static float getFloatParam(const BaseClass *b, int i) { return b->fb[i]; }
 
-    static void setIntParam(BaseClass *, int, int) {}
-    static int getIntParam(const BaseClass *, int) { return 0.f; }
+    static void setIntParam(BaseClass *b, int i, int v) { b->ib[i] = v; }
+    static int getIntParam(const BaseClass *b, int i) { return b->ib[i]; }
 
     static float dbToLinear(const BaseClass *, float f) { return 1.f; }
-    static float equalNoteToPitch(const BaseClass *, float f) { return 0.f; }
+    static float equalNoteToPitch(const BaseClass *, float f) { return pow(2.f, (f + 69) / 12.f); }
     static float getSampleRate(const BaseClass *) { return 48000.f; }
     static float getSampleRateInv(const BaseClass *) { return 1.0 / 48000.f; }
 
@@ -66,6 +69,7 @@ template <typename T> struct VTester
         INFO("Starting test with instantiation : " << T::effectName);
         auto fx = std::make_unique<T>(std::forward<Args>(a)...);
         REQUIRE(fx);
+        fx->initVoiceEffectParams();
     };
 };
 
@@ -79,6 +83,8 @@ TEST_CASE("Can Create Voice FX")
     {
         VTester<sst::voice_effects::distortion::BitCrusher<VTestConfig>>::TestVFX();
     }
+
+    SECTION("Slewer") { VTester<sst::voice_effects::distortion::Slewer<VTestConfig>>::TestVFX(); }
     SECTION("WaveShaper")
     {
         VTester<sst::voice_effects::waveshaper::WaveShaper<VTestConfig>>::TestVFX();
