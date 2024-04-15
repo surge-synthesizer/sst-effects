@@ -25,6 +25,7 @@
 #include "sst/basic-blocks/dsp/QuadratureOscillators.h"
 
 #include "../VoiceEffectCore.h"
+#include "DelaySupport.h"
 
 #include <iostream>
 
@@ -43,6 +44,8 @@ template <typename VFXConfig> struct FauxStereo : core::VoiceEffectTemplateBase<
     static constexpr int numFloatParams{3};
     static constexpr int numIntParams{0};
 
+    static constexpr int shortLineSize{14}, longLineSize{16};
+
     using SincTable = sst::basic_blocks::tables::SurgeSincTableProvider;
 
     const SincTable &sSincTable;
@@ -50,23 +53,14 @@ template <typename VFXConfig> struct FauxStereo : core::VoiceEffectTemplateBase<
     FauxStereo(const SincTable &st) : sSincTable(st), core::VoiceEffectTemplateBase<VFXConfig>()
     {
         std::fill(mLastParam.begin(), mLastParam.end(), -188888.f);
-        this->preReservePool(sizeof(short_line));
-        this->preReservePool(sizeof(long_line));
     }
 
     ~FauxStereo()
     {
-        // Return to memory pool
-        if (isShort && shortDelays)
-        {
-            shortDelays->~short_line();
-            this->returnBlock(shortLineBuffers, sizeof(short_line));
-        }
-        if (!isShort && longDelays)
-        {
-            longDelays->~long_line();
-            this->returnBlock(longLineBuffers, sizeof(long_line));
-        }
+        if (isShort)
+            lineSupport.returnLines<shortLineSize>(this);
+        else
+            lineSupport.returnLines<longLineSize>(this);
     }
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
@@ -101,17 +95,17 @@ template <typename VFXConfig> struct FauxStereo : core::VoiceEffectTemplateBase<
 
     void initVoiceEffect()
     {
-        if (this->getSampleRate() * 0.1 > (1 << 14))
+        if (this->getSampleRate() * 0.1 > (1 << shortLineSize))
         {
             isShort = false;
-            longLineBuffers = this->checkoutBlock(sizeof(long_line));
-            longDelays = new (longLineBuffers) long_line(sSincTable);
+            lineSupport.preReserveLines<longLineSize>(this);
+            lineSupport.prepareLine<longLineSize>(this, sSincTable);
         }
         else
         {
             isShort = true;
-            shortLineBuffers = this->checkoutBlock(sizeof(short_line));
-            shortDelays = new (shortLineBuffers) short_line(sSincTable);
+            lineSupport.preReserveLines<shortLineSize>(this);
+            lineSupport.prepareLine<shortLineSize>(this, sSincTable);
         }
 
         auto amp = this->getFloatParam(0);
@@ -123,17 +117,9 @@ template <typename VFXConfig> struct FauxStereo : core::VoiceEffectTemplateBase<
     }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
-    void processMonoToStereo(float *data, float *dataoutL, float *dataoutR, float pitch)
-    {
-        float tmpb alignas(16)[VFXConfig::blockSize];
-        namespace mech = sst::basic_blocks::mechanics;
-
-        mech::copy_from_to<VFXConfig::blockSize>(data, tmpb);
-        processStereo(data, tmpb, dataoutL, dataoutR, pitch);
-    }
-
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    template <typename Line>
+    void processOntoLine(Line *line, float *datainL, float *datainR, float *dataoutL,
+                         float *dataoutR, float pitch)
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
@@ -157,36 +143,35 @@ template <typename VFXConfig> struct FauxStereo : core::VoiceEffectTemplateBase<
         // do delay here
         float dlyTime alignas(16)[VFXConfig::blockSize];
         lipolDelay.store_block(dlyTime);
-        if (isShort)
+
+        for (size_t i = 0; i < VFXConfig::blockSize; ++i)
         {
-            assert(shortDelays);
-            for (size_t i = 0; i < VFXConfig::blockSize; ++i)
-            {
-                shortDelays->write(sideDly[i]);
-                sideDly[i] = shortDelays->read(dlyTime[i] * this->getSampleRate());
-            }
-        }
-        else
-        {
-            assert(longDelays);
-            for (size_t i = 0; i < VFXConfig::blockSize; ++i)
-            {
-                longDelays->write(sideDly[i]);
-                sideDly[i] = longDelays->read(dlyTime[i] * this->getSampleRate());
-            }
+            line->write(sideDly[i]);
+            sideDly[i] = line->read(dlyTime[i] * this->getSampleRate());
         }
 
         lipolAmp.MAC_block_to(sideDly, side);
         sdsp::decodeMS<VFXConfig::blockSize>(mid, side, dataoutL, dataoutR);
     }
 
+    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
+                       float pitch)
+    {
+        if (isShort)
+        {
+            processOntoLine(lineSupport.getLinePointer<shortLineSize>(), datainL, datainR, dataoutL,
+                            dataoutR, pitch);
+        }
+        else
+        {
+            processOntoLine(lineSupport.getLinePointer<longLineSize>(), datainL, datainR, dataoutL,
+                            dataoutR, pitch);
+        }
+    }
+
   protected:
-    using short_line = sst::basic_blocks::dsp::SSESincDelayLine<1 << 14>;
-    using long_line = sst::basic_blocks::dsp::SSESincDelayLine<1 << 16>;
-    uint8_t *shortLineBuffers{nullptr};
-    uint8_t *longLineBuffers{nullptr};
-    short_line *shortDelays{nullptr};
-    long_line *longDelays{nullptr};
+    details::DelayLineSupport lineSupport;
+
     bool isShort{true};
     std::array<float, numFloatParams> mLastParam{};
 

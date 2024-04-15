@@ -33,6 +33,7 @@
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
 #include "sst/basic-blocks/dsp/MidSide.h"
 #include "sst/basic-blocks/tables/SincTableProvider.h"
+#include "DelaySupport.h"
 
 namespace sst::voice_effects::delay
 {
@@ -43,8 +44,13 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
     static constexpr int numFloatParams{6};
     static constexpr int numIntParams{0};
 
+    static constexpr float maxMiliseconds{250.f};
+
     using SincTable = sst::basic_blocks::tables::SurgeSincTableProvider;
     const SincTable &sSincTable;
+
+    static constexpr int shortLineSize{15}; // enough for 250ms at 96k
+    static constexpr int longLineSize{17};  // enough for 250ms at 96k
 
     enum FloatParams
     {
@@ -60,25 +66,19 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
         : sSincTable(st), core::VoiceEffectTemplateBase<VFXConfig>(), lp(this), hp(this)
     {
         std::fill(mLastParam.begin(), mLastParam.end(), -188888.f);
-        this->preReservePool(sizeof(short_line));
-        this->preReservePool(sizeof(long_line));
     }
 
     ~ShortDelay()
     {
-        for (int i = 0; i < 2; ++i)
+        if (isShort)
         {
-            // Return to memory pool
-            if (isShort && shortDelays[i])
-            {
-                shortDelays[i]->~short_line();
-                this->returnBlock(shortLineBuffers[i], sizeof(short_line));
-            }
-            if (!isShort && longDelays[i])
-            {
-                longDelays[i]->~long_line();
-                this->returnBlock(longLineBuffers[i], sizeof(long_line));
-            }
+            lineSupport[0].template returnLines<shortLineSize>(this);
+            lineSupport[1].template returnLines<shortLineSize>(this);
+        }
+        else
+        {
+            lineSupport[0].template returnLines<longLineSize>(this);
+            lineSupport[1].template returnLines<longLineSize>(this);
         }
     }
 
@@ -90,7 +90,7 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
         case fpTimeL:
             return pmd()
                 .asFloat()
-                .withRange(0, 100)
+                .withRange(0, maxMiliseconds)
                 .withDefault(50)
                 .withLinearScaleFormatting("ms")
                 .withName("Time L");
@@ -98,7 +98,7 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
         case fpTimeR:
             return pmd()
                 .asFloat()
-                .withRange(0, 100)
+                .withRange(0, maxMiliseconds)
                 .withDefault(50)
                 .withLinearScaleFormatting("ms")
                 .withName("Time R");
@@ -123,8 +123,8 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
             isShort = false;
             for (int i = 0; i < 2; ++i)
             {
-                longLineBuffers[i] = this->checkoutBlock(sizeof(long_line));
-                longDelays[i] = new (longLineBuffers[i]) long_line(sSincTable);
+                lineSupport[i].template preReserveLines<longLineSize>(this);
+                lineSupport[i].template prepareLine<longLineSize>(this, sSincTable);
             }
         }
         else
@@ -132,15 +132,17 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
             isShort = true;
             for (int i = 0; i < 2; ++i)
             {
-                shortLineBuffers[i] = this->checkoutBlock(sizeof(short_line));
-                shortDelays[i] = new (shortLineBuffers[i]) short_line(sSincTable);
+                lineSupport[i].template preReserveLines<shortLineSize>(this);
+                lineSupport[i].template prepareLine<shortLineSize>(this, sSincTable);
             }
         }
 
         lipolDelay[0].set_target_instant(
-            std::clamp(this->getFloatParam(fpTimeL) / 1000.0f, 0.f, 0.1f));
+            std::clamp(this->getFloatParam(fpTimeL), 0.f, maxMiliseconds) * this->getSampleRate() /
+            1000.f);
         lipolDelay[1].set_target_instant(
-            std::clamp(this->getFloatParam(fpTimeR) / 1000.0f, 0.f, 0.1f));
+            std::clamp(this->getFloatParam(fpTimeR), 0.f, maxMiliseconds) * this->getSampleRate() /
+            1000.f);
 
         lipolFb.set_target_instant(std::clamp(this->getFloatParam(fpFeedback), 0.f, 1.f));
         lipolCross.set_target_instant(std::clamp(this->getFloatParam(fpCrossFeed), 0.f, 1.f));
@@ -159,8 +161,10 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
         mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
         mech::copy_from_to<VFXConfig::blockSize>(datainR, dataoutR);
 
-        lipolDelay[0].set_target(std::clamp(this->getFloatParam(fpTimeL) / 1000.0f, 0.f, 0.1f));
-        lipolDelay[1].set_target(std::clamp(this->getFloatParam(fpTimeR) / 1000.0f, 0.f, 0.1f));
+        lipolDelay[0].set_target(std::clamp(this->getFloatParam(fpTimeL), 0.f, maxMiliseconds) *
+                                 this->getSampleRate() / 1000.f);
+        lipolDelay[1].set_target(std::clamp(this->getFloatParam(fpTimeR), 0.f, maxMiliseconds) *
+                                 this->getSampleRate() / 1000.f);
 
         lipolFb.set_target(std::clamp(this->getFloatParam(fpFeedback), 0.f, 1.f));
         lipolCross.set_target(std::clamp(this->getFloatParam(fpCrossFeed), 0.f, 1.f));
@@ -178,8 +182,8 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
 
         for (int i = 0; i < VFXConfig::blockSize; ++i)
         {
-            dataoutL[i] = lines[0]->read(ld[0][i] * this->getSampleRate());
-            dataoutR[i] = lines[1]->read(ld[1][i] * this->getSampleRate());
+            dataoutL[i] = lines[0]->read(ld[0][i]);
+            dataoutR[i] = lines[1]->read(ld[1][i]);
 
             auto fbc0 = fb[0][i] * dataoutL[i] + fb[1][i] * dataoutR[i];
             auto fbc1 = fb[0][i] * dataoutR[i] + fb[1][i] * dataoutL[i];
@@ -203,19 +207,23 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
                        float pitch)
     {
         if (isShort)
-            processImpl(shortDelays, datainL, datainR, dataoutL, dataoutR, pitch);
+        {
+            processImpl(std::array{lineSupport[0].template getLinePointer<shortLineSize>(),
+                                   lineSupport[1].template getLinePointer<shortLineSize>()},
+                        datainL, datainR, dataoutL, dataoutR, pitch);
+        }
         else
-            processImpl(longDelays, datainL, datainR, dataoutL, dataoutR, pitch);
+        {
+            processImpl(std::array{lineSupport[0].template getLinePointer<longLineSize>(),
+                                   lineSupport[1].template getLinePointer<longLineSize>()},
+                        datainL, datainR, dataoutL, dataoutR, pitch);
+        }
     }
 
   protected:
-    using short_line = sst::basic_blocks::dsp::SSESincDelayLine<1 << 14>;
-    using long_line = sst::basic_blocks::dsp::SSESincDelayLine<1 << 16>;
-    std::array<uint8_t *, 2> shortLineBuffers{nullptr, nullptr};
-    std::array<uint8_t *, 2> longLineBuffers{nullptr, nullptr};
-    std::array<short_line *, 2> shortDelays{nullptr, nullptr};
-    std::array<long_line *, 2> longDelays{nullptr, nullptr};
+    std::array<details::DelayLineSupport, 2> lineSupport;
     bool isShort{true};
+
     std::array<float, numFloatParams> mLastParam{};
 
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> lipolFb, lipolCross,
