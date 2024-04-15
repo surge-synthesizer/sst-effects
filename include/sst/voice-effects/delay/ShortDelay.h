@@ -182,8 +182,14 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
 
         for (int i = 0; i < VFXConfig::blockSize; ++i)
         {
-            dataoutL[i] = lines[0]->read(ld[0][i]);
-            dataoutR[i] = lines[1]->read(ld[1][i]);
+            auto out0 = lines[0]->read(ld[0][i]);
+            auto out1 = lines[1]->read(ld[1][i]);
+            
+            lp.process_sample(out0, out1, out0, out1);
+            hp.process_sample(out0, out1, out0, out1);
+            
+            dataoutL[i] = out0;
+            dataoutR[i] = out1;
 
             auto fbc0 = fb[0][i] * dataoutL[i] + fb[1][i] * dataoutR[i];
             auto fbc1 = fb[0][i] * dataoutR[i] + fb[1][i] * dataoutL[i];
@@ -194,9 +200,6 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
 
             fbc1 = std::clamp(fbc1, -1.5f, 1.5f);
             fbc1 = fbc1 - 4.0 / 27.0 * fbc1 * fbc1 * fbc1;
-
-            lp.process_sample(fbc0, fbc1, fbc0, fbc1);
-            hp.process_sample(fbc0, fbc1, fbc0, fbc1);
 
             lines[0]->write(datainL[i] + fbc0);
             lines[1]->write(datainR[i] + fbc1);
