@@ -36,9 +36,11 @@
 #include "sst/voice-effects/eq/EqGraphic6Band.h"
 #include "sst/voice-effects/delay/FauxStereo.h"
 #include "sst/voice-effects/delay/ShortDelay.h"
+#include "sst/voice-effects/delay/StringExciter.h"
 #include "sst/voice-effects/filter/CytomicSVF.h"
 #include "sst/voice-effects/filter/SurgeBiquads.h"
 #include "sst/voice-effects/filter/SSTFilters.h"
+#include "sst/voice-effects/filter/StaticPhaser.h"
 
 struct VTestConfig
 {
@@ -130,6 +132,12 @@ TEST_CASE("Can Create Voice FX")
         VTester<sst::voice_effects::delay::ShortDelay<VTestConfig>>::TestVFX(s);
     }
 
+    SECTION("StringExciter")
+    {
+        sst::basic_blocks::tables::SurgeSincTableProvider s;
+        VTester<sst::voice_effects::delay::StringExciter<VTestConfig>>::TestVFX(s);
+    }
+
     SECTION("CytomicSVF")
     {
         VTester<sst::voice_effects::filter::CytomicSVF<VTestConfig>>::TestVFX();
@@ -143,5 +151,9 @@ TEST_CASE("Can Create Voice FX")
     SECTION("SSTFilters")
     {
         VTester<sst::voice_effects::filter::SSTFilters<VTestConfig>>::TestVFX();
+    }
+    SECTION("Static Phaser")
+    {
+        VTester<sst::voice_effects::filter::StaticPhaser<VTestConfig>>::TestVFX();
     }
 }
