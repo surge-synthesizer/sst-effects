@@ -184,10 +184,10 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
         {
             auto out0 = lines[0]->read(ld[0][i]);
             auto out1 = lines[1]->read(ld[1][i]);
-            
+
             lp.process_sample(out0, out1, out0, out1);
             hp.process_sample(out0, out1, out0, out1);
-            
+
             dataoutL[i] = out0;
             dataoutR[i] = out1;
 
