@@ -24,6 +24,7 @@
 #include "sst/voice-effects/distortion/BitCrusher.h"
 #include "sst/voice-effects/distortion/Microgate.h"
 #include "sst/voice-effects/distortion/Slewer.h"
+#include "sst/voice-effects/distortion/RingModulator.h"
 #include "sst/voice-effects/waveshaper/WaveShaper.h"
 #include "sst/voice-effects/pitch/PitchRing.h"
 #include "sst/voice-effects/generator/GenPulseSync.h"
@@ -88,6 +89,10 @@ TEST_CASE("Can Create Voice FX")
     }
 
     SECTION("Slewer") { VTester<sst::voice_effects::distortion::Slewer<VTestConfig>>::TestVFX(); }
+    SECTION("RingMod")
+    {
+        VTester<sst::voice_effects::distortion::RingModulator<VTestConfig>>::TestVFX();
+    }
     SECTION("WaveShaper")
     {
         VTester<sst::voice_effects::waveshaper::WaveShaper<VTestConfig>>::TestVFX();
