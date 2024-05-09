@@ -265,5 +265,5 @@ template <typename VFXConfig> struct StaticMonoPhaser : StaticPhaser<VFXConfig, 
     }
 };
 
-} // namespace sst::voice_effects::filter
+} // namespace sst::voice_effects::modulation
 #endif // SHORTCIRCUITXT_CYTOMICSVF_H
