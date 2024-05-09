@@ -18,8 +18,8 @@
  * https://github.com/surge-synthesizer/sst-effects
  */
 
-#ifndef INCLUDE_SST_VOICE_EFFECTS_PITCH_PITCHRING_H
-#define INCLUDE_SST_VOICE_EFFECTS_PITCH_PITCHRING_H
+#ifndef INCLUDE_SST_VOICE_EFFECTS_MODULATION_FREQSHIFTMOD_H
+#define INCLUDE_SST_VOICE_EFFECTS_MODULATION_FREQSHIFTMOD_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/HilbertTransform.h"
@@ -31,13 +31,13 @@
 
 #include "sst/basic-blocks/mechanics/block-ops.h"
 
-namespace sst::voice_effects::pitch
+namespace sst::voice_effects::modulation
 {
-template <typename VFXConfig> struct PitchRing : core::VoiceEffectTemplateBase<VFXConfig>
+template <typename VFXConfig> struct FreqShiftMod : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"PitchRing"};
+    static constexpr const char *effectName{"Freq Shift Mod"};
 
-    enum struct PitchRingFloatParams : uint32_t
+    enum struct FreqShiftModFloatParams : uint32_t
     {
         fine,
         coarse,
@@ -45,40 +45,40 @@ template <typename VFXConfig> struct PitchRing : core::VoiceEffectTemplateBase<V
         num_params
     };
 
-    enum struct PitchRingIntParams : uint32_t
+    enum struct FreqShiftModIntParams : uint32_t
     {
         num_params
     };
 
-    static constexpr int numFloatParams{(int)PitchRingFloatParams::num_params};
-    static constexpr int numIntParams{(int)PitchRingIntParams::num_params};
+    static constexpr int numFloatParams{(int)FreqShiftModFloatParams::num_params};
+    static constexpr int numIntParams{(int)FreqShiftModIntParams::num_params};
 
-    PitchRing() : core::VoiceEffectTemplateBase<VFXConfig>() {}
+    FreqShiftMod() : core::VoiceEffectTemplateBase<VFXConfig>() {}
 
-    ~PitchRing() {}
+    ~FreqShiftMod() {}
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
-        assert(idx >= 0 && idx < (int)PitchRingFloatParams::num_params);
+        assert(idx >= 0 && idx < (int)FreqShiftModFloatParams::num_params);
         using pmd = basic_blocks::params::ParamMetaData;
 
-        switch ((PitchRingFloatParams)idx)
+        switch ((FreqShiftModFloatParams)idx)
         {
-        case PitchRingFloatParams::fine:
+        case FreqShiftModFloatParams::fine:
             return pmd()
                 .asFloat()
                 .withName("Fine")
                 .withLinearScaleFormatting("hz")
                 .withRange(-10, 10)
                 .withDefault(0);
-        case PitchRingFloatParams::coarse:
+        case FreqShiftModFloatParams::coarse:
             return pmd()
                 .asFloat()
                 .withName("Coarse")
                 .withLinearScaleFormatting("hz")
                 .withRange(-1000, 1000)
                 .withDefault(0);
-        case PitchRingFloatParams::feedback:
+        case FreqShiftModFloatParams::feedback:
             return pmd().asPercentBipolar().withName("Feedback").withDefault(0);
         default:
             break;
@@ -97,11 +97,11 @@ template <typename VFXConfig> struct PitchRing : core::VoiceEffectTemplateBase<V
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
     {
-        auto rate = this->getFloatParam((int)PitchRingFloatParams::coarse) +
-                    this->getFloatParam((int)PitchRingFloatParams::fine);
+        auto rate = this->getFloatParam((int)FreqShiftModFloatParams::coarse) +
+                    this->getFloatParam((int)FreqShiftModFloatParams::fine);
         mSinOsc.setRate(2.0 * M_PI * rate * this->getSampleRateInv());
 
-        auto fbp = this->getFloatParam((int)PitchRingFloatParams::feedback) * 0.75;
+        auto fbp = this->getFloatParam((int)FreqShiftModFloatParams::feedback) * 0.75;
         mFeedbackLerp.newValue(fbp);
 
         for (auto i = 0U; i < VFXConfig::blockSize; ++i)
@@ -138,6 +138,6 @@ template <typename VFXConfig> struct PitchRing : core::VoiceEffectTemplateBase<V
 
     sst::basic_blocks::dsp::lipol<float, VFXConfig::blockSize, true> mFeedbackLerp;
 };
-} // namespace sst::voice_effects::pitch
+} // namespace sst::voice_effects::modulation
 
-#endif // SHORTCIRCUITXT_PitchRing_H
+#endif // SHORTCIRCUITXT_FreqShiftMod_H

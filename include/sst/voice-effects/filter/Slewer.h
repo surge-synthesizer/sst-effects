@@ -24,7 +24,7 @@
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "../VoiceEffectCore.h"
 
-namespace sst::voice_effects::distortion
+namespace sst::voice_effects::filter
 {
 template <typename VFXConfig> struct Slewer : core::VoiceEffectTemplateBase<VFXConfig>
 {
@@ -172,6 +172,6 @@ template <typename VFXConfig> struct Slewer : core::VoiceEffectTemplateBase<VFXC
 
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> lipolRate;
 };
-} // namespace sst::voice_effects::distortion
+} // namespace sst::voice_effects::filter
 
 #endif // SHORTCIRCUITXT_BITCRUSHER_H

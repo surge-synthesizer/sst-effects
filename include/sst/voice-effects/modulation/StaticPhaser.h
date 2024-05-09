@@ -32,7 +32,7 @@
 #include "sst/basic-blocks/mechanics/block-ops.h"
 #include "sst/filters/CytomicSVF.h"
 
-namespace sst::voice_effects::filter
+namespace sst::voice_effects::modulation
 {
 template <typename VFXConfig, bool stereo>
 struct StaticPhaser : core::VoiceEffectTemplateBase<VFXConfig>

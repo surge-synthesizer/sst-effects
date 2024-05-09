@@ -18,8 +18,8 @@
  * https://github.com/surge-synthesizer/sst-effects
  */
 
-#ifndef INCLUDE_SST_VOICE_EFFECTS_DELAY_STRINGEXCITER_H
-#define INCLUDE_SST_VOICE_EFFECTS_DELAY_STRINGEXCITER_H
+#ifndef INCLUDE_SST_VOICE_EFFECTS_DELAY_StringResonator_H
+#define INCLUDE_SST_VOICE_EFFECTS_DELAY_StringResonator_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/QuadratureOscillators.h"
@@ -37,7 +37,7 @@
 
 namespace sst::voice_effects::delay
 {
-template <typename VFXConfig> struct StringExciter : core::VoiceEffectTemplateBase<VFXConfig>
+template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplateBase<VFXConfig>
 {
     static constexpr const char *effectName{"String Exciter"};
 
@@ -59,13 +59,13 @@ template <typename VFXConfig> struct StringExciter : core::VoiceEffectTemplateBa
         fpStiffness,
     };
 
-    StringExciter(const SincTable &st)
+    StringResonator(const SincTable &st)
         : sSincTable(st), core::VoiceEffectTemplateBase<VFXConfig>(), lp(this), hp(this)
     {
         std::fill(mLastParam.begin(), mLastParam.end(), -188888.f);
     }
 
-    ~StringExciter()
+    ~StringResonator()
     {
         if (isShort)
         {

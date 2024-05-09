@@ -27,7 +27,7 @@
 
 #include "sst/basic-blocks/mechanics/block-ops.h"
 
-namespace sst::voice_effects::distortion
+namespace sst::voice_effects::delay
 {
 template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<VFXConfig>
 {
@@ -209,6 +209,6 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
 
     sst::basic_blocks::dsp::lipol<float, VFXConfig::blockSize, true> mReductionLerp;
 };
-} // namespace sst::voice_effects::distortion
+} // namespace sst::voice_effects::delay
 
 #endif

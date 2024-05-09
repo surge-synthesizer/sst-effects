@@ -77,7 +77,7 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
         case GenCorrelatedNoiseFloatParams::color:
             return pmd().asPercentBipolar().withName("Color");
         case GenCorrelatedNoiseFloatParams::level:
-            return pmd().asCubicDecibelAttenuation().withDefault(1.f).withName("Level");
+            return pmd().asCubicDecibelAttenuation().withDefault(0.5f).withName("Level");
         default:
             break;
         }
