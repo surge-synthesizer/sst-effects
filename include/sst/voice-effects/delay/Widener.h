@@ -18,8 +18,8 @@
  * https://github.com/surge-synthesizer/sst-effects
  */
 
-#ifndef INCLUDE_SST_VOICE_EFFECTS_DELAY_Widener_H
-#define INCLUDE_SST_VOICE_EFFECTS_DELAY_Widener_H
+#ifndef INCLUDE_SST_VOICE_EFFECTS_DELAY_WIDENER_H
+#define INCLUDE_SST_VOICE_EFFECTS_DELAY_WIDENER_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/QuadratureOscillators.h"

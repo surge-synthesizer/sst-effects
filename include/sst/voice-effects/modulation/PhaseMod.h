@@ -91,8 +91,8 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
                          this->note_to_pitch_ignoring_tuning(
                              pitch + this->getFloatParam((int)PhaseModFloatParams::transpose)) *
                          M_PI_2 * this->getSampleRateInv());
-        pregain.set_target(
-            3.1415 * this->dbToLinear(this->getFloatParam((int)PhaseModFloatParams::depth)));
+        pregain.set_target(3.1415 *
+                           this->dbToLinear(this->getFloatParam((int)PhaseModFloatParams::depth)));
 
         constexpr int bs2 = VFXConfig::blockSize << 1;
         float OS alignas(16)[2][bs2];
@@ -141,8 +141,8 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
                          this->note_to_pitch_ignoring_tuning(
                              pitch + this->getFloatParam((int)PhaseModFloatParams::transpose)) *
                          M_PI_2 * this->getSampleRateInv());
-        pregain.set_target(
-            3.1415 * this->dbToLinear(this->getFloatParam((int)PhaseModFloatParams::depth)));
+        pregain.set_target(3.1415 *
+                           this->dbToLinear(this->getFloatParam((int)PhaseModFloatParams::depth)));
 
         constexpr int bs2 = VFXConfig::blockSize << 1;
         float OS alignas(16)[2][bs2];

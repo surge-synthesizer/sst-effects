@@ -18,8 +18,8 @@
  * https://github.com/surge-synthesizer/sst-effects
  */
 
-#ifndef INCLUDE_SST_VOICE_EFFECTS_DISTORTION_MICROGATE_H
-#define INCLUDE_SST_VOICE_EFFECTS_DISTORTION_MICROGATE_H
+#ifndef INCLUDE_SST_VOICE_EFFECTS_DELAY_MICROGATE_H
+#define INCLUDE_SST_VOICE_EFFECTS_DELAY_MICROGATE_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
