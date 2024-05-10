@@ -100,13 +100,21 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
             std::clamp(this->getFloatParam((int)GenCorrelatedNoiseFloatParams::color), -1.f, 1.f);
         mLevelLerp.set_target(levT);
         mColorLerp.newValue(col);
-        for (int k = 0; k < VFXConfig::blockSize; k++)
+        // remember getOversamplingRatio is constexpr so the compiler
+        // will get a good shot at this loop
+        for (int k = 0; k < VFXConfig::blockSize; k += this->getOversamplingRatio())
         {
             dataoutL[k] = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
                 mPrior[0][0], mPrior[0][1], mColorLerp.v, mDistro(mGenerator));
             dataoutR[k] = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
                 mPrior[1][0], mPrior[1][1], mColorLerp.v, mDistro(mGenerator));
-            mColorLerp.process();
+            for (auto kk = 1; kk < this->getOversamplingRatio(); ++kk)
+            {
+                dataoutL[k + kk] = dataoutL[k];
+                dataoutR[k + kk] = dataoutR[k];
+
+                mColorLerp.process(); // inside since LERP is at OS
+            }
         }
         mLevelLerp.multiply_2_blocks(dataoutL, dataoutR);
     }
@@ -121,11 +129,16 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
             std::clamp(this->getFloatParam((int)GenCorrelatedNoiseFloatParams::color), -1.f, 1.f);
         mColorLerp.newValue(col);
 
-        for (int k = 0; k < VFXConfig::blockSize; k++)
+        for (int k = 0; k < VFXConfig::blockSize; k += this->getOversamplingRatio())
         {
             dataoutL[k] = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
                 mPrior[0][0], mPrior[0][1], mColorLerp.v, mDistro(mGenerator));
-            mColorLerp.process();
+            for (auto kk = 1; kk < this->getOversamplingRatio(); ++kk)
+            {
+                dataoutL[k + kk] = dataoutL[k];
+
+                mColorLerp.process(); // inside since this LERP is at OS
+            }
         }
         mLevelLerp.multiply_block(dataoutL);
     }

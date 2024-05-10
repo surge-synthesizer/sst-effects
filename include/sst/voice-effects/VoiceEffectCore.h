@@ -167,6 +167,27 @@ template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig:
         }
     }
 
+    template <typename T, typename = void> struct has_oversampling : std::false_type
+    {
+    };
+
+    template <typename T>
+    struct has_oversampling<T, std::void_t<decltype(&T::oversamplingRatio)>> : std::true_type
+    {
+    };
+
+    constexpr int16_t getOversamplingRatio()
+    {
+        if constexpr (has_oversampling<VFXConfig>::value)
+        {
+            return VFXConfig::oversamplingRatio;
+        }
+        else
+        {
+            return 1;
+        }
+    }
+
     using BiquadFilterType =
         sst::filters::Biquad::BiquadFilter<VoiceEffectTemplateBase<VFXConfig>, VFXConfig::blockSize,
                                            VoiceEffectTemplateBase<VFXConfig>>;
