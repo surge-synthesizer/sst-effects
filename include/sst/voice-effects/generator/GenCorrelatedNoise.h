@@ -60,8 +60,10 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
         // Warm up
         for (int i = 0; i < 7; ++i)
         {
-            sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(mPrior[0], mPrior[1], 0,
-                                                                          mDistro(mGenerator));
+            sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
+                mPrior[0][0], mPrior[0][1], 0, mDistro(mGenerator));
+            sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
+                mPrior[1][0], mPrior[1][1], 0, mDistro(mGenerator));
         }
     }
 
@@ -101,9 +103,9 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
         for (int k = 0; k < VFXConfig::blockSize; k++)
         {
             dataoutL[k] = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
-                mPrior[0], mPrior[1], mColorLerp.v, mDistro(mGenerator));
+                mPrior[0][0], mPrior[0][1], mColorLerp.v, mDistro(mGenerator));
             dataoutR[k] = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
-                mPrior[0], mPrior[1], mColorLerp.v, mDistro(mGenerator));
+                mPrior[1][0], mPrior[1][1], mColorLerp.v, mDistro(mGenerator));
             mColorLerp.process();
         }
         mLevelLerp.multiply_2_blocks(dataoutL, dataoutR);
@@ -122,14 +124,14 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
         for (int k = 0; k < VFXConfig::blockSize; k++)
         {
             dataoutL[k] = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
-                mPrior[0], mPrior[1], mColorLerp.v, mDistro(mGenerator));
+                mPrior[0][0], mPrior[0][1], mColorLerp.v, mDistro(mGenerator));
             mColorLerp.process();
         }
         mLevelLerp.multiply_block(dataoutL);
     }
 
   protected:
-    float mPrior[2]{0.f, 0.f};
+    float mPrior[2][2]{{0.f, 0.f}, {0.f, 0.f}};
 
     std::minstd_rand mGenerator;
     std::uniform_real_distribution<float> mDistro;
