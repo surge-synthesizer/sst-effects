@@ -18,8 +18,8 @@
  * https://github.com/surge-synthesizer/sst-effects
  */
 
-#ifndef INCLUDE_SST_VOICE_EFFECTS_GENERATOR_GENPHASEMOD_H
-#define INCLUDE_SST_VOICE_EFFECTS_GENERATOR_GENPHASEMOD_H
+#ifndef INCLUDE_SST_VOICE_EFFECTS_MODULATION_PHASEMOD_H
+#define INCLUDE_SST_VOICE_EFFECTS_MODULATION_PHASEMOD_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/FastMath.h"
@@ -31,46 +31,46 @@
 
 #include "sst/basic-blocks/mechanics/block-ops.h"
 
-namespace sst::voice_effects::generator
+namespace sst::voice_effects::modulation
 {
-template <typename VFXConfig> struct GenPhaseMod : core::VoiceEffectTemplateBase<VFXConfig>
+template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"GenPhaseMod"};
+    static constexpr const char *effectName{"PhaseMod"};
 
-    enum struct GenPhaseModFloatParams : uint32_t
+    enum struct PhaseModFloatParams : uint32_t
     {
         transpose,
         depth,
         num_params
     };
 
-    enum struct GenPhaseModIntParams : uint32_t
+    enum struct PhaseModIntParams : uint32_t
     {
         num_params
     };
 
-    static constexpr int numFloatParams{(int)GenPhaseModFloatParams::num_params};
-    static constexpr int numIntParams{(int)GenPhaseModIntParams::num_params};
+    static constexpr int numFloatParams{(int)PhaseModFloatParams::num_params};
+    static constexpr int numIntParams{(int)PhaseModIntParams::num_params};
 
-    GenPhaseMod() : core::VoiceEffectTemplateBase<VFXConfig>(), pre(6, true), post(6, true) {}
+    PhaseMod() : core::VoiceEffectTemplateBase<VFXConfig>(), pre(6, true), post(6, true) {}
 
-    ~GenPhaseMod() {}
+    ~PhaseMod() {}
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
-        assert(idx >= 0 && idx < (int)GenPhaseModFloatParams::num_params);
+        assert(idx >= 0 && idx < (int)PhaseModFloatParams::num_params);
         using pmd = basic_blocks::params::ParamMetaData;
 
-        switch ((GenPhaseModFloatParams)idx)
+        switch ((PhaseModFloatParams)idx)
         {
-        case GenPhaseModFloatParams::transpose:
+        case PhaseModFloatParams::transpose:
             return pmd()
                 .asFloat()
                 .withRange(-96, 96)
                 .withLinearScaleFormatting("semitones")
                 .withDefault(0)
                 .withName("Transpose");
-        case GenPhaseModFloatParams::depth:
+        case PhaseModFloatParams::depth:
             return pmd().asDecibel().withName("Depth").withDefault(0);
         default:
             break;
@@ -89,10 +89,10 @@ template <typename VFXConfig> struct GenPhaseMod : core::VoiceEffectTemplateBase
 
         omega.set_target(0.5 * 440 *
                          this->note_to_pitch_ignoring_tuning(
-                             pitch + this->getFloatParam((int)GenPhaseModFloatParams::transpose)) *
+                             pitch + this->getFloatParam((int)PhaseModFloatParams::transpose)) *
                          M_PI_2 * this->getSampleRateInv());
-        pregain.set_target(
-            3.1415 * this->dbToLinear(this->getFloatParam((int)GenPhaseModFloatParams::depth)));
+        pregain.set_target(3.1415 *
+                           this->dbToLinear(this->getFloatParam((int)PhaseModFloatParams::depth)));
 
         constexpr int bs2 = VFXConfig::blockSize << 1;
         float OS alignas(16)[2][bs2];
@@ -139,10 +139,10 @@ template <typename VFXConfig> struct GenPhaseMod : core::VoiceEffectTemplateBase
 
         omega.set_target(0.5 * 440 *
                          this->note_to_pitch_ignoring_tuning(
-                             pitch + this->getFloatParam((int)GenPhaseModFloatParams::transpose)) *
+                             pitch + this->getFloatParam((int)PhaseModFloatParams::transpose)) *
                          M_PI_2 * this->getSampleRateInv());
-        pregain.set_target(
-            3.1415 * this->dbToLinear(this->getFloatParam((int)GenPhaseModFloatParams::depth)));
+        pregain.set_target(3.1415 *
+                           this->dbToLinear(this->getFloatParam((int)PhaseModFloatParams::depth)));
 
         constexpr int bs2 = VFXConfig::blockSize << 1;
         float OS alignas(16)[2][bs2];
@@ -185,6 +185,6 @@ template <typename VFXConfig> struct GenPhaseMod : core::VoiceEffectTemplateBase
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize> pregain;
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize << 1, true> omega;
 };
-} // namespace sst::voice_effects::generator
+} // namespace sst::voice_effects::modulation
 
-#endif // SHORTCIRCUITXT_GenPhaseMod_H
+#endif // SHORTCIRCUITXT_PhaseMod_H

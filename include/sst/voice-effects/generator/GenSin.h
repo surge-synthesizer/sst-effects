@@ -71,7 +71,7 @@ template <typename VFXConfig> struct GenSin : core::VoiceEffectTemplateBase<VFXC
                 .withLinearScaleFormatting("semitones")
                 .withName("Tune");
         case GenSinFloatParams::level:
-            return pmd().asCubicDecibelAttenuation().withDefault(1.f).withName("Level");
+            return pmd().asCubicDecibelAttenuation().withDefault(0.5f).withName("Level");
         default:
             break;
         }

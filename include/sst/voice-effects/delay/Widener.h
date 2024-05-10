@@ -18,8 +18,8 @@
  * https://github.com/surge-synthesizer/sst-effects
  */
 
-#ifndef INCLUDE_SST_VOICE_EFFECTS_DELAY_FAUXSTEREO_H
-#define INCLUDE_SST_VOICE_EFFECTS_DELAY_FAUXSTEREO_H
+#ifndef INCLUDE_SST_VOICE_EFFECTS_DELAY_WIDENER_H
+#define INCLUDE_SST_VOICE_EFFECTS_DELAY_WIDENER_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/QuadratureOscillators.h"
@@ -37,9 +37,9 @@
 
 namespace sst::voice_effects::delay
 {
-template <typename VFXConfig> struct FauxStereo : core::VoiceEffectTemplateBase<VFXConfig>
+template <typename VFXConfig> struct Widener : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Faux Stereo"};
+    static constexpr const char *effectName{"Widener"};
 
     static constexpr int numFloatParams{3};
     static constexpr int numIntParams{0};
@@ -50,12 +50,12 @@ template <typename VFXConfig> struct FauxStereo : core::VoiceEffectTemplateBase<
 
     const SincTable &sSincTable;
 
-    FauxStereo(const SincTable &st) : sSincTable(st), core::VoiceEffectTemplateBase<VFXConfig>()
+    Widener(const SincTable &st) : sSincTable(st), core::VoiceEffectTemplateBase<VFXConfig>()
     {
         std::fill(mLastParam.begin(), mLastParam.end(), -188888.f);
     }
 
-    ~FauxStereo()
+    ~Widener()
     {
         if (isShort)
             lineSupport.returnLines<shortLineSize>(this);

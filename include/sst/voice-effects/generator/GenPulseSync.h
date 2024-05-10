@@ -96,7 +96,7 @@ template <typename VFXConfig> struct GenPulseSync : core::VoiceEffectTemplateBas
                 .withDefault(0)
                 .withLinearScaleFormatting("semitones");
         case GenPulseSyncFloatParams::level:
-            return pmd().asCubicDecibelAttenuation().withDefault(1.f).withName("Level");
+            return pmd().asCubicDecibelAttenuation().withDefault(0.5f).withName("Level");
 
         default:
             break;

@@ -18,8 +18,8 @@
  * https://github.com/surge-synthesizer/sst-effects
  */
 
-#ifndef INCLUDE_SST_VOICE_EFFECTS_DISTORTION_RINGMODULATOR_H
-#define INCLUDE_SST_VOICE_EFFECTS_DISTORTION_RINGMODULATOR_H
+#ifndef INCLUDE_SST_VOICE_EFFECTS_MODULATION_RINGMOD_H
+#define INCLUDE_SST_VOICE_EFFECTS_MODULATION_RINGMOD_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/QuadratureOscillators.h"
@@ -31,11 +31,11 @@
 
 #include "sst/basic-blocks/mechanics/block-ops.h"
 
-namespace sst::voice_effects::distortion
+namespace sst::voice_effects::modulation
 {
-template <typename VFXConfig> struct RingModulator : core::VoiceEffectTemplateBase<VFXConfig>
+template <typename VFXConfig> struct RingMod : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Ring Modulator"};
+    static constexpr const char *effectName{"Ring Mod"};
 
     static constexpr int numFloatParams{1};
     static constexpr int numIntParams{0};
@@ -45,13 +45,13 @@ template <typename VFXConfig> struct RingModulator : core::VoiceEffectTemplateBa
         fpCarrierFrequency,
     };
 
-    RingModulator() : core::VoiceEffectTemplateBase<VFXConfig>()
+    RingMod() : core::VoiceEffectTemplateBase<VFXConfig>()
     {
         std::fill(mLastIParam.begin(), mLastIParam.end(), -1);
         std::fill(mLastParam.begin(), mLastParam.end(), -188888.f);
     }
 
-    ~RingModulator() {}
+    ~RingMod() {}
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
@@ -138,5 +138,5 @@ template <typename VFXConfig> struct RingModulator : core::VoiceEffectTemplateBa
     sst::basic_blocks::dsp::QuadratureOscillator<float> qosc;
 };
 
-} // namespace sst::voice_effects::distortion
+} // namespace sst::voice_effects::modulation
 #endif // SHORTCIRCUITXT_CYTOMICSVF_H

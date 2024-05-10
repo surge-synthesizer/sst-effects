@@ -18,8 +18,8 @@
  * https://github.com/surge-synthesizer/sst-effects
  */
 
-#ifndef INCLUDE_SST_VOICE_EFFECTS_FILTER_STATICPHASER_H
-#define INCLUDE_SST_VOICE_EFFECTS_FILTER_STATICPHASER_H
+#ifndef INCLUDE_SST_VOICE_EFFECTS_MODULATION_STATICPHASER_H
+#define INCLUDE_SST_VOICE_EFFECTS_MODULATION_STATICPHASER_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/QuadratureOscillators.h"
@@ -32,7 +32,7 @@
 #include "sst/basic-blocks/mechanics/block-ops.h"
 #include "sst/filters/CytomicSVF.h"
 
-namespace sst::voice_effects::filter
+namespace sst::voice_effects::modulation
 {
 template <typename VFXConfig, bool stereo>
 struct StaticPhaser : core::VoiceEffectTemplateBase<VFXConfig>
@@ -265,5 +265,5 @@ template <typename VFXConfig> struct StaticMonoPhaser : StaticPhaser<VFXConfig, 
     }
 };
 
-} // namespace sst::voice_effects::filter
+} // namespace sst::voice_effects::modulation
 #endif // SHORTCIRCUITXT_CYTOMICSVF_H
