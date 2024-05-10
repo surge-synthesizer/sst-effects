@@ -22,26 +22,26 @@
 #include "simd-test-include.h"
 
 #include "sst/voice-effects/distortion/BitCrusher.h"
-#include "sst/voice-effects/distortion/Microgate.h"
-#include "sst/voice-effects/distortion/Slewer.h"
-#include "sst/voice-effects/distortion/RingModulator.h"
+#include "sst/voice-effects/delay/Microgate.h"
+#include "sst/voice-effects/filter/Slewer.h"
+#include "sst/voice-effects/modulation/RingMod.h"
 #include "sst/voice-effects/waveshaper/WaveShaper.h"
-#include "sst/voice-effects/pitch/PitchRing.h"
+#include "sst/voice-effects/modulation/FreqShiftMod.h"
 #include "sst/voice-effects/generator/GenPulseSync.h"
 #include "sst/voice-effects/generator/GenSin.h"
 #include "sst/voice-effects/generator/GenSaw.h"
-#include "sst/voice-effects/generator/GenPhaseMod.h"
+#include "sst/voice-effects/modulation/PhaseMod.h"
 #include "sst/voice-effects/generator/GenCorrelatedNoise.h"
 #include "sst/voice-effects/eq/EqNBandParametric.h"
 #include "sst/voice-effects/eq/MorphEQ.h"
 #include "sst/voice-effects/eq/EqGraphic6Band.h"
-#include "sst/voice-effects/delay/FauxStereo.h"
+#include "sst/voice-effects/delay/Widener.h"
 #include "sst/voice-effects/delay/ShortDelay.h"
-#include "sst/voice-effects/delay/StringExciter.h"
+#include "sst/voice-effects/delay/StringResonator.h"
 #include "sst/voice-effects/filter/CytomicSVF.h"
 #include "sst/voice-effects/filter/SurgeBiquads.h"
 #include "sst/voice-effects/filter/SSTFilters.h"
-#include "sst/voice-effects/filter/StaticPhaser.h"
+#include "sst/voice-effects/modulation/StaticPhaser.h"
 
 struct VTestConfig
 {
@@ -79,30 +79,27 @@ template <typename T> struct VTester
 
 TEST_CASE("Can Create Voice FX")
 {
-    SECTION("MicroGate")
-    {
-        VTester<sst::voice_effects::distortion::MicroGate<VTestConfig>>::TestVFX();
-    }
+    SECTION("MicroGate") { VTester<sst::voice_effects::delay::MicroGate<VTestConfig>>::TestVFX(); }
     SECTION("BitCrusher")
     {
         VTester<sst::voice_effects::distortion::BitCrusher<VTestConfig>>::TestVFX();
     }
 
-    SECTION("Slewer") { VTester<sst::voice_effects::distortion::Slewer<VTestConfig>>::TestVFX(); }
-    SECTION("RingMod")
-    {
-        VTester<sst::voice_effects::distortion::RingModulator<VTestConfig>>::TestVFX();
-    }
+    SECTION("Slewer") { VTester<sst::voice_effects::filter::Slewer<VTestConfig>>::TestVFX(); }
+    SECTION("RingMod") { VTester<sst::voice_effects::modulation::RingMod<VTestConfig>>::TestVFX(); }
     SECTION("WaveShaper")
     {
         VTester<sst::voice_effects::waveshaper::WaveShaper<VTestConfig>>::TestVFX();
     }
-    SECTION("PitchRing") { VTester<sst::voice_effects::pitch::PitchRing<VTestConfig>>::TestVFX(); }
+    SECTION("PitchRing")
+    {
+        VTester<sst::voice_effects::modulation::FreqShiftMod<VTestConfig>>::TestVFX();
+    }
     SECTION("GenSin") { VTester<sst::voice_effects::generator::GenSin<VTestConfig>>::TestVFX(); }
     SECTION("GenSaw") { VTester<sst::voice_effects::generator::GenSaw<VTestConfig>>::TestVFX(); }
     SECTION("GenPhaseMod")
     {
-        VTester<sst::voice_effects::generator::GenPhaseMod<VTestConfig>>::TestVFX();
+        VTester<sst::voice_effects::modulation::PhaseMod<VTestConfig>>::TestVFX();
     }
     SECTION("GenCorrelatedNoise")
     {
@@ -128,7 +125,7 @@ TEST_CASE("Can Create Voice FX")
     SECTION("FauxStereo")
     {
         sst::basic_blocks::tables::SurgeSincTableProvider s;
-        VTester<sst::voice_effects::delay::FauxStereo<VTestConfig>>::TestVFX(s);
+        VTester<sst::voice_effects::delay::Widener<VTestConfig>>::TestVFX(s);
     }
 
     SECTION("ShortDelay")
@@ -140,7 +137,7 @@ TEST_CASE("Can Create Voice FX")
     SECTION("StringExciter")
     {
         sst::basic_blocks::tables::SurgeSincTableProvider s;
-        VTester<sst::voice_effects::delay::StringExciter<VTestConfig>>::TestVFX(s);
+        VTester<sst::voice_effects::delay::StringResonator<VTestConfig>>::TestVFX(s);
     }
 
     SECTION("CytomicSVF")
@@ -159,7 +156,7 @@ TEST_CASE("Can Create Voice FX")
     }
     SECTION("Static Phaser")
     {
-        VTester<sst::voice_effects::filter::StaticStereoPhaser<VTestConfig>>::TestVFX();
-        VTester<sst::voice_effects::filter::StaticMonoPhaser<VTestConfig>>::TestVFX();
+        VTester<sst::voice_effects::modulation::StaticStereoPhaser<VTestConfig>>::TestVFX();
+        VTester<sst::voice_effects::modulation::StaticMonoPhaser<VTestConfig>>::TestVFX();
     }
 }
