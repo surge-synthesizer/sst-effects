@@ -160,11 +160,12 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
         namespace sdsp = sst::basic_blocks::dsp;
         mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
         mech::copy_from_to<VFXConfig::blockSize>(datainR, dataoutR);
+        float FIRipol = static_cast<float>(SincTable::FIRipol_N);
 
-        lipolDelay[0].set_target(std::clamp(this->getFloatParam(fpTimeL), 0.f, maxMiliseconds) *
-                                 this->getSampleRate() / 1000.f);
-        lipolDelay[1].set_target(std::clamp(this->getFloatParam(fpTimeR), 0.f, maxMiliseconds) *
-                                 this->getSampleRate() / 1000.f);
+        lipolDelay[0].set_target(std::max((std::clamp(this->getFloatParam(fpTimeL), 0.f, maxMiliseconds) *
+                                 this->getSampleRate() / 1000.f), FIRipol));
+        lipolDelay[1].set_target(std::max((std::clamp(this->getFloatParam(fpTimeR), 0.f, maxMiliseconds) *
+                                 this->getSampleRate() / 1000.f), FIRipol));
 
         lipolFb.set_target(std::clamp(this->getFloatParam(fpFeedback), 0.f, 1.f));
         lipolCross.set_target(std::clamp(this->getFloatParam(fpCrossFeed), 0.f, 1.f));
