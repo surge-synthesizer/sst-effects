@@ -47,6 +47,7 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
 
     enum struct GenCorrelatedNoiseIntParams : uint32_t
     {
+        stereo,
         num_params
     };
 
@@ -87,12 +88,25 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
         return pmd().withName("Unknown " + std::to_string(idx)).asPercent();
     }
 
+    basic_blocks::params::ParamMetaData intParamAt(int idx) const
+    {
+        assert(idx == 0);
+        return basic_blocks::params::ParamMetaData().asBool().withName("Stereo Noise");
+    }
+
     void initVoiceEffect() {}
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
     {
+        auto isSterep = this->getIntParam((int)GenCorrelatedNoiseIntParams::stereo) != 0;
+        if (!isSterep)
+        {
+            processMonoToMono(datainL, dataoutL, pitch);
+            basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(dataoutL, dataoutR);
+            return;
+        }
         auto levT =
             std::clamp(this->getFloatParam((int)GenCorrelatedNoiseFloatParams::level), 0.f, 1.f);
         levT = levT * levT * levT;
@@ -141,6 +155,16 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
             }
         }
         mLevelLerp.multiply_block(dataoutL);
+    }
+
+    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
+    {
+        processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
+    }
+
+    bool getMonoToStereoSetting() const
+    {
+        return this->getIntParam((int)GenCorrelatedNoiseIntParams::stereo) > 0;
     }
 
   protected:
