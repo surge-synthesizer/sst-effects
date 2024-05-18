@@ -41,7 +41,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
 {
     static constexpr const char *effectName{"String Exciter"};
 
-    static constexpr int numFloatParams{6};
+    static constexpr int numFloatParams{8};
     static constexpr int numIntParams{0};
 
     static constexpr float maxMiliseconds{100.f}; // 10 hz floor
@@ -54,7 +54,8 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
 
     enum FloatParams
     {
-        // TODO: level controls
+        fpLevelOne,
+        fpLevelTwo,
         fpOffsetOne,
         fpOffsetTwo,
         fpPanOne,
@@ -88,6 +89,10 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
         using pmd = basic_blocks::params::ParamMetaData;
         switch (idx)
         {
+        case fpLevelOne:
+            return pmd().asPercent().withName("Level One");
+        case fpLevelTwo:
+            return pmd().asPercent().withName("Level Two");
         case fpOffsetOne:
             return pmd()
                 .asFloat()
@@ -261,10 +266,13 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
             float leftOutOne = 0.f, rightOutOne = 0.f;
             float leftOutTwo = 0.f, rightOutTwo = 0.f;
             
+            auto levelOne = this->getFloatParam(fpLevelOne);
+            auto levelTwo = this->getFloatParam(fpLevelTwo);
+            
             panLineToOutput(panParamOne, inToOne, leftOutOne, rightOutOne);
             panLineToOutput(panParamTwo, inToTwo, leftOutTwo, rightOutTwo);
-            dataoutL[i] = (leftOutOne + leftOutTwo) / 2;
-            dataoutR[i] = (rightOutOne + rightOutTwo) / 2;
+            dataoutL[i] = ((leftOutOne + leftOutTwo) / 2) * levelOne;
+            dataoutR[i] = ((rightOutOne + rightOutTwo) / 2) * levelTwo;
         }
     }
 
