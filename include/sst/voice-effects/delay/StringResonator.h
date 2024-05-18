@@ -41,7 +41,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
 {
     static constexpr const char *effectName{"String Exciter"};
 
-    static constexpr int numFloatParams{3};
+    static constexpr int numFloatParams{6};
     static constexpr int numIntParams{0};
 
     static constexpr float maxMiliseconds{100.f}; // 10 hz floor
@@ -54,7 +54,11 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
 
     enum FloatParams
     {
-        fpOffset,
+        // TODO: level controls
+        fpOffsetOne,
+        fpOffsetTwo,
+        fpPanOne,
+        fpPanTwo,
         fpDecay,
         fpStiffness,
     };
@@ -84,14 +88,34 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
         using pmd = basic_blocks::params::ParamMetaData;
         switch (idx)
         {
-        case fpOffset:
+        case fpOffsetOne:
             return pmd()
                 .asFloat()
                 .withRange(-48, 48)
                 .withDefault(0)
                 .withLinearScaleFormatting("semitones")
-                .withName("Offset");
-
+                .withName("Offset One");
+        case fpOffsetTwo:
+            return pmd()
+                .asFloat()
+                .withRange(-48, 48)
+                .withDefault(0)
+                .withLinearScaleFormatting("semitones")
+                .withName("Offset Two");
+        case fpPanOne:
+            return pmd()
+                .asPercentBipolar()
+                .withCustomMinDisplay("L")
+                .withCustomMaxDisplay("R")
+                .withDefault(-1.f)
+                .withName("Pan One");
+        case fpPanTwo:
+            return pmd()
+                .asPercentBipolar()
+                .withCustomMinDisplay("L")
+                .withCustomMaxDisplay("R")
+                .withDefault(1.f)
+                .withName("Pan Two");
         case fpDecay:
             return pmd()
                 .asFloat()
@@ -128,6 +152,43 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
     }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
+    float equalPowerFormula(float theta)
+    {
+        return float (theta + (theta * theta * theta)*(-0.166666667f + theta * theta * 0.00833333333f)) * 1.414213562f;
+    }
+
+    void balancedMonoSum(float pan, float leftIn, float rightIn, float &sum)
+    {
+        if (pan == 0.5f)
+        {
+            sum = leftIn + rightIn;
+        }
+        else if (pan == 0)
+        {
+            sum = leftIn;
+        }
+        else if (pan == 1)
+        {
+            sum = rightIn;
+        }
+        else
+        {
+            float rTheta = pan * M_PI_2;
+            float lTheta = M_PI_2 - rTheta;
+            float leftVolume = leftIn * equalPowerFormula(lTheta);
+            float rightVolume = rightIn * equalPowerFormula(rTheta);
+            sum = leftVolume + rightVolume;
+        }
+    }
+    
+    void panLineToOutput(float pan, float monoIn, float &outL, float &outR)
+    {
+        float rTheta = pan * M_PI_2;
+        float lTheta = M_PI_2 - rTheta;
+        outL = monoIn * equalPowerFormula(lTheta);
+        outR = monoIn * equalPowerFormula(rTheta);
+    }
+    
     template <typename T>
     void processImpl(const std::array<T *, 2> &lines, float *datainL, float *datainR,
                      float *dataoutL, float *dataoutR, float pitch)
@@ -136,51 +197,74 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
         namespace sdsp = sst::basic_blocks::dsp;
         mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
         mech::copy_from_to<VFXConfig::blockSize>(datainR, dataoutR);
+        auto panParamOne = (this->getFloatParam(fpPanOne) + 1) / 2;
+        auto panParamTwo = (this->getFloatParam(fpPanTwo) + 1) / 2;
+        //the functions above need 0..1 but pmd.asPercentBipolar is -1..1
+        
+        auto ptOne = pitch + this->getFloatParam(fpOffsetOne);
+        auto ptTwo = pitch + this->getFloatParam(fpOffsetTwo);
+        ptOne += pitchAdjustmentForStiffness();
+        ptTwo += pitchAdjustmentForStiffness();
+        setupFilters(ptOne);
+        setupFilters(ptTwo);
 
-        auto pt = pitch + this->getFloatParam(fpOffset);
-        pt += pitchAdjustmentForStiffness();
-        setupFilters(pt);
-
-        lipolPitch.set_target(this->getSampleRate() /
-                              (440 * this->note_to_pitch_ignoring_tuning(pt)));
+        lipolPitchOne.set_target(this->getSampleRate() /
+                              (440 * this->note_to_pitch_ignoring_tuning(ptOne)));
+        lipolPitchTwo.set_target(this->getSampleRate() /
+                              (440 * this->note_to_pitch_ignoring_tuning(ptTwo)));
+        
         auto dcv = std::clamp(this->getFloatParam(fpDecay), 0.f, 1.f) * 0.12 + 0.88;
         dcv = std::min(sqrt(dcv), 0.99999);
         lipolDecay.set_target(dcv);
         if (firstPitch)
         {
-            lipolPitch.instantize();
+            lipolPitchOne.instantize();
+            lipolPitchTwo.instantize();
             lipolDecay.instantize();
             firstPitch = false;
         }
-        float dt alignas(16)[VFXConfig::blockSize];
+        float dtOne alignas(16)[VFXConfig::blockSize];
+        float dtTwo alignas(16)[VFXConfig::blockSize];
         float dc alignas(16)[VFXConfig::blockSize];
-        lipolPitch.store_block(dt);
+        lipolPitchOne.store_block(dtOne);
+        lipolPitchTwo.store_block(dtTwo);
         lipolDecay.store_block(dc);
 
         float tone = this->getFloatParam(fpStiffness);
 
         for (int i = 0; i < VFXConfig::blockSize; ++i)
         {
-            auto dl = lines[0]->read(dt[i]);
-            auto dr = lines[1]->read(dt[i]);
+            auto fromLineOne = lines[0]->read(dtOne[i]);
+            auto fromLineTwo = lines[1]->read(dtTwo[i]);
 
-            auto wl = datainL[i] + dc[i] * dl;
-            auto wr = datainR[i] + dc[i] * dr;
+            float inToOne = 0.f;
+            float inToTwo = 0.f;
+            
+            balancedMonoSum(panParamOne, datainL[i], datainR[i], inToOne);
+            balancedMonoSum(panParamTwo, datainL[i], datainR[i], inToTwo);
+            
+            inToOne = inToOne + dc[i] * fromLineOne;
+            inToTwo = inToTwo + dc[i] * fromLineTwo;
 
             if (tone < 0)
             {
-                lp.process_sample(wl, wr, wl, wr);
+                lp.process_sample(inToOne, inToTwo, inToOne, inToTwo);
             }
             else if (tone > 0)
             {
-                hp.process_sample(wl, wr, wl, wr);
+                hp.process_sample(inToOne, inToTwo, inToOne, inToTwo);
             }
 
-            lines[0]->write(wl);
-            lines[1]->write(wr);
-
-            dataoutL[i] = dl;
-            dataoutR[i] = dr;
+            lines[0]->write(inToOne);
+            lines[1]->write(inToTwo);
+            
+            float leftOutOne = 0.f, rightOutOne = 0.f;
+            float leftOutTwo = 0.f, rightOutTwo = 0.f;
+            
+            panLineToOutput(panParamOne, inToOne, leftOutOne, rightOutOne);
+            panLineToOutput(panParamTwo, inToTwo, leftOutTwo, rightOutTwo);
+            dataoutL[i] = (leftOutOne + leftOutTwo) / 2;
+            dataoutR[i] = (rightOutOne + rightOutTwo) / 2;
         }
     }
 
@@ -272,7 +356,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
 
     std::array<float, numFloatParams> mLastParam{};
 
-    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> lipolPitch, lipolDecay;
+    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> lipolPitchOne, lipolPitchTwo, lipolDecay;
 
     typename core::VoiceEffectTemplateBase<VFXConfig>::BiquadFilterType lp, hp;
 };
