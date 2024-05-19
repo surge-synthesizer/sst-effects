@@ -23,6 +23,7 @@
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
+#include "sst/basic-blocks/dsp/PanLaws.h"
 #include "sst/basic-blocks/dsp/CorrelatedNoise.h"
 
 #include "../VoiceEffectCore.h"
@@ -42,6 +43,7 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
     {
         color,
         level,
+        stereo_width,
         num_params
     };
 
@@ -81,6 +83,8 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
             return pmd().asPercentBipolar().withName("Color");
         case GenCorrelatedNoiseFloatParams::level:
             return pmd().asCubicDecibelAttenuation().withDefault(0.5f).withName("Level");
+        case GenCorrelatedNoiseFloatParams::stereo_width:
+            return pmd().asPercent().withName("Stereo Width").withDefault(1.0);
         default:
             break;
         }
@@ -114,14 +118,28 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
             std::clamp(this->getFloatParam((int)GenCorrelatedNoiseFloatParams::color), -1.f, 1.f);
         mLevelLerp.set_target(levT);
         mColorLerp.newValue(col);
+
+        sst::basic_blocks::dsp::pan_laws::panmatrix_t lPan{}, rPan{};
+
+        auto pv = std::clamp(this->getFloatParam((int)GenCorrelatedNoiseFloatParams::stereo_width),
+                             0.f, 1.f) *
+                  0.5;
+        // 0 is centered 1 is extrema
+        auto lpVal = 0.5 - pv;
+        auto rpVal = 0.5 + pv;
+        sst::basic_blocks::dsp::pan_laws::monoEqualPowerUnityGainAtExtrema(lpVal, lPan);
+        sst::basic_blocks::dsp::pan_laws::monoEqualPowerUnityGainAtExtrema(rpVal, rPan);
+
         // remember getOversamplingRatio is constexpr so the compiler
         // will get a good shot at this loop
         for (int k = 0; k < VFXConfig::blockSize; k += this->getOversamplingRatio())
         {
-            dataoutL[k] = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
+            auto rL = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
                 mPrior[0][0], mPrior[0][1], mColorLerp.v, mDistro(mGenerator));
-            dataoutR[k] = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
+            auto rR = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
                 mPrior[1][0], mPrior[1][1], mColorLerp.v, mDistro(mGenerator));
+            dataoutL[k] = rL * lPan[0] + rR * rPan[0];
+            dataoutR[k] = rL * rPan[3] + rR * rPan[3];
             for (auto kk = 1; kk < this->getOversamplingRatio(); ++kk)
             {
                 dataoutL[k + kk] = dataoutL[k];
