@@ -23,7 +23,6 @@
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
-#include "sst/basic-blocks/dsp/PanLaws.h"
 #include "sst/basic-blocks/dsp/CorrelatedNoise.h"
 
 #include "../VoiceEffectCore.h"
@@ -37,24 +36,22 @@ namespace sst::voice_effects::generator
 {
 template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Generate Sin"};
+    static constexpr const char *effectName{"Correlated Noise"};
 
-    enum struct GenCorrelatedNoiseFloatParams : uint32_t
+    static constexpr int numFloatParams{3};
+    static constexpr int numIntParams{1};
+
+    enum FloatParams
     {
-        color,
-        level,
-        stereo_width,
-        num_params
+        fpColor,
+        fpLevel,
+        fpStereoWidth,
     };
 
-    enum struct GenCorrelatedNoiseIntParams : uint32_t
+    enum IntParams
     {
-        stereo,
-        num_params
+        ipStereo,
     };
-
-    static constexpr int numFloatParams{(int)GenCorrelatedNoiseFloatParams::num_params};
-    static constexpr int numIntParams{(int)GenCorrelatedNoiseIntParams::num_params};
 
     // provide a function which is uniform bipolar float -1.f .. 1.f random values
     GenCorrelatedNoise()
@@ -74,17 +71,16 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
-        assert(idx >= 0 && idx < (int)GenCorrelatedNoiseFloatParams::num_params);
         using pmd = basic_blocks::params::ParamMetaData;
 
-        switch ((GenCorrelatedNoiseFloatParams)idx)
+        switch (idx)
         {
-        case GenCorrelatedNoiseFloatParams::color:
+        case FloatParams::fpColor:
             return pmd().asPercentBipolar().withName("Color");
-        case GenCorrelatedNoiseFloatParams::level:
+        case FloatParams::fpLevel:
             return pmd().asCubicDecibelAttenuation().withDefault(0.5f).withName("Level");
-        case GenCorrelatedNoiseFloatParams::stereo_width:
-            return pmd().asPercent().withName("Stereo Width").withDefault(1.0);
+        case FloatParams::fpStereoWidth:
+            return pmd().asFloat().withRange(0.f, 2.f).withDefault(1.f).withName("Stereo Width");
         default:
             break;
         }
@@ -94,52 +90,56 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
 
     basic_blocks::params::ParamMetaData intParamAt(int idx) const
     {
-        assert(idx == 0);
-        return basic_blocks::params::ParamMetaData().asBool().withName("Stereo Noise");
+        return basic_blocks::params::ParamMetaData().asBool().withDefault(true).withName(
+            "Stereo Noise");
     }
 
     void initVoiceEffect() {}
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
+    void midSideAdjust(float width, float leftIn, float rightIn, float &leftOut, float &rightOut)
+    {
+        float midIn = 0.f, sideIn = 0.f, midOut = 0.f, sideOut = 0.f;
+
+        midIn = (leftIn + rightIn) / 2;
+        sideIn = (leftIn - rightIn) / 2;
+
+        sideIn *= width;
+
+        // TODO: loudness compensation...
+        leftOut = midIn + sideIn;
+        rightOut = midIn - sideIn;
+    }
+
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
     {
-        auto isSterep = this->getIntParam((int)GenCorrelatedNoiseIntParams::stereo) != 0;
-        if (!isSterep)
+        auto isStereo = this->getIntParam(ipStereo) != 0;
+        if (!isStereo)
         {
             processMonoToMono(datainL, dataoutL, pitch);
             basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(dataoutL, dataoutR);
             return;
         }
-        auto levT =
-            std::clamp(this->getFloatParam((int)GenCorrelatedNoiseFloatParams::level), 0.f, 1.f);
+        auto levT = std::clamp(this->getFloatParam(fpLevel), 0.f, 1.f);
         levT = levT * levT * levT;
-        auto col =
-            std::clamp(this->getFloatParam((int)GenCorrelatedNoiseFloatParams::color), -1.f, 1.f);
+        auto col = std::clamp(this->getFloatParam(fpColor), -1.f, 1.f);
         mLevelLerp.set_target(levT);
         mColorLerp.newValue(col);
 
-        sst::basic_blocks::dsp::pan_laws::panmatrix_t lPan{}, rPan{};
-
-        auto pv = std::clamp(this->getFloatParam((int)GenCorrelatedNoiseFloatParams::stereo_width),
-                             0.f, 1.f) *
-                  0.5;
-        // 0 is centered 1 is extrema
-        auto lpVal = 0.5 - pv;
-        auto rpVal = 0.5 + pv;
-        sst::basic_blocks::dsp::pan_laws::monoEqualPowerUnityGainAtExtrema(lpVal, lPan);
-        sst::basic_blocks::dsp::pan_laws::monoEqualPowerUnityGainAtExtrema(rpVal, rPan);
+        auto widthParam = std::clamp(this->getFloatParam(fpStereoWidth), 0.f, 2.f);
 
         // remember getOversamplingRatio is constexpr so the compiler
         // will get a good shot at this loop
         for (int k = 0; k < VFXConfig::blockSize; k += this->getOversamplingRatio())
         {
-            auto rL = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
+            auto runLeft = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
                 mPrior[0][0], mPrior[0][1], mColorLerp.v, mDistro(mGenerator));
-            auto rR = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
+            auto runRight = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
                 mPrior[1][0], mPrior[1][1], mColorLerp.v, mDistro(mGenerator));
-            dataoutL[k] = rL * lPan[0] + rR * rPan[0];
-            dataoutR[k] = rL * rPan[3] + rR * rPan[3];
+
+            midSideAdjust(widthParam, runLeft, runRight, dataoutL[k], dataoutR[k]);
+
             for (auto kk = 1; kk < this->getOversamplingRatio(); ++kk)
             {
                 dataoutL[k + kk] = dataoutL[k];
@@ -153,12 +153,10 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
 
     void processMonoToMono(float *datainL, float *dataoutL, float pitch)
     {
-        auto levT =
-            std::clamp(this->getFloatParam((int)GenCorrelatedNoiseFloatParams::level), 0.f, 1.f);
+        auto levT = std::clamp(this->getFloatParam(fpLevel), 0.f, 1.f);
         levT = levT * levT * levT;
         mLevelLerp.set_target(levT);
-        auto col =
-            std::clamp(this->getFloatParam((int)GenCorrelatedNoiseFloatParams::color), -1.f, 1.f);
+        auto col = std::clamp(this->getFloatParam(fpColor), -1.f, 1.f);
         mColorLerp.newValue(col);
 
         for (int k = 0; k < VFXConfig::blockSize; k += this->getOversamplingRatio())
@@ -180,10 +178,7 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
         processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
     }
 
-    bool getMonoToStereoSetting() const
-    {
-        return this->getIntParam((int)GenCorrelatedNoiseIntParams::stereo) > 0;
-    }
+    bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
 
   protected:
     float mPrior[2][2]{{0.f, 0.f}, {0.f, 0.f}};
