@@ -34,29 +34,28 @@
 
 namespace sst::voice_effects::modulation
 {
-template <typename VFXConfig, bool stereo>
-struct StaticPhaser : core::VoiceEffectTemplateBase<VFXConfig>
+template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{stereo ? "StereoStaticPhaser" : "MonoStaticPhaser"};
+    static constexpr const char *effectName{"StaticPhaser"};
 
-    static constexpr int numFloatParams{4 + (stereo ? 1 : 0)};
-    static constexpr int numIntParams{1};
+    static constexpr int numFloatParams{5};
+    static constexpr int numIntParams{2};
 
     static constexpr int maxPhases{6};
 
     enum FloatParams
     {
         fpCenterFrequency,
-        fpSpacing = fpCenterFrequency + (stereo ? 2 : 1),
+        fpCenterFrequencyR,
+        fpSpacing, // = fpCenterFrequency + (stereo ? 2 : 1) <-re-implement this?
         fpResonance,
-        fpFeedback,
-
-        fpCenterFrequencyR = fpCenterFrequency + (stereo ? 1 : -100)
+        fpFeedback
     };
 
     enum IntParams
     {
-        ipStages
+        ipStages,
+        ipStereo
     };
 
     StaticPhaser() : core::VoiceEffectTemplateBase<VFXConfig>()
@@ -67,6 +66,30 @@ struct StaticPhaser : core::VoiceEffectTemplateBase<VFXConfig>
 
     ~StaticPhaser() {}
 
+    basic_blocks::params::ParamMetaData intParamAt(int idx) const
+    {
+        using pmd = basic_blocks::params::ParamMetaData;
+
+        assert(numIntParams == 2);
+        switch (idx)
+        {
+        case ipStages:
+            return pmd()
+                .asInt()
+                .withRange(1, maxPhases)
+                .withName("Stages")
+                .withLinearScaleFormatting("Stage")
+                .withDefault(4);
+        case ipStereo:
+            return pmd().asBool().withDefault(true).withName("Stereo");
+
+        default:
+            break;
+        }
+
+        return pmd().withName("Unknown " + std::to_string(idx)).asPercent();
+    }
+
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
         assert(idx >= 0 && idx < numFloatParams);
@@ -75,16 +98,10 @@ struct StaticPhaser : core::VoiceEffectTemplateBase<VFXConfig>
         switch (idx)
         {
         case fpCenterFrequency:
-            return pmd()
-                .asAudibleFrequency()
-                .withName(std::string("Ctr") + (stereo ? " L" : ""))
-                .withDefault(0);
+            return pmd().asAudibleFrequency().withName(std::string("Freq (L)")).withDefault(0);
 
         case fpCenterFrequencyR:
-            return pmd()
-                .asAudibleFrequency()
-                .withName(std::string("Ctr") + (stereo ? " R" : ""))
-                .withDefault(0);
+            return pmd().asAudibleFrequency().withName("Freq R").withDefault(0);
 
             break;
         case fpSpacing:
@@ -104,20 +121,6 @@ struct StaticPhaser : core::VoiceEffectTemplateBase<VFXConfig>
         }
 
         return pmd().withName("Unknown " + std::to_string(idx)).asPercent();
-    }
-
-    basic_blocks::params::ParamMetaData intParamAt(int idx) const
-    {
-        using pmd = basic_blocks::params::ParamMetaData;
-
-        assert(idx == ipStages);
-
-        return pmd()
-            .asInt()
-            .withRange(1, maxPhases)
-            .withName("Stages")
-            .withLinearScaleFormatting("stages")
-            .withDefault(4);
     }
 
     void initVoiceEffect()
@@ -156,6 +159,39 @@ struct StaticPhaser : core::VoiceEffectTemplateBase<VFXConfig>
         }
     }
 
+    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
+    {
+        processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
+    }
+
+    void processMonoToMono(float *dataIn, float *dataOut, float pitch)
+    {
+        namespace mech = sst::basic_blocks::mechanics;
+
+        this->calc_coeffs(pitch);
+
+        mech::copy_from_to<VFXConfig::blockSize>(dataIn, dataOut);
+
+        this->lipolFb.set_target(
+            std::sqrt(std::clamp(this->getFloatParam(this->fpFeedback), 0.f, 1.f)));
+        float fb alignas(16)[VFXConfig::blockSize];
+        this->lipolFb.store_block(fb);
+
+        for (int k = 0; k < VFXConfig::blockSize; ++k)
+        {
+            auto dL = dataOut[k] + this->fbAmt[0];
+            for (int i = 0; i < this->getIntParam(this->ipStages); ++i)
+            {
+                float tmp{0};
+                this->apfs[i].processBlockStep(dL, tmp);
+            }
+            this->fbAmt[0] = dL * fb[k];
+            dataOut[k] = dL;
+        }
+    }
+
+    bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
+
     void calc_coeffs(float pitch = 0.f)
     {
         std::array<float, numFloatParams> param;
@@ -184,7 +220,7 @@ struct StaticPhaser : core::VoiceEffectTemplateBase<VFXConfig>
             auto mode = sst::filters::CytomicSVF::Mode::ALL;
             auto spread{0.f};
             auto baseL{param[fpCenterFrequency]}, baseR{baseL};
-            if (stereo)
+            if (iparam[ipStereo])
             {
                 baseR = param[fpCenterFrequencyR];
             }
@@ -197,7 +233,7 @@ struct StaticPhaser : core::VoiceEffectTemplateBase<VFXConfig>
             }
             for (int i = 0; i < iparam[ipStages]; ++i)
             {
-                if constexpr (stereo)
+                if (iparam[ipStereo])
                 {
                     auto freqL = 440.0 * this->note_to_pitch_ignoring_tuning(baseL + spread * i);
                     auto freqR = 440.0 * this->note_to_pitch_ignoring_tuning(baseR + spread * i);
@@ -233,37 +269,5 @@ struct StaticPhaser : core::VoiceEffectTemplateBase<VFXConfig>
 
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> lipolFb;
 };
-
-template <typename VFXConfig> using StaticStereoPhaser = StaticPhaser<VFXConfig, true>;
-
-template <typename VFXConfig> struct StaticMonoPhaser : StaticPhaser<VFXConfig, false>
-{
-    void processMonoToMono(float *dataIn, float *dataOut, float pitch)
-    {
-        namespace mech = sst::basic_blocks::mechanics;
-
-        this->calc_coeffs(pitch);
-
-        mech::copy_from_to<VFXConfig::blockSize>(dataIn, dataOut);
-
-        this->lipolFb.set_target(
-            std::sqrt(std::clamp(this->getFloatParam(this->fpFeedback), 0.f, 1.f)));
-        float fb alignas(16)[VFXConfig::blockSize];
-        this->lipolFb.store_block(fb);
-
-        for (int k = 0; k < VFXConfig::blockSize; ++k)
-        {
-            auto dL = dataOut[k] + this->fbAmt[0];
-            for (int i = 0; i < this->getIntParam(this->ipStages); ++i)
-            {
-                float tmp{0};
-                this->apfs[i].processBlockStep(dL, tmp);
-            }
-            this->fbAmt[0] = dL * fb[k];
-            dataOut[k] = dL;
-        }
-    }
-};
-
 } // namespace sst::voice_effects::modulation
 #endif // SHORTCIRCUITXT_CYTOMICSVF_H

@@ -156,7 +156,6 @@ TEST_CASE("Can Create Voice FX")
     }
     SECTION("Static Phaser")
     {
-        VTester<sst::voice_effects::modulation::StaticStereoPhaser<VTestConfig>>::TestVFX();
-        VTester<sst::voice_effects::modulation::StaticMonoPhaser<VTestConfig>>::TestVFX();
+        VTester<sst::voice_effects::modulation::StaticPhaser<VTestConfig>>::TestVFX();
     }
 }
