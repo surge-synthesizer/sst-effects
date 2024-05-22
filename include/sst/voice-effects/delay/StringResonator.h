@@ -155,18 +155,18 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
     basic_blocks::params::ParamMetaData intParamAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
-        
+
         assert(numIntParams == 3);
         switch (idx)
         {
         case ipStereo:
-                return pmd().asBool().withDefault(true).withName("Stereo)");
+            return pmd().asBool().withDefault(true).withName("Stereo)");
         case ipDualString:
-                return pmd().asBool().withDefault(true).withName("Dual String");
+            return pmd().asBool().withDefault(true).withName("Dual String");
         }
         return pmd().withName("Error");
     }
-    
+
     void initVoiceEffect()
     {
         if (this->getSampleRate() * 0.1 > (1 << 14))
@@ -231,22 +231,22 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
 
     template <typename T>
     void stereoDualString(const std::array<T *, 2> &lines, float *datainL, float *datainR,
-                           float *dataoutL, float *dataoutR, float pitch)
+                          float *dataoutL, float *dataoutR, float pitch)
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
         mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
         mech::copy_from_to<VFXConfig::blockSize>(datainR, dataoutR);
-        
+
         auto panParamOne = std::clamp((this->getFloatParam(fpPanOne) + 1) / 2, 0.f, 1.f);
         auto panParamTwo = std::clamp((this->getFloatParam(fpPanTwo) + 1) / 2, 0.f, 1.f);
-        
+
         if (this->getIntParam(ipStereo) == false)
         {
             panParamOne = 0.f;
             panParamTwo = 1.f;
         }
-        
+
         auto ptOne = pitch + this->getFloatParam(fpOffsetOne);
         auto ptTwo = pitch + this->getFloatParam(fpOffsetTwo);
         ptOne += pitchAdjustmentForStiffness();
@@ -318,16 +318,16 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
     }
 
     template <typename T>
-    void stereoSingleString(T *line, float *datainL, float *datainR,
-                                       float *dataoutL, float *dataoutR, float pitch)
+    void stereoSingleString(T *line, float *datainL, float *datainR, float *dataoutL,
+                            float *dataoutR, float pitch)
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
         mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
         mech::copy_from_to<VFXConfig::blockSize>(datainR, dataoutR);
-        
+
         auto panParam = std::clamp((this->getFloatParam(fpPanOne) + 1) / 2, 0.f, 1.f);
-        
+
         if (this->getIntParam(ipStereo) == false)
         {
             panParam = 0.5f;
@@ -361,9 +361,9 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
             auto fromLine = line->read(dt[i]);
 
             float toLine = datainL[i];
-            
+
             balancedMonoSum(panParam, datainL[i], datainR[i], toLine);
-            
+
             toLine = toLine + dc[i] * fromLine;
 
             float dummyR = 0.f;
@@ -382,22 +382,22 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
             auto level = std::clamp(this->getFloatParam(fpLevelOne), 0.f, 1.f);
 
             float leftOut = 0.f, rightOut = 0.f;
-            
+
             panLineToOutput(panParam, toLine, leftOut, rightOut);
-            
+
             dataoutL[i] = leftOut * level;
             dataoutR[i] = rightOut * level;
         }
     }
-    
+
     template <typename T>
-    void monoDualString(const std::array<T *, 2> &lines, float *datainL,
-                           float *dataoutL, float pitch)
+    void monoDualString(const std::array<T *, 2> &lines, float *datainL, float *dataoutL,
+                        float pitch)
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
         mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
-        
+
         auto ptOne = pitch + this->getFloatParam(fpOffsetOne);
         auto ptTwo = pitch + this->getFloatParam(fpOffsetTwo);
         ptOne += pitchAdjustmentForStiffness();
@@ -448,7 +448,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
             {
                 hp.process_sample(toLineOne, toLineTwo, toLineOne, toLineTwo);
             }
-            
+
             auto levelOne = std::clamp(this->getFloatParam(fpLevelOne), 0.f, 1.f);
             auto levelTwo = std::clamp(this->getFloatParam(fpLevelTwo), 0.f, 1.f);
 
@@ -458,10 +458,9 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
             dataoutL[i] = ((toLineOne * levelOne + toLineTwo * levelTwo) / 2);
         }
     }
-    
+
     template <typename T>
-    void monoSingleString(T *line, float *datainL, float *dataoutL,
-                         float pitch)
+    void monoSingleString(T *line, float *datainL, float *dataoutL, float pitch)
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
@@ -587,33 +586,33 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
     {
         if (this->getIntParam(ipDualString == true))
         {
-             if (isShort)
-             {
-                stereoDualString(std::array{lineSupport[0].template getLinePointer<shortLineSize>(),
-                                         lineSupport[1].template getLinePointer<shortLineSize>()},
-                              datainL, datainR, dataoutL, dataoutR, pitch);
-             }
-             else
-             {
+            if (isShort)
+            {
+                stereoDualString(
+                    std::array{lineSupport[0].template getLinePointer<shortLineSize>(),
+                               lineSupport[1].template getLinePointer<shortLineSize>()},
+                    datainL, datainR, dataoutL, dataoutR, pitch);
+            }
+            else
+            {
                 stereoDualString(std::array{lineSupport[0].template getLinePointer<longLineSize>(),
-                                         lineSupport[1].template getLinePointer<longLineSize>()},
-                              datainL, datainR, dataoutL, dataoutR, pitch);
-             }
+                                            lineSupport[1].template getLinePointer<longLineSize>()},
+                                 datainL, datainR, dataoutL, dataoutR, pitch);
+            }
         }
         else
         {
             if (isShort)
             {
-               stereoSingleString(lineSupport[0].template getLinePointer<shortLineSize>(),
-                                  datainL, datainR, dataoutL, dataoutR, pitch);
+                stereoSingleString(lineSupport[0].template getLinePointer<shortLineSize>(), datainL,
+                                   datainR, dataoutL, dataoutR, pitch);
             }
             else
             {
-               stereoSingleString(lineSupport[0].template getLinePointer<shortLineSize>(),
-                                  datainL, datainR, dataoutL, dataoutR, pitch);
+                stereoSingleString(lineSupport[0].template getLinePointer<shortLineSize>(), datainL,
+                                   datainR, dataoutL, dataoutR, pitch);
             }
         }
-        
     }
 
     void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
@@ -628,14 +627,14 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
             if (isShort)
             {
                 monoDualString(std::array{lineSupport[0].template getLinePointer<shortLineSize>(),
-                    lineSupport[1].template getLinePointer<shortLineSize>()}, datainL,
-                                        dataoutL, pitch);
+                                          lineSupport[1].template getLinePointer<shortLineSize>()},
+                               datainL, dataoutL, pitch);
             }
             else
             {
                 monoDualString(std::array{lineSupport[0].template getLinePointer<shortLineSize>(),
-                    lineSupport[1].template getLinePointer<shortLineSize>()}, datainL,
-                                        dataoutL, pitch);
+                                          lineSupport[1].template getLinePointer<shortLineSize>()},
+                               datainL, dataoutL, pitch);
             }
         }
         else
@@ -643,12 +642,12 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
             if (isShort)
             {
                 monoSingleString(lineSupport[0].template getLinePointer<shortLineSize>(), datainL,
-                                        dataoutL, pitch);
+                                 dataoutL, pitch);
             }
             else
             {
                 monoSingleString(lineSupport[0].template getLinePointer<longLineSize>(), datainL,
-                                        dataoutL, pitch);
+                                 dataoutL, pitch);
             }
         }
     }
