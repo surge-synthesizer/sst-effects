@@ -198,7 +198,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
             actualLFO.applyPhaseOffset(phase); // and initialize the LFO phase with it.
             phaseSet = true;                   // then set this true so it doesn't run next block.
         }
-        
+
         shapeCheck(); // Sets the lfoshape.
         // Run the LFO. (the 0.f is for the deform param which we don't use here).
         actualLFO.process_block(lfoRate, 0.f, lfoShape);

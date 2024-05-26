@@ -40,7 +40,7 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
 
     static constexpr int numFloatParams{6};
     static constexpr int numIntParams{2};
-    
+
     static constexpr int maxPhases{6};
 
     enum FloatParams
@@ -96,8 +96,8 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
                 .withDefault(1.f)
                 .withLinearScaleFormatting("%", 100.f)
                 .withName("Depth");
-            case fpCenterFreq:
-                return pmd().asAudibleFrequency().withName("Center Frequency").withDefault(0);
+        case fpCenterFreq:
+            return pmd().asAudibleFrequency().withName("Center Frequency").withDefault(0);
         }
         return pmd().asFloat().withName("Error");
     }
@@ -131,7 +131,7 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
     using lfo_t = sst::basic_blocks::modulators::SimpleLFO<Phaser, VFXConfig::blockSize>;
     lfo_t actualLFO{this, 1};
     typename lfo_t::Shape lfoShape = lfo_t::Shape::SINE;
-    
+
     void shapeCheck()
     {
         switch (this->getIntParam(ipShape))
@@ -159,7 +159,7 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
             break;
         }
     }
-    
+
     float randUniZeroToOne()
     {
         std::random_device rd;
@@ -167,15 +167,15 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
         std::uniform_real_distribution<> dis(0, 1);
         return static_cast<float>(dis(gen));
     }
-    
+
     bool phaseSet = false;
-    
+
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
     {
         auto lfoRate = this->getFloatParam(fpRate);
         auto lfoDepth = this->getFloatParam(fpDepth);
-        
+
         if (!phaseSet)
         {
             auto phase = randUniZeroToOne();
@@ -220,21 +220,21 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
     {
         auto lfoRate = this->getFloatParam(fpRate);
         auto lfoDepth = this->getFloatParam(fpDepth);
-        
+
         if (!phaseSet)
         {
             auto phase = randUniZeroToOne();
             actualLFO.applyPhaseOffset(phase);
             phaseSet = true;
         }
-        
+
         shapeCheck();
         actualLFO.process_block(lfoRate, 0.f, lfoShape);
 
         float lfoValue = actualLFO.lastTarget * lfoDepth;
 
         this->calc_coeffs(pitch, lfoValue);
-        
+
         sst::basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(dataIn, dataOut);
 
         this->lipolFb.set_target(
@@ -254,11 +254,11 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
             dataOut[k] = dL;
         }
     }
-    
+
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
-    
+
     bool isFirst = true;
-    
+
     void calc_coeffs(float pitch = 0.f, float LFO = 0.f)
     {
         auto resonance = this->getFloatParam(fpResonance);
@@ -266,7 +266,7 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
         auto spread{0.f};
         auto mode = sst::filters::CytomicSVF::Mode::ALL;
         auto stereo = this->getIntParam(ipStereo);
-        
+
         if (isFirst)
         {
             for (int i = 0; i < 4; ++i)
@@ -275,19 +275,21 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
             }
             isFirst = false;
         }
-        
+
         spread = this->getFloatParam(fpSpacing);
         auto halfStage = 4 * 0.5;
         baseFreq -= halfStage * spread;
-        
+
         float lfoValueL = LFO * (baseFreq / 2);
-        float lfoValueR = LFO  * (baseFreq / 2)  * (stereo ? -1 : 1);
-        
+        float lfoValueR = LFO * (baseFreq / 2) * (stereo ? -1 : 1);
+
         for (int i = 0; i < 4; ++i)
         {
-            auto freqL = 440.f * this->note_to_pitch_ignoring_tuning((baseFreq + spread * i) + lfoValueL);
-            auto freqR = 440.f * this->note_to_pitch_ignoring_tuning((baseFreq + spread * i) + lfoValueR);
-            
+            auto freqL =
+                440.f * this->note_to_pitch_ignoring_tuning((baseFreq + spread * i) + lfoValueL);
+            auto freqR =
+                440.f * this->note_to_pitch_ignoring_tuning((baseFreq + spread * i) + lfoValueR);
+
             auto res = std::clamp(resonance, 0.f, 1.f);
             filters[i].template setCoeffForBlock<VFXConfig::blockSize>(
                 mode, freqL, freqR, res, res, this->getSampleRateInv(), 1.f, 1.f);
