@@ -77,15 +77,18 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
                 .withATwoToTheBFormatting(1, 1, "Hz")
                 .withName("Rate");
         case fpDepth:
-            return pmd().asFloat().
-                withRange(0.f, 1.f)
+            return pmd()
+                .asFloat()
+                .withRange(0.f, 1.f)
                 .withDefault(1.f)
                 .withLinearScaleFormatting("%", 100.f)
                 .withName("Depth");
         case fpCrossover:
             return pmd()
                 .asFloat()
-                .withRange(150.f, 1500.f) // TODO: I increase the range without making the param scaling suck.
+                .withRange(
+                    150.f,
+                    1500.f) // TODO: I increase the range without making the param scaling suck.
                 .withDefault(700.f)
                 .withLinearScaleFormatting("Hz")
                 .withName("Crossover");
@@ -114,10 +117,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         filters[1].init();
     }
 
-    void initVoiceEffectParams()
-    {
-        this->initToParamMetadataDefault(this);
-    }
+    void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     // This ain't in VFXConfig so put it here (the simpleLFO needs it):
     float envelope_rate_linear_nowrap(float f)
@@ -178,8 +178,8 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
      Next is the actual DSP.
      Tremolo is a really simple effect: Multiply each audio sample (or block of samples in our case)
      by one minus the LFO value on that sample.
-     Harmonic tremolo is only a tiny bit more involved (ignoring the filter design...): Make highpassed
-     and lowpassed copies of the signal, apply tremolo to those in opposite polarity.
+     Harmonic tremolo is only a tiny bit more involved (ignoring the filter design...): Make
+     highpassed and lowpassed copies of the signal, apply tremolo to those in opposite polarity.
      Meaning the highs will be loud when the lows are quiet and vice versa.
      There's 4 functions, for stereo+mono*harmonic+standard.
      I'll comment the stereo harmonic case. All the others have the same concepts,
@@ -198,28 +198,30 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         // PhaseSet is false by default so this will run at note-on.
         if (!phaseSet)
         {
-            shapeCheck(); // Sets the lfoshape here because changing shape during the voice isn't very useful anyway.
-            auto phase = randUniZeroToOne(); // get a random number
+            shapeCheck(); // Sets the lfoshape here because changing shape during the voice isn't
+                          // very useful anyway.
+            auto phase = randUniZeroToOne();   // get a random number
             actualLFO.applyPhaseOffset(phase); // and initialize the LFO phase with it.
-            phaseSet = true; // then set this true so it doesn't run next block.
+            phaseSet = true;                   // then set this true so it doesn't run next block.
         }
         // Run the LFO. (the 0.f is for the deform param which we don't use here).
         actualLFO.process_block(lfoRate, 0.f, lfoShape);
-        
+
         // Make a couple variables for the LFO value and its inverse,
         // both normalized into unipolar 0...1 range.
         float lfoValueL = (actualLFO.lastTarget * lfoDepth + 1) / 2;
         float lfoValueInvL = (actualLFO.lastTarget * lfoDepth * -1 + 1) / 2;
-        
-        // If the user asked for stereo modulation, right gets opposite LFOs to left, else it gets the same.
+
+        // If the user asked for stereo modulation, right gets opposite LFOs to left, else it gets
+        // the same.
         float lfoValueR = (this->getIntParam(ipStereo) == true ? lfoValueInvL : lfoValueL);
         float lfoValueInvR = (this->getIntParam(ipStereo) == true ? lfoValueL : lfoValueInvL);
-        
+
         /*
          Ok, now to setup the filter coefficients. Though this filter is extremely efficient,
          it's still more expensive than an if statement. So we do the nice and easy optimisation:
-         check if the crossover frequency changed since last block, recalculate the coefficients if so,
-         else just keep them from last block. We initialized priorCrossover to a nonsense value,
+         check if the crossover frequency changed since last block, recalculate the coefficients if
+         so, else just keep them from last block. We initialized priorCrossover to a nonsense value,
          so this will always run on the first block.
          */
         if (crossover != priorCrossover)
@@ -237,7 +239,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
             filters[0].template retainCoeffForBlock<VFXConfig::blockSize>();
             filters[1].template retainCoeffForBlock<VFXConfig::blockSize>();
         }
-        
+
         // Ok, here's where the action happens.
         // Process is per-block, but we want to calculate per-sample.
         // Hence the for loop from 0 to block size. Each i is a sample.
@@ -248,11 +250,11 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
             auto inputLeftHP = datainL[i];
             auto inputRightLP = datainR[i];
             auto inputRightHP = datainR[i];
-            
+
             // Feed those into the filters.
             filters[0].processBlockStep(inputLeftLP, inputRightLP);
             filters[1].processBlockStep(inputLeftHP, inputRightHP);
-            
+
             // Now we have our high-and lowpassed versions of left and right.
             // Let's multiply them by the LFO values.
             inputLeftLP *= 1 - lfoValueL;
@@ -261,7 +263,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
             inputRightHP *= 1 - lfoValueInvR;
             // Remember the right LFO values will either be identical to the left ones or
             // opposite, depending on the stereo setting.
-            
+
             // Now add the highpassed and lowpassed signals together for each side.
             inputLeftLP += inputLeftHP;
             inputRightLP += inputRightHP;
@@ -274,12 +276,12 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
             dataoutR[i] = inputRightLP * outputVolume;
         }
     }
-    
+
     /*
      That's it! Once a voice has been called, the above runs for the duration of that voice.
      The next voice runs another copy etc.
-     At first I wrote one big function with lots of ifs, but it was a messy and seemed inefficient so I
-     separated it. Now the branches are in the process functions further down instead.
+     At first I wrote one big function with lots of ifs, but it was a messy and seemed inefficient
+     so I separated it. Now the branches are in the process functions further down instead.
      */
 
     void standardStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
@@ -426,7 +428,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         // which in turn simply copies the mono audio and calls the stereo one with the copies.
         processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
     }
-    
+
     // How does it know which MonoTo... function to choose? By first calling this.
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
 
