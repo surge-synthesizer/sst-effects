@@ -170,10 +170,6 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         return static_cast<float>(dis(gen));
     }
 
-    // We need these to initialize some stuff in the DSP functions.
-    float priorCrossover = -1234.5678f;
-    bool phaseSet = false;
-
     /*
      Next is the actual DSP.
      Tremolo is a really simple effect: Multiply each audio sample (or block of samples in our case)
@@ -436,6 +432,8 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
     std::array<float, numFloatParams> mLastParam{};
     std::array<int, numIntParams> mLastIParam{};
     std::array<sst::filters::CytomicSVF, 2> filters;
+    float priorCrossover = -1234.5678f;
+    bool phaseSet = false;
 };
 } // namespace sst::voice_effects::modulation
 #endif // SCXT_TREMOLO_H
