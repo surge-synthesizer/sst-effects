@@ -42,8 +42,8 @@
 #include "sst/voice-effects/filter/SurgeBiquads.h"
 #include "sst/voice-effects/filter/SSTFilters.h"
 #include "sst/voice-effects/filter/StaticPhaser.h"
-#include "sst/voice-effects/modulation/Tremolo"
-#include "sst/voice-effects/modulation&/Phaser"
+#include "sst/voice-effects/modulation/Tremolo.h"
+#include "sst/voice-effects/modulation&/Phaser.h"
 struct VTestConfig
 {
     struct BaseClass
