@@ -194,12 +194,12 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         // PhaseSet is false by default so this will run at note-on.
         if (!phaseSet)
         {
-            shapeCheck(); // Sets the lfoshape here because changing shape during the voice isn't
-                          // very useful anyway.
             auto phase = randUniZeroToOne();   // get a random number
             actualLFO.applyPhaseOffset(phase); // and initialize the LFO phase with it.
             phaseSet = true;                   // then set this true so it doesn't run next block.
         }
+        
+        shapeCheck(); // Sets the lfoshape.
         // Run the LFO. (the 0.f is for the deform param which we don't use here).
         actualLFO.process_block(lfoRate, 0.f, lfoShape);
 
@@ -289,12 +289,12 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
 
         if (!phaseSet)
         {
-            shapeCheck();
             auto phase = randUniZeroToOne();
             actualLFO.applyPhaseOffset(phase);
             phaseSet = true;
         }
 
+        shapeCheck();
         actualLFO.process_block(lfoRate, 0.f, lfoShape);
 
         float lfoValue = (actualLFO.lastTarget * lfoDepth + 1) / 2;
@@ -322,12 +322,12 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
 
         if (!phaseSet)
         {
-            shapeCheck();
             auto phase = randUniZeroToOne();
             actualLFO.applyPhaseOffset(phase);
             phaseSet = true;
         }
 
+        shapeCheck();
         actualLFO.process_block(lfoRate, 0.f, lfoShape);
 
         float lfoValue = (actualLFO.lastTarget * lfoDepth + 1) / 2;
@@ -372,12 +372,12 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
 
         if (!phaseSet)
         {
-            shapeCheck();
             auto phase = randUniZeroToOne();
             actualLFO.applyPhaseOffset(phase);
             phaseSet = true;
         }
 
+        shapeCheck();
         actualLFO.process_block(lfoRate, 0.f, lfoShape);
 
         float lfoValue = (actualLFO.lastTarget * lfoDepth + 1) / 2;

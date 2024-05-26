@@ -39,7 +39,7 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
     static constexpr const char *effectName{"Phaser"};
 
     static constexpr int numFloatParams{6};
-    static constexpr int numIntParams{3};
+    static constexpr int numIntParams{2};
     
     static constexpr int maxPhases{6};
 
@@ -57,7 +57,6 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
     {
         ipShape,
         ipStereo,
-        ipStages
     };
 
     Phaser() : core::VoiceEffectTemplateBase<VFXConfig>() {}
@@ -112,13 +111,6 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
             return pmd().asBool().withDefault(false).withName("Stereo");
         case ipShape:
             return pmd().asInt().withRange(0, 6).withName("LFO shape");
-        case ipStages:
-            return pmd()
-                .asInt()
-                .withRange(1, maxPhases)
-                .withName("Stages")
-                .withLinearScaleFormatting("Stage")
-                .withDefault(4);
         }
         return pmd().asInt().withName("Error");
     }
@@ -177,7 +169,6 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
     }
     
     bool phaseSet = false;
-    int priorStages = -1;
     
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
@@ -187,12 +178,11 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
         
         if (!phaseSet)
         {
-            shapeCheck();
             auto phase = randUniZeroToOne();
             actualLFO.applyPhaseOffset(phase);
             phaseSet = true;
         }
-
+        shapeCheck();
         actualLFO.process_block(lfoRate, 0.f, lfoShape);
 
         float lfoValue = actualLFO.lastTarget * lfoDepth;
@@ -210,7 +200,7 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
         {
             auto dL = dataoutL[k] + fbAmt[0];
             auto dR = dataoutR[k] + fbAmt[1];
-            for (int i = 0; i < this->getIntParam(ipStages); ++i)
+            for (int i = 0; i < 4; ++i)
             {
                 filters[i].processBlockStep(dL, dR);
             }
@@ -233,12 +223,12 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
         
         if (!phaseSet)
         {
-            shapeCheck();
             auto phase = randUniZeroToOne();
             actualLFO.applyPhaseOffset(phase);
             phaseSet = true;
         }
-
+        
+        shapeCheck();
         actualLFO.process_block(lfoRate, 0.f, lfoShape);
 
         float lfoValue = actualLFO.lastTarget * lfoDepth;
@@ -255,7 +245,7 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
         for (int k = 0; k < VFXConfig::blockSize; ++k)
         {
             auto dL = dataOut[k] + this->fbAmt[0];
-            for (int i = 0; i < this->getIntParam(this->ipStages); ++i)
+            for (int i = 0; i < 4; ++i)
             {
                 float tmp{0};
                 this->filters[i].processBlockStep(dL, tmp);
@@ -267,37 +257,33 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
     
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
     
+    bool isFirst = true;
     
     void calc_coeffs(float pitch = 0.f, float LFO = 0.f)
     {
         auto resonance = this->getFloatParam(fpResonance);
         auto baseFreq = this->getFloatParam(fpCenterFreq);
-        auto stages = this->getIntParam(ipStages);
         auto spread{0.f};
         auto mode = sst::filters::CytomicSVF::Mode::ALL;
         auto stereo = this->getIntParam(ipStereo);
-        bool phaseSet = false;
         
-        if (stages != priorStages)
+        if (isFirst)
         {
-            for (int i = 0; i < stages; ++i)
+            for (int i = 0; i < 4; ++i)
             {
                 filters[i].init();
             }
-            priorStages = stages;
+            isFirst = false;
         }
         
-        if (stages > 1)
-        {
-            spread = this->getFloatParam(fpSpacing);
-            auto halfStage = this->getIntParam(ipStages) * 0.5;
-            baseFreq -= halfStage * spread;
-        }
+        spread = this->getFloatParam(fpSpacing);
+        auto halfStage = 4 * 0.5;
+        baseFreq -= halfStage * spread;
         
         float lfoValueL = LFO * (baseFreq / 2);
         float lfoValueR = LFO  * (baseFreq / 2)  * (stereo ? -1 : 1);
         
-        for (int i = 0; i < stages; ++i)
+        for (int i = 0; i < 4; ++i)
         {
             auto freqL = 440.f * this->note_to_pitch_ignoring_tuning((baseFreq + spread * i) + lfoValueL);
             auto freqR = 440.f * this->note_to_pitch_ignoring_tuning((baseFreq + spread * i) + lfoValueR);
@@ -311,7 +297,7 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
   protected:
     std::array<float, numFloatParams> mLastParam{};
     std::array<int, numIntParams> mLastIParam{};
-    std::array<sst::filters::CytomicSVF, maxPhases> filters;
+    std::array<sst::filters::CytomicSVF, 4> filters;
     float fbAmt[2]{0.f, 0.f};
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> lipolFb;
 };
