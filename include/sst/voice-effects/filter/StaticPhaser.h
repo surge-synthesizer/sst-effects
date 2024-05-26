@@ -32,7 +32,7 @@
 #include "sst/basic-blocks/mechanics/block-ops.h"
 #include "sst/filters/CytomicSVF.h"
 
-namespace sst::voice_effects::modulation
+namespace sst::voice_effects::filter
 {
 template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBase<VFXConfig>
 {
@@ -269,5 +269,5 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
 
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> lipolFb;
 };
-} // namespace sst::voice_effects::modulation
-#endif // SHORTCIRCUITXT_CYTOMICSVF_H
+} // namespace sst::voice_effects::filter
+#endif // SHORTCIRCUITXT_STATICPHASER_H

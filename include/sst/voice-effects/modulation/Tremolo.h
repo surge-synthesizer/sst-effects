@@ -45,7 +45,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         fpVolume,
         fpRate,
         fpDepth,
-        fpCenterFreq,
+        fpCrossover,
     };
 
     enum IntParams
@@ -68,13 +68,27 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         case fpVolume:
             return pmd().asLinearDecibel(-60.f, 12.f).withName("Volume");
         case fpRate:
-            return pmd().asLfoRate().withName("Rate");
-        case fpDepth:
-            return pmd().asFloat().withRange(0.f, 1.f).withDefault(1.f).withName("Depth");
-        case fpCenterFreq:
             return pmd()
                 .asFloat()
-                .withRange(150.f, 1500.f)
+                .withRange(-3, 4)
+                .withPolarity(pmd::ParamMetaData::Polarity::UNIPOLAR_POSITIVE)
+                // .temposyncable()
+                // .withTemposyncMultiplier(-1)
+                .withATwoToTheBFormatting(1, 1, "Hz")
+                .withName("Rate");
+        case fpDepth:
+            return pmd()
+                .asFloat()
+                .withRange(0.f, 1.f)
+                .withDefault(1.f)
+                .withLinearScaleFormatting("%", 100.f)
+                .withName("Depth");
+        case fpCrossover:
+            return pmd()
+                .asFloat()
+                .withRange(
+                    150.f,
+                    1500.f) // TODO: I increase the range without making the param scaling suck.
                 .withDefault(700.f)
                 .withLinearScaleFormatting("Hz")
                 .withName("Crossover");
@@ -103,11 +117,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         filters[1].init();
     }
 
-    void initVoiceEffectParams()
-    {
-        this->initToParamMetadataDefault(this);
-        // TODO: this doesn't compile. Why on earth not?
-    }
+    void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     // This ain't in VFXConfig so put it here (the simpleLFO needs it):
     float envelope_rate_linear_nowrap(float f)
@@ -115,12 +125,14 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         return VFXConfig::blockSize * VFXConfig::getSampleRateInv(this) * std::pow(2, -f);
     }
 
-    // Ok, so let's introduce the simpleLFO and create one out here.
+    // Ok, so let's introduce the simpleLFO with an alias.
     using lfo_t = sst::basic_blocks::modulators::SimpleLFO<Tremolo, VFXConfig::blockSize>;
+    // create one...
     lfo_t actualLFO{this, 1};
+    // ...set up a variable for lfo shape.
     typename lfo_t::Shape lfoShape = lfo_t::Shape::SINE;
 
-    // ...which we can then use in here to get these variables for later.
+    // ...which we set in this little function that checks the shape parameter.
     void shapeCheck()
     {
         switch (this->getIntParam(ipShape))
@@ -158,46 +170,65 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         return static_cast<float>(dis(gen));
     }
 
-    // We need these to initialize some stuff in the DSP functions.
-    bool isFirst = true;
-    bool phaseSet = false;
-
     /*
-     Now we're ready for the actual DSP.
-     Stereo + Mono * Standard vs. Harmonic = 4 cases, each gets its own function here.
-     The process functions further down will choose which one to call.
+     Next is the actual DSP.
+     Tremolo is a really simple effect: Multiply each audio sample (or block of samples in our case)
+     by one minus the LFO value on that sample.
+     Harmonic tremolo is only a tiny bit more involved (ignoring the filter design...): Make
+     highpassed and lowpassed copies of the signal, apply tremolo to those in opposite polarity.
+     Meaning the highs will be loud when the lows are quiet and vice versa.
+     There's 4 functions, for stereo+mono*harmonic+standard.
+     I'll comment the stereo harmonic case. All the others have the same concepts,
+     without the filters or the stereo or both.
     */
 
     void harmonicStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                         float pitch)
     {
+        // Bring in the various params.
         auto outputVolume = this->dbToLinear(this->getFloatParam(fpVolume));
         auto lfoRate = this->getFloatParam(fpRate);
         auto lfoDepth = this->getFloatParam(fpDepth);
-        auto CenterFreq = this->getFloatParam(fpCenterFreq);
+        auto crossover = this->getFloatParam(fpCrossover);
 
+        // PhaseSet is false by default so this will run at note-on.
         if (!phaseSet)
         {
-            shapeCheck();
-            auto phase = randUniZeroToOne();
-            actualLFO.applyPhaseOffset(phase);
-            phaseSet = true;
+            auto phase = randUniZeroToOne();   // get a random number
+            actualLFO.applyPhaseOffset(phase); // and initialize the LFO phase with it.
+            phaseSet = true;                   // then set this true so it doesn't run next block.
         }
 
+        shapeCheck(); // Sets the lfoshape.
+        // Run the LFO. (the 0.f is for the deform param which we don't use here).
         actualLFO.process_block(lfoRate, 0.f, lfoShape);
 
-        float lfoValue = (actualLFO.lastTarget * lfoDepth + 1) / 2;
-        float lfoValueInv = (actualLFO.lastTarget * lfoDepth * -1 + 1) / 2;
+        // Make a couple variables for the LFO value and its inverse,
+        // both normalized into unipolar 0...1 range.
+        float lfoValueL = (actualLFO.lastTarget * lfoDepth + 1) / 2;
+        float lfoValueInvL = (actualLFO.lastTarget * lfoDepth * -1 + 1) / 2;
 
-        if (isFirst)
+        // If the user asked for stereo modulation, right gets opposite LFOs to left, else it gets
+        // the same.
+        float lfoValueR = (this->getIntParam(ipStereo) == true ? lfoValueInvL : lfoValueL);
+        float lfoValueInvR = (this->getIntParam(ipStereo) == true ? lfoValueL : lfoValueInvL);
+
+        /*
+         Ok, now to setup the filter coefficients. Though this filter is extremely efficient,
+         it's still more expensive than an if statement. So we do the nice and easy optimisation:
+         check if the crossover frequency changed since last block, recalculate the coefficients if
+         so, else just keep them from last block. We initialized priorCrossover to a nonsense value,
+         so this will always run on the first block.
+         */
+        if (crossover != priorCrossover)
         {
             filters[0].template setCoeffForBlock<VFXConfig::blockSize>(
-                filters::CytomicSVF::LP, CenterFreq, CenterFreq, .707f, .707f,
+                filters::CytomicSVF::LP, crossover, crossover, .707f, .707f,
                 VFXConfig::getSampleRateInv(this), 0.f, 0.f);
             filters[1].template setCoeffForBlock<VFXConfig::blockSize>(
-                filters::CytomicSVF::HP, CenterFreq, CenterFreq, .707f, .707f,
+                filters::CytomicSVF::HP, crossover, crossover, .707f, .707f,
                 VFXConfig::getSampleRateInv(this), 0.f, 0.f);
-            isFirst = false;
+            priorCrossover = crossover;
         }
         else
         {
@@ -205,30 +236,49 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
             filters[1].template retainCoeffForBlock<VFXConfig::blockSize>();
         }
 
+        // Ok, here's where the action happens.
+        // Process is per-block, but we want to calculate per-sample.
+        // Hence the for loop from 0 to block size. Each i is a sample.
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
+            // First make two copies of the L and R inputs.
             auto inputLeftLP = datainL[i];
             auto inputLeftHP = datainL[i];
             auto inputRightLP = datainR[i];
             auto inputRightHP = datainR[i];
 
+            // Feed those into the filters.
             filters[0].processBlockStep(inputLeftLP, inputRightLP);
             filters[1].processBlockStep(inputLeftHP, inputRightHP);
 
-            inputLeftLP *= 1 - lfoValue;
-            inputLeftHP *= 1 - lfoValueInv;
-            // These ternary statements let us do both stereo or mono modulation on stereo audio.
-            // If the user asked for mono, right and left get same LFO, else they get opposite.
-            inputRightLP *= 1 - (this->getIntParam(ipStereo) == true ? lfoValueInv : lfoValue);
-            inputRightHP *= 1 - (this->getIntParam(ipStereo) == true ? lfoValue : lfoValueInv);
+            // Now we have our high-and lowpassed versions of left and right.
+            // Let's multiply them by the LFO values.
+            inputLeftLP *= 1 - lfoValueL;
+            inputLeftHP *= 1 - lfoValueInvL;
+            inputRightLP *= 1 - lfoValueR;
+            inputRightHP *= 1 - lfoValueInvR;
+            // Remember the right LFO values will either be identical to the left ones or
+            // opposite, depending on the stereo setting.
 
+            // Now add the highpassed and lowpassed signals together for each side.
             inputLeftLP += inputLeftHP;
             inputRightLP += inputRightHP;
+            // Normally when adding copies you have to divide down so it doens't get louder,
+            // but not here because of the filtering.
 
+            // lastly, pass each sample (scaled by the volume control) to the corresponding
+            // output index to construct a block of audio to output.
             dataoutL[i] = inputLeftLP * outputVolume;
             dataoutR[i] = inputRightLP * outputVolume;
         }
     }
+
+    /*
+     That's it! Once a voice has been called, the above runs for the duration of that voice.
+     The next voice runs another copy etc.
+     At first I wrote one big function with lots of ifs, but it was a messy and seemed inefficient
+     so I separated it. Now the branches are in the process functions further down instead.
+     */
 
     void standardStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                         float pitch)
@@ -239,12 +289,12 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
 
         if (!phaseSet)
         {
-            shapeCheck();
             auto phase = randUniZeroToOne();
             actualLFO.applyPhaseOffset(phase);
             phaseSet = true;
         }
 
+        shapeCheck();
         actualLFO.process_block(lfoRate, 0.f, lfoShape);
 
         float lfoValue = (actualLFO.lastTarget * lfoDepth + 1) / 2;
@@ -268,28 +318,28 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         auto outputVolume = this->dbToLinear(this->getFloatParam(fpVolume));
         auto lfoRate = this->getFloatParam(fpRate);
         auto lfoDepth = this->getFloatParam(fpDepth);
-        auto CenterFreq = this->getFloatParam(fpCenterFreq);
+        auto crossover = this->getFloatParam(fpCrossover);
 
         if (!phaseSet)
         {
-            shapeCheck();
             auto phase = randUniZeroToOne();
             actualLFO.applyPhaseOffset(phase);
             phaseSet = true;
         }
 
+        shapeCheck();
         actualLFO.process_block(lfoRate, 0.f, lfoShape);
 
         float lfoValue = (actualLFO.lastTarget * lfoDepth + 1) / 2;
         float lfoValueInv = (actualLFO.lastTarget * lfoDepth * -1 + 1) / 2;
 
-        if (isFirst)
+        if (crossover != priorCrossover)
         {
             filters[0].template setCoeffForBlock<VFXConfig::blockSize>(
-                filters::CytomicSVF::LP, CenterFreq, .707f, VFXConfig::getSampleRateInv(this), 0.f);
+                filters::CytomicSVF::LP, crossover, .707f, VFXConfig::getSampleRateInv(this), 0.f);
             filters[1].template setCoeffForBlock<VFXConfig::blockSize>(
-                filters::CytomicSVF::HP, CenterFreq, .707f, VFXConfig::getSampleRateInv(this), 0.f);
-            isFirst = false;
+                filters::CytomicSVF::HP, crossover, .707f, VFXConfig::getSampleRateInv(this), 0.f);
+            priorCrossover = crossover;
         }
         else
         {
@@ -322,12 +372,12 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
 
         if (!phaseSet)
         {
-            shapeCheck();
             auto phase = randUniZeroToOne();
             actualLFO.applyPhaseOffset(phase);
             phaseSet = true;
         }
 
+        shapeCheck();
         actualLFO.process_block(lfoRate, 0.f, lfoShape);
 
         float lfoValue = (actualLFO.lastTarget * lfoDepth + 1) / 2;
@@ -374,6 +424,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         // which in turn simply copies the mono audio and calls the stereo one with the copies.
         processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
     }
+
     // How does it know which MonoTo... function to choose? By first calling this.
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
 
@@ -381,6 +432,8 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
     std::array<float, numFloatParams> mLastParam{};
     std::array<int, numIntParams> mLastIParam{};
     std::array<sst::filters::CytomicSVF, 2> filters;
+    float priorCrossover = -1234.5678f;
+    bool phaseSet = false;
 };
 } // namespace sst::voice_effects::modulation
 #endif // SCXT_TREMOLO_H

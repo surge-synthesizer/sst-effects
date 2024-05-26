@@ -23,7 +23,7 @@
 
 #include "sst/voice-effects/distortion/BitCrusher.h"
 #include "sst/voice-effects/delay/Microgate.h"
-#include "sst/voice-effects/filter/Slewer.h"
+#include "sst/voice-effects/distortion/Slewer.h"
 #include "sst/voice-effects/modulation/RingMod.h"
 #include "sst/voice-effects/waveshaper/WaveShaper.h"
 #include "sst/voice-effects/modulation/FreqShiftMod.h"
@@ -41,8 +41,9 @@
 #include "sst/voice-effects/filter/CytomicSVF.h"
 #include "sst/voice-effects/filter/SurgeBiquads.h"
 #include "sst/voice-effects/filter/SSTFilters.h"
-#include "sst/voice-effects/modulation/StaticPhaser.h"
-
+#include "sst/voice-effects/filter/StaticPhaser.h"
+#include "sst/voice-effects/modulation/Tremolo.h"
+#include "sst/voice-effects/modulation/Phaser.h"
 struct VTestConfig
 {
     struct BaseClass
@@ -85,7 +86,7 @@ TEST_CASE("Can Create Voice FX")
         VTester<sst::voice_effects::distortion::BitCrusher<VTestConfig>>::TestVFX();
     }
 
-    SECTION("Slewer") { VTester<sst::voice_effects::filter::Slewer<VTestConfig>>::TestVFX(); }
+    SECTION("Slewer") { VTester<sst::voice_effects::distortion::Slewer<VTestConfig>>::TestVFX(); }
     SECTION("RingMod") { VTester<sst::voice_effects::modulation::RingMod<VTestConfig>>::TestVFX(); }
     SECTION("WaveShaper")
     {
@@ -156,6 +157,14 @@ TEST_CASE("Can Create Voice FX")
     }
     SECTION("Static Phaser")
     {
-        VTester<sst::voice_effects::modulation::StaticPhaser<VTestConfig>>::TestVFX();
+        VTester<sst::voice_effects::filter::StaticPhaser<VTestConfig>>::TestVFX();
+    }
+    SECTION("Tremolo")
+    {
+        VTester<sst::voice_effects::modulation::Tremolo<VTestConfig>>::TestVFX();
+    }
+    SECTION("Phaser")
+    {
+        VTester<sst::voice_effects::modulation::Phaser<VTestConfig>>::TestVFX();
     }
 }
