@@ -88,7 +88,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
                 .asFloat()
                 .withRange(
                     150.f,
-                    1500.f) // TODO: I increase the range without making the param scaling suck.
+                    1500.f) // TODO: Increase the range without making the param scaling suck.
                 .withDefault(700.f)
                 .withLinearScaleFormatting("Hz")
                 .withName("Crossover");
@@ -104,7 +104,20 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         case ipStereo:
             return pmd().asBool().withDefault(false).withName("Stereo");
         case ipShape:
-            return pmd().asInt().withRange(0, 6).withName("LFO shape");
+            return pmd()
+                .asInt()
+                .withRange(0, 6)
+                .withUnorderedMapFormatting({
+                    
+                    {0, "Sine"},
+                    {1, "Triangle"},
+                    {2, "Ramp Down"},
+                    {3, "Ramp Up"},
+                    {4, "Square"},
+                    {5, "Noise"},
+                    {6, "S&H"}})
+                .withDefault(0)
+                .withName("LFO shape");
         case ipHarmonic:
             return pmd().asBool().withDefault(false).withName("Harmonic");
         }
