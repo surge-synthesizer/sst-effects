@@ -58,7 +58,6 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
-        assert(idx >= 0 && idx < (int)PhaseModFloatParams::num_params);
         using pmd = basic_blocks::params::ParamMetaData;
 
         switch ((PhaseModFloatParams)idx)

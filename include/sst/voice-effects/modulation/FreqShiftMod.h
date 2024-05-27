@@ -59,7 +59,6 @@ template <typename VFXConfig> struct FreqShiftMod : core::VoiceEffectTemplateBas
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
-        assert(idx >= 0 && idx < (int)FreqShiftModFloatParams::num_params);
         using pmd = basic_blocks::params::ParamMetaData;
 
         switch ((FreqShiftModFloatParams)idx)

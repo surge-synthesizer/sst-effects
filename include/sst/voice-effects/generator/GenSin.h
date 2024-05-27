@@ -58,7 +58,6 @@ template <typename VFXConfig> struct GenSin : core::VoiceEffectTemplateBase<VFXC
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
-        assert(idx >= 0 && idx < (int)GenSinFloatParams::num_params);
         using pmd = basic_blocks::params::ParamMetaData;
 
         switch ((GenSinFloatParams)idx)

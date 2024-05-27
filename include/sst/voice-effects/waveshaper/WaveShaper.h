@@ -60,7 +60,6 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
-        assert(idx >= 0 && idx < (int)WaveShaperFloatParams::num_params);
         using pmd = basic_blocks::params::ParamMetaData;
 
         switch ((WaveShaperFloatParams)idx)

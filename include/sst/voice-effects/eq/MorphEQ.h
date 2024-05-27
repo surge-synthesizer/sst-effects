@@ -228,7 +228,6 @@ template <typename VFXConfig> struct MorphEQ : core::VoiceEffectTemplateBase<VFX
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
-        assert(idx >= 0 && idx < numFloatParams);
         using pmd = basic_blocks::params::ParamMetaData;
 
         switch (idx)
