@@ -65,7 +65,6 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
 
     basic_blocks::params::ParamMetaData paramAt(uint16_t idx) const
     {
-        assert(idx >= 0 && idx < (int)MicroGateParams::num_params);
         using pmd = basic_blocks::params::ParamMetaData;
 
         switch ((MicroGateParams)idx)

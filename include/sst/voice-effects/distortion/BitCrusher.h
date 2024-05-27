@@ -49,7 +49,6 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
-        assert(idx >= 0 && idx < bc_num_params);
         using pmd = basic_blocks::params::ParamMetaData;
 
         switch ((bc_fparams)idx)

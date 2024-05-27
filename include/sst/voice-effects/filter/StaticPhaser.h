@@ -69,8 +69,6 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
     basic_blocks::params::ParamMetaData intParamAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
-
-        assert(numIntParams == 2);
         switch (idx)
         {
         case ipStages:
@@ -92,7 +90,6 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
-        assert(idx >= 0 && idx < numFloatParams);
         using pmd = basic_blocks::params::ParamMetaData;
 
         switch (idx)

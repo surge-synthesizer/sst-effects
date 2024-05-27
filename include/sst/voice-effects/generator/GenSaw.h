@@ -58,7 +58,6 @@ template <typename VFXConfig> struct GenSaw : core::VoiceEffectTemplateBase<VFXC
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
-        assert(idx >= 0 && idx < (int)GenSawFloatParams::num_params);
         using pmd = basic_blocks::params::ParamMetaData;
 
         switch ((GenSawFloatParams)idx)

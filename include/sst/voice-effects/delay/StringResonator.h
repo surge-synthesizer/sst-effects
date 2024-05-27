@@ -155,8 +155,6 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
     basic_blocks::params::ParamMetaData intParamAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
-
-        assert(numIntParams == 3);
         switch (idx)
         {
         case ipStereo:

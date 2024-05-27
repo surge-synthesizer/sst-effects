@@ -51,7 +51,6 @@ struct EqNBandParametric : core::VoiceEffectTemplateBase<VFXConfig>
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
-        assert(idx >= 0 && idx < numFloatParams);
         using pmd = basic_blocks::params::ParamMetaData;
 
         int type = idx % 3;
