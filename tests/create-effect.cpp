@@ -38,6 +38,9 @@ struct TestConfig
 
     struct GS
     {
+        float noteToPitch(float f) { return 0; }
+        float dbToLinear(float f) { return 1.f; }
+        float getSampleRateInv() { return 1.0 / 48000; }
     };
     struct ES
     {

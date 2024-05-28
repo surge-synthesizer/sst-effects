@@ -138,8 +138,7 @@ template <typename FXConfig> struct EffectTemplateBase : public FXConfig::BaseCl
     static constexpr float blockSize_quad{FXConfig::blockSize >> 2};
 
     using BiquadFilterType =
-        sst::filters::Biquad::BiquadFilter<typename FXConfig::GlobalStorage, FXConfig::blockSize,
-                                           typename FXConfig::BiquadAdapter>;
+        sst::filters::Biquad::BiquadFilter<typename FXConfig::GlobalStorage, FXConfig::blockSize>;
 
     inline typename FXConfig::BaseClass *asBase()
     {
