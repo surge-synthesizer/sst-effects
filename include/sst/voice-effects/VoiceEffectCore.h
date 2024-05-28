@@ -98,7 +98,7 @@ concept optionalEnvelopeTime = requires(typename VFXConfig::BaseClass *b, float 
 template <typename VFXConfig>
 concept supportsVoiceConfig =
     std::is_class_v<typename VFXConfig::BaseClass> &&
-    sst::basic_blocks::concepts::is_power_of_two_ge(VFXConfig::blockSize, 4) &&
+    sst::basic_blocks::concepts::is_power_of_two_ge(VFXConfig::blockSize, (size_t)4) &&
     baseClassAPI<VFXConfig>;
 
 // Todo: as we port consider this FXConfig::BaseClass being a bit more configurable.
