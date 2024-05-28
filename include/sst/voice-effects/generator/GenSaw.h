@@ -63,18 +63,16 @@ template <typename VFXConfig> struct GenSaw : core::VoiceEffectTemplateBase<VFXC
         switch ((GenSawFloatParams)idx)
         {
         case GenSawFloatParams::offset:
-                if (keytrackOn)
-                {
+            if (keytrackOn)
+            {
                 return pmd()
                     .asFloat()
                     .withRange(-96, 96)
                     .withDefault(0)
                     .withLinearScaleFormatting("semitones")
                     .withName("Tune");
-                }
-                return pmd()
-                    .asAudibleFrequency()
-                    .withName("Frequency");
+            }
+            return pmd().asAudibleFrequency().withName("Frequency");
         case GenSawFloatParams::level:
             return pmd().asCubicDecibelAttenuation().withDefault(0.5f).withName("Level");
         default:
@@ -97,16 +95,15 @@ template <typename VFXConfig> struct GenSaw : core::VoiceEffectTemplateBase<VFXC
     {
         if (keytrackOn)
         {
-        mSawOsc.setFrequency(440.0 *
-                                 this->note_to_pitch_ignoring_tuning(
-                                     this->getFloatParam((int)GenSawFloatParams::offset) + pitch),
-                             this->getSampleRateInv());
+            mSawOsc.setFrequency(
+                440.0 * this->note_to_pitch_ignoring_tuning(
+                            this->getFloatParam((int)GenSawFloatParams::offset) + pitch),
+                this->getSampleRateInv());
         }
         else
         {
-            mSawOsc.setFrequency(440.0 *
-                                     this->note_to_pitch_ignoring_tuning(
-                                         this->getFloatParam((int)GenSawFloatParams::offset)),
+            mSawOsc.setFrequency(440.0 * this->note_to_pitch_ignoring_tuning(
+                                             this->getFloatParam((int)GenSawFloatParams::offset)),
                                  this->getSampleRateInv());
         }
         auto levT = std::clamp(this->getFloatParam((int)GenSawFloatParams::level), 0.f, 1.f);

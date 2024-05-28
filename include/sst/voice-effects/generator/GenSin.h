@@ -65,16 +65,14 @@ template <typename VFXConfig> struct GenSin : core::VoiceEffectTemplateBase<VFXC
         case GenSinFloatParams::offset:
             if (keytrackOn)
             {
-            return pmd()
-                .asFloat()
-                .withRange(-96, 96)
-                .withDefault(0)
-                .withLinearScaleFormatting("semitones")
-                .withName("Tune");
+                return pmd()
+                    .asFloat()
+                    .withRange(-96, 96)
+                    .withDefault(0)
+                    .withLinearScaleFormatting("semitones")
+                    .withName("Tune");
             }
-            return pmd()
-                .asAudibleFrequency()
-                .withName("Frequency");
+            return pmd().asAudibleFrequency().withName("Frequency");
         case GenSinFloatParams::level:
             return pmd().asCubicDecibelAttenuation().withDefault(0.5f).withName("Level");
         default:
@@ -98,10 +96,10 @@ template <typename VFXConfig> struct GenSin : core::VoiceEffectTemplateBase<VFXC
     {
         if (keytrackOn)
         {
-        mQuadOsc.setRate(440.0 * 2 * M_PI *
-                         this->note_to_pitch_ignoring_tuning(
-                             this->getFloatParam((int)GenSinFloatParams::offset) + pitch) *
-                         this->getSampleRateInv());
+            mQuadOsc.setRate(440.0 * 2 * M_PI *
+                             this->note_to_pitch_ignoring_tuning(
+                                 this->getFloatParam((int)GenSinFloatParams::offset) + pitch) *
+                             this->getSampleRateInv());
         }
         else
         {
@@ -120,7 +118,7 @@ template <typename VFXConfig> struct GenSin : core::VoiceEffectTemplateBase<VFXC
         }
         mLevelLerp.multiply_block(dataoutL);
     }
-    
+
     bool enableKeytrack(bool b)
     {
         auto res = (b != keytrackOn);

@@ -226,7 +226,7 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
             iparam[i] = this->getIntParam(i);
             idiff = idiff || (mLastIParam[i] != iparam[i]);
         }
-        
+
         idiff |= (wasKeytrackOn != keytrackOn);
         wasKeytrackOn = keytrackOn;
 

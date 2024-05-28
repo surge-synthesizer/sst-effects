@@ -84,16 +84,16 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
                 .withLinearScaleFormatting("%", 100.f)
                 .withName("Depth");
         case fpCrossover:
-                if (keytrackOn)
-                {
-                    return pmd()
-                        .asFloat()
-                        .withRange(-24, 48)
-                        .withName("Crossover Offset")
-                        .withDefault(0)
-                        .withLinearScaleFormatting("semitones");
-                }
-                return pmd().asAudibleFrequency().withName("Crossover");
+            if (keytrackOn)
+            {
+                return pmd()
+                    .asFloat()
+                    .withRange(-24, 48)
+                    .withName("Crossover Offset")
+                    .withDefault(0)
+                    .withLinearScaleFormatting("semitones");
+            }
+            return pmd().asAudibleFrequency().withName("Crossover");
         }
         return pmd().asFloat().withName("Error");
     }
@@ -106,19 +106,19 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         case ipStereo:
             return pmd().asBool().withDefault(false).withName("Stereo");
         case ipShape:
-                return pmd()
-                    .asInt()
-                    .withRange(0, 6)
-                    .withUnorderedMapFormatting({
-                        {0, "Sine"},
-                        {1, "Triangle"},
-                        {2, "Ramp Up"},
-                        {3, "Ramp Down"},
-                        {4, "Square"},
-                        {5, "Noise"},
-                        {6, "S&H"},
-                    })
-                    .withName("LFO shape");
+            return pmd()
+                .asInt()
+                .withRange(0, 6)
+                .withUnorderedMapFormatting({
+                    {0, "Sine"},
+                    {1, "Triangle"},
+                    {2, "Ramp Up"},
+                    {3, "Ramp Down"},
+                    {4, "Square"},
+                    {5, "Noise"},
+                    {6, "S&H"},
+                })
+                .withName("LFO shape");
         case ipHarmonic:
             return pmd().asBool().withDefault(false).withName("Harmonic");
         }
@@ -450,7 +450,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
 
     // How does it know which MonoTo... function to choose? By first calling this.
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
-    
+
     bool enableKeytrack(bool b)
     {
         auto res = (b != keytrackOn);

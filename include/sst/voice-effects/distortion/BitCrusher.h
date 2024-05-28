@@ -30,7 +30,7 @@ namespace sst::voice_effects::distortion
 template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<VFXConfig>
 {
     static constexpr const char *effectName{"BitCrusher"};
-    
+
     static constexpr int numFloatParams{5};
     static constexpr int numIntParams{1};
 
@@ -42,13 +42,11 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
         fpCutoff,
         fpResonance,
     };
-    
+
     enum IntParams
     {
         ipFilterSwitch
     };
-    
-
 
     BitCrusher() : core::VoiceEffectTemplateBase<VFXConfig>() {}
 
@@ -90,7 +88,7 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
                     .withLinearScaleFormatting("semitones");
             }
             return pmd().asAudibleFrequency().withName("Cutoff");
-            case fpResonance:
+        case fpResonance:
             return pmd().asPercent().withName("resonance").withDefault(0.707f);
         default:
             break;
@@ -98,15 +96,15 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
 
         return pmd().withName("Unknown " + std::to_string(idx));
     }
-    
+
     basic_blocks::params::ParamMetaData intParamAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
         switch (idx)
         {
-            case ipFilterSwitch:
-                return pmd().asBool().withName("Filter Engage");
-                break;
+        case ipFilterSwitch:
+            return pmd().asBool().withName("Filter Engage");
+            break;
         }
         return pmd().withName("oops");
     }
@@ -122,11 +120,10 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
         {
             sRate += pitch;
         }
-        float t = this->getSampleRateInv() * 440 *
-                  this->equalNoteToPitch(sRate);
+        float t = this->getSampleRateInv() * 440 * this->equalNoteToPitch(sRate);
         float bd = 16.f * std::min(1.f, std::max(0.f, this->getFloatParam(fpBitdepth)));
         float b = powf(2, bd), b_inv = 1.f / b;
-        
+
         auto reso = std::clamp(this->getFloatParam(fpResonance), 0.f, 1.f);
         auto cutoff = this->getFloatParam(fpCutoff);
         if (keytrackOn)
@@ -137,9 +134,10 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
 
         if (priorFreq != filterFreq && filterSwitch == true)
         {
-        filter.template setCoeffForBlock<VFXConfig::blockSize>(filters::CytomicSVF::LP, filterFreq, reso, this->getSampleRateInv(), 0.f);
+            filter.template setCoeffForBlock<VFXConfig::blockSize>(
+                filters::CytomicSVF::LP, filterFreq, reso, this->getSampleRateInv(), 0.f);
         }
-        
+
         int k;
         float dVal = this->getFloatParam(fpZeropoint);
         for (k = 0; k < VFXConfig::blockSize; k++)
@@ -169,11 +167,10 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
         }
         if (filterSwitch == true)
         {
-        filter.processBlock<VFXConfig::blockSize>(dataoutL, dataoutR, dataoutL, dataoutR);
+            filter.processBlock<VFXConfig::blockSize>(dataoutL, dataoutR, dataoutL, dataoutR);
         }
     }
-    
-    
+
     bool enableKeytrack(bool b)
     {
         auto res = (b != keytrackOn);
