@@ -51,7 +51,7 @@ struct VTestConfig
         std::array<float, 256> fb{};
         std::array<int, 256> ib{};
     };
-    static constexpr int blockSize{16};
+    static constexpr size_t blockSize{16};
     static void setFloatParam(BaseClass *b, int i, float f) { b->fb[i] = f; }
     static float getFloatParam(const BaseClass *b, int i) { return b->fb[i]; }
 
@@ -159,12 +159,6 @@ TEST_CASE("Can Create Voice FX")
     {
         VTester<sst::voice_effects::filter::StaticPhaser<VTestConfig>>::TestVFX();
     }
-    SECTION("Tremolo")
-    {
-        VTester<sst::voice_effects::modulation::Tremolo<VTestConfig>>::TestVFX();
-    }
-    SECTION("Phaser")
-    {
-        VTester<sst::voice_effects::modulation::Phaser<VTestConfig>>::TestVFX();
-    }
+    SECTION("Tremolo") { VTester<sst::voice_effects::modulation::Tremolo<VTestConfig>>::TestVFX(); }
+    SECTION("Phaser") { VTester<sst::voice_effects::modulation::Phaser<VTestConfig>>::TestVFX(); }
 }
