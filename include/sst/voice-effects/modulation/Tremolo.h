@@ -84,14 +84,16 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
                 .withLinearScaleFormatting("%", 100.f)
                 .withName("Depth");
         case fpCrossover:
-            return pmd()
-                .asFloat()
-                .withRange(
-                    150.f,
-                    1500.f) // TODO: Increase the range without making the param scaling suck.
-                .withDefault(700.f)
-                .withLinearScaleFormatting("Hz")
-                .withName("Crossover");
+            if (keytrackOn)
+            {
+                return pmd()
+                    .asFloat()
+                    .withRange(-24, 48)
+                    .withName("Crossover Offset")
+                    .withDefault(0)
+                    .withLinearScaleFormatting("semitones");
+            }
+            return pmd().asAudibleFrequency().withName("Crossover");
         }
         return pmd().asFloat().withName("Error");
     }
@@ -108,14 +110,14 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
                 .asInt()
                 .withRange(0, 6)
                 .withUnorderedMapFormatting({
-                    
                     {0, "Sine"},
                     {1, "Triangle"},
-                    {2, "Ramp Down"},
-                    {3, "Ramp Up"},
+                    {2, "Ramp Up"},
+                    {3, "Ramp Down"},
                     {4, "Square"},
                     {5, "Noise"},
-                    {6, "S&H"}})
+                    {6, "S&H"},
+                })
                 .withDefault(0)
                 .withName("LFO shape");
         case ipHarmonic:
@@ -157,10 +159,10 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
             lfoShape = lfo_t::TRI;
             break;
         case 2:
-            lfoShape = lfo_t::RAMP;
+            lfoShape = lfo_t::DOWN_RAMP; // reverse the ramps because we subtract the lfo here.
             break;
         case 3:
-            lfoShape = lfo_t::DOWN_RAMP;
+            lfoShape = lfo_t::RAMP;
             break;
         case 4:
             lfoShape = lfo_t::PULSE;
@@ -202,7 +204,12 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         auto outputVolume = this->dbToLinear(this->getFloatParam(fpVolume));
         auto lfoRate = this->getFloatParam(fpRate);
         auto lfoDepth = this->getFloatParam(fpDepth);
-        auto crossover = this->getFloatParam(fpCrossover);
+        auto crossParam = this->getFloatParam(fpCrossover);
+        if (keytrackOn)
+        {
+            crossParam += pitch;
+        }
+        auto crossover = 440 * this->note_to_pitch_ignoring_tuning(crossParam);
 
         // PhaseSet is false by default so this will run at note-on.
         if (!phaseSet)
@@ -332,6 +339,10 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         auto lfoRate = this->getFloatParam(fpRate);
         auto lfoDepth = this->getFloatParam(fpDepth);
         auto crossover = this->getFloatParam(fpCrossover);
+        if (keytrackOn)
+        {
+            crossover += pitch;
+        }
 
         if (!phaseSet)
         {
@@ -441,7 +452,16 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
     // How does it know which MonoTo... function to choose? By first calling this.
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
 
+    bool enableKeytrack(bool b)
+    {
+        auto res = (b != keytrackOn);
+        keytrackOn = b;
+        return res;
+    }
+    bool getKeytrack() const { return keytrackOn; }
+
   protected:
+    bool keytrackOn{false};
     std::array<float, numFloatParams> mLastParam{};
     std::array<int, numIntParams> mLastIParam{};
     std::array<sst::filters::CytomicSVF, 2> filters;

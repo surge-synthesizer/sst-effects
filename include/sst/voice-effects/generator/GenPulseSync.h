@@ -79,12 +79,16 @@ template <typename VFXConfig> struct GenPulseSync : core::VoiceEffectTemplateBas
         switch ((GenPulseSyncFloatParams)idx)
         {
         case GenPulseSyncFloatParams::tune:
-            return pmd()
-                .asFloat()
-                .withRange(-96, 96)
-                .withName("Tune")
-                .withDefault(0)
-                .withLinearScaleFormatting("semitones");
+            if (keytrackOn)
+            {
+                return pmd()
+                    .asFloat()
+                    .withRange(-96, 96)
+                    .withDefault(0)
+                    .withLinearScaleFormatting("semitones")
+                    .withName("Tune");
+            }
+            return pmd().asAudibleFrequency().withName("Frequency");
         case GenPulseSyncFloatParams::width:
             return pmd().asPercent().withName("Width").withDefault(0.5);
         case GenPulseSyncFloatParams::sync:
@@ -120,7 +124,10 @@ template <typename VFXConfig> struct GenPulseSync : core::VoiceEffectTemplateBas
         mWidthLerp.newValue(this->getFloatParam((int)GenPulseSyncFloatParams::width));
         mSyncLerp.newValue(this->getFloatParam((int)GenPulseSyncFloatParams::sync));
         mLevelLerp.newValue(this->getFloatParam((int)GenPulseSyncFloatParams::level));
-        mPitchLerp.newValue(pitch);
+        if (keytrackOn)
+        {
+            mPitchLerp.newValue(pitch);
+        }
 
         if (mFirstRun)
         {
@@ -156,7 +163,10 @@ template <typename VFXConfig> struct GenPulseSync : core::VoiceEffectTemplateBas
             mSyncLerp.process();
             mTuneLerp.process();
             mLevelLerp.process();
-            mPitchLerp.process();
+            if (keytrackOn)
+            {
+                mPitchLerp.process();
+            }
         }
     }
 
@@ -166,12 +176,13 @@ template <typename VFXConfig> struct GenPulseSync : core::VoiceEffectTemplateBas
         auto samplerate = this->getSampleRate();
         int32_t ipos = (int32_t)(((kLarge + mOscState) >> 16) & 0xFFFFFFFF);
         bool sync = false;
+        double freq = (keytrackOn) ? (mPitchLerp.v + mTuneLerp.v) : mTuneLerp.v;
+
         if (mSyncState < mOscState)
         {
             ipos = (int32_t)(((kLarge + mSyncState) >> 16) & 0xFFFFFFFF);
             double t =
-                std::max(0.5, samplerate / (440.0 * this->note_to_pitch_ignoring_tuning(
-                                                        (double)mPitchLerp.v + mTuneLerp.v)));
+                std::max(0.5, samplerate / (440.0 * this->note_to_pitch_ignoring_tuning(freq)));
             int64_t syncrate = (int64_t)(double)(65536.0 * 16777216.0 * t);
             mOscState = mSyncState;
             mSyncState += syncrate;
@@ -198,11 +209,9 @@ template <typename VFXConfig> struct GenPulseSync : core::VoiceEffectTemplateBas
         // add time until next statechange
         double width = (0.5 - 0.499f * std::clamp(mWidthLerp.v, 0.01f, 0.99f));
         double t = std::max(
-            0.5,
-            samplerate / (440.0 * this->note_to_pitch_ignoring_tuning(
-                                      (double)mPitchLerp.v +
-                                      this->getFloatParam((int)GenPulseSyncFloatParams::tune) +
-                                      this->getFloatParam((int)GenPulseSyncFloatParams::sync))));
+            0.5, samplerate /
+                     (440.0 * this->note_to_pitch_ignoring_tuning(
+                                  freq + this->getFloatParam((int)GenPulseSyncFloatParams::sync))));
         if (mPolarity)
         {
             width = 1 - width;
@@ -218,6 +227,15 @@ template <typename VFXConfig> struct GenPulseSync : core::VoiceEffectTemplateBas
 
     float mOscBuffer alignas(16)[VFXConfig::blockSize];
 
+    bool enableKeytrack(bool b)
+    {
+        auto res = (b != keytrackOn);
+        keytrackOn = b;
+        return res;
+    }
+    bool getKeytrack() const { return keytrackOn; }
+
+    bool keytrackOn{true};
     bool mFirstRun{true};
     int64_t mOscState{0}, mSyncState{0};
     bool mPolarity{false};

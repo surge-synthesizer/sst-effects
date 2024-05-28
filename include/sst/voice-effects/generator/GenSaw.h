@@ -63,12 +63,16 @@ template <typename VFXConfig> struct GenSaw : core::VoiceEffectTemplateBase<VFXC
         switch ((GenSawFloatParams)idx)
         {
         case GenSawFloatParams::offset:
-            return pmd()
-                .asFloat()
-                .withRange(-96, 96)
-                .withDefault(0)
-                .withLinearScaleFormatting("semitones")
-                .withName("Tune");
+            if (keytrackOn)
+            {
+                return pmd()
+                    .asFloat()
+                    .withRange(-96, 96)
+                    .withDefault(0)
+                    .withLinearScaleFormatting("semitones")
+                    .withName("Tune");
+            }
+            return pmd().asAudibleFrequency().withName("Frequency");
         case GenSawFloatParams::level:
             return pmd().asCubicDecibelAttenuation().withDefault(0.5f).withName("Level");
         default:
@@ -89,10 +93,19 @@ template <typename VFXConfig> struct GenSaw : core::VoiceEffectTemplateBase<VFXC
     }
     void processMonoToMono(float *datainL, float *dataoutL, float pitch)
     {
-        mSawOsc.setFrequency(440.0 *
-                                 this->note_to_pitch_ignoring_tuning(
-                                     this->getFloatParam((int)GenSawFloatParams::offset) + pitch),
-                             this->getSampleRateInv());
+        if (keytrackOn)
+        {
+            mSawOsc.setFrequency(
+                440.0 * this->note_to_pitch_ignoring_tuning(
+                            this->getFloatParam((int)GenSawFloatParams::offset) + pitch),
+                this->getSampleRateInv());
+        }
+        else
+        {
+            mSawOsc.setFrequency(440.0 * this->note_to_pitch_ignoring_tuning(
+                                             this->getFloatParam((int)GenSawFloatParams::offset)),
+                                 this->getSampleRateInv());
+        }
         auto levT = std::clamp(this->getFloatParam((int)GenSawFloatParams::level), 0.f, 1.f);
         levT = levT * levT * levT;
         mLevelLerp.set_target(levT);
@@ -104,7 +117,16 @@ template <typename VFXConfig> struct GenSaw : core::VoiceEffectTemplateBase<VFXC
         mLevelLerp.multiply_block(dataoutL);
     }
 
+    bool enableKeytrack(bool b)
+    {
+        auto res = (b != keytrackOn);
+        keytrackOn = b;
+        return res;
+    }
+    bool getKeytrack() const { return keytrackOn; }
+
   protected:
+    bool keytrackOn{true};
     sst::basic_blocks::dsp::DPWSawOscillator<
         sst::basic_blocks::dsp::BlockInterpSmoothingStrategy<VFXConfig::blockSize>>
         mSawOsc;
