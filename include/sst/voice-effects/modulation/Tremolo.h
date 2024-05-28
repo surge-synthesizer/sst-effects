@@ -118,6 +118,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
                     {5, "Noise"},
                     {6, "S&H"},
                 })
+                .withDefault(0)
                 .withName("LFO shape");
         case ipHarmonic:
             return pmd().asBool().withDefault(false).withName("Harmonic");
