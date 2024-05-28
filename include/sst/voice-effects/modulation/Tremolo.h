@@ -132,9 +132,14 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
+    // This ain't in VFXConfig so put it here (the simpleLFO needs it):
+    float envelope_rate_linear_nowrap(float f)
+    {
+        return VFXConfig::blockSize * VFXConfig::getSampleRateInv(this) * std::pow(2, -f);
+    }
+
     // Ok, so let's introduce the simpleLFO with an alias.
-    using lfo_t = sst::basic_blocks::modulators::SimpleLFO<core::VoiceEffectTemplateBase<VFXConfig>,
-                                                           VFXConfig::blockSize>;
+    using lfo_t = sst::basic_blocks::modulators::SimpleLFO<Tremolo, VFXConfig::blockSize>;
     // create one...
     lfo_t actualLFO{this, 1};
     // ...set up a variable for lfo shape.
