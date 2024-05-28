@@ -26,86 +26,23 @@
  *
  */
 
-#include <type_traits>
-#include <concepts>
-
 // For shared width calculations
 #include "sst/basic-blocks/dsp/MidSide.h"
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
-
-#include "sst/basic-blocks/concepts/concepts.h"
-
 #include "sst/filters/BiquadFilter.h"
 
 #include <type_traits>
 
 namespace sst::voice_effects::core
 {
-
-template <typename VFXConfig>
-concept baseClassAPI =
-    requires(typename VFXConfig::BaseClass *b, size_t st, float f, int i, uint8_t *u8) {
-        {
-            VFXConfig::setFloatParam(b, st, f)
-        } -> std::convertible_to<void>;
-        {
-            VFXConfig::getFloatParam(b, st)
-        } -> std::floating_point;
-
-        {
-            VFXConfig::setIntParam(b, st, i)
-        } -> std::convertible_to<void>;
-        {
-            VFXConfig::getIntParam(b, st)
-        } -> std::integral;
-
-        {
-            VFXConfig::dbToLinear(b, f)
-        } -> std::floating_point;
-
-        {
-            VFXConfig::equalNoteToPitch(b, f)
-        } -> std::floating_point;
-
-        {
-            VFXConfig::getSampleRate(b)
-        } -> std::floating_point;
-        {
-            VFXConfig::getSampleRateInv(b)
-        } -> std::floating_point;
-
-        {
-            VFXConfig::preReservePool(b, st)
-        } -> std::convertible_to<void>;
-        {
-            VFXConfig::checkoutBlock(b, st)
-        } -> std::same_as<uint8_t *>;
-        {
-            VFXConfig::returnBlock(b, u8, st)
-        } -> std::convertible_to<void>;
-    };
-
-template <typename VFXConfig>
-concept optionalOversampling = std::is_integral_v<typename VFXConfig::oversamplingRatio>;
-
-template <typename VFXConfig>
-concept optionalEnvelopeTime = requires(typename VFXConfig::BaseClass *b, float f) {
-    {
-        VFXConfig::envelope_rate_linear_nowrap(b, f)
-    } -> std::convertible_to<float>;
-};
-
-template <typename VFXConfig>
-concept supportsVoiceConfig =
-    std::is_class_v<typename VFXConfig::BaseClass> &&
-    sst::basic_blocks::concepts::is_power_of_two_ge(VFXConfig::blockSize, (size_t)4) &&
-    baseClassAPI<VFXConfig>;
-
 // Todo: as we port consider this FXConfig::BaseClass being a bit more configurable.
-template <typename VFXConfig>
-    requires(supportsVoiceConfig<VFXConfig>)
-struct VoiceEffectTemplateBase : public VFXConfig::BaseClass
+template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig::BaseClass
 {
+    static_assert(std::is_integral<decltype(VFXConfig::blockSize)>::value);
+    static_assert(!(VFXConfig::blockSize & (VFXConfig::blockSize - 1))); // 2^n
+    static_assert(VFXConfig::blockSize >= 4);                            // > simd register length
+    static_assert(std::is_class<typename VFXConfig::BaseClass>::value);
+
     typename VFXConfig::BaseClass *asBase()
     {
         return static_cast<typename VFXConfig::BaseClass *>(this);
@@ -116,8 +53,35 @@ struct VoiceEffectTemplateBase : public VFXConfig::BaseClass
         return static_cast<const typename VFXConfig::BaseClass *>(this);
     }
 
+    /*
+     * Params
+     */
+    static_assert(std::is_same<decltype(VFXConfig::setFloatParam(
+                                   std::declval<typename VFXConfig::BaseClass *>(),
+                                   std::declval<size_t>(), std::declval<float>())),
+                               void>::value,
+                  "Implement setFloatParam");
+
+    static_assert(
+        std::is_same<decltype(VFXConfig::getFloatParam(
+                         std::declval<typename VFXConfig::BaseClass *>(), std::declval<size_t>())),
+                     float>::value,
+        "Implement getFloatParam");
+
     void setFloatParam(int i, float f) { VFXConfig::setFloatParam(asBase(), i, f); }
     float getFloatParam(int i) const { return VFXConfig::getFloatParam(asBase(), i); }
+
+    static_assert(std::is_same<decltype(VFXConfig::setIntParam(
+                                   std::declval<typename VFXConfig::BaseClass *>(),
+                                   std::declval<size_t>(), std::declval<int>())),
+                               void>::value,
+                  "Implement setIntParam");
+
+    static_assert(
+        std::is_same<decltype(VFXConfig::getIntParam(
+                         std::declval<typename VFXConfig::BaseClass *>(), std::declval<size_t>())),
+                     int>::value,
+        "Implement getIntParam");
 
     void setIntParam(int i, int f) { VFXConfig::setIntParam(asBase(), i, f); }
     int getIntParam(int i) const { return VFXConfig::getIntParam(asBase(), i); }
@@ -125,12 +89,22 @@ struct VoiceEffectTemplateBase : public VFXConfig::BaseClass
     /*
      * Conversions
      */
+    static_assert(
+        std::is_same<decltype(VFXConfig::dbToLinear(std::declval<typename VFXConfig::BaseClass *>(),
+                                                    std::declval<float>())),
+                     float>::value,
+        "Implement dbToLinear");
     float dbToLinear(float f) { return VFXConfig::dbToLinear(asBase(), f); }
     static float dbToLinear(typename VFXConfig::BaseClass *b, float f)
     {
         return VFXConfig::dbToLinear(b, f);
     }
 
+    static_assert(
+        std::is_same<decltype(VFXConfig::equalNoteToPitch(
+                         std::declval<typename VFXConfig::BaseClass *>(), std::declval<float>())),
+                     float>::value,
+        "Implement getEqualNoteToPitch");
     float equalNoteToPitch(float f) { return VFXConfig::equalNoteToPitch(asBase(), f); }
     float note_to_pitch_ignoring_tuning(float f) { return equalNoteToPitch(f); }
     static float noteToPitchIgnoringTuning(VoiceEffectTemplateBase<VFXConfig> *that, float f)
@@ -142,12 +116,38 @@ struct VoiceEffectTemplateBase : public VFXConfig::BaseClass
         return that->getSampleRateInv();
     }
 
+    static_assert(std::is_same<decltype(VFXConfig::getSampleRate(
+                                   std::declval<typename VFXConfig::BaseClass *>())),
+                               float>::value,
+                  "Implement getSampleRate");
     float getSampleRate() { return VFXConfig::getSampleRate(asBase()); }
+    static_assert(std::is_same<decltype(VFXConfig::getSampleRateInv(
+                                   std::declval<typename VFXConfig::BaseClass *>())),
+                               float>::value,
+                  "Implement getSampleRateInv");
     float getSampleRateInv() { return VFXConfig::getSampleRateInv(asBase()); }
 
     /*
      * We have to provide a memory pool
      */
+    static_assert(
+        std::is_same<decltype(VFXConfig::preReservePool(
+                         std::declval<typename VFXConfig::BaseClass *>(), std::declval<size_t>())),
+                     void>::value,
+        "void preReservePool(base*, size_t) not defined");
+
+    static_assert(
+        std::is_same<decltype(VFXConfig::checkoutBlock(
+                         std::declval<typename VFXConfig::BaseClass *>(), std::declval<size_t>())),
+                     uint8_t *>::value,
+        "uint8_t* checkoutBlock(base *,size_t) not defined");
+
+    static_assert(std::is_same<decltype(VFXConfig::returnBlock(
+                                   std::declval<typename VFXConfig::BaseClass *>(),
+                                   std::declval<uint8_t *>(), std::declval<size_t>())),
+                               void>::value,
+                  "void returnBlock(base *, uint8_t *, size_t) not defined");
+
     void preReservePool(size_t s) { VFXConfig::preReservePool(asBase(), s); }
     uint8_t *checkoutBlock(size_t s) { return VFXConfig::checkoutBlock(asBase(), s); }
     void returnBlock(uint8_t *d, size_t s) { VFXConfig::returnBlock(asBase(), d, s); }
@@ -167,9 +167,18 @@ struct VoiceEffectTemplateBase : public VFXConfig::BaseClass
         }
     }
 
+    template <typename T, typename = void> struct has_oversampling : std::false_type
+    {
+    };
+
+    template <typename T>
+    struct has_oversampling<T, std::void_t<decltype(&T::oversamplingRatio)>> : std::true_type
+    {
+    };
+
     constexpr int16_t getOversamplingRatio()
     {
-        if constexpr (optionalOversampling<VFXConfig>)
+        if constexpr (has_oversampling<VFXConfig>::value)
         {
             return VFXConfig::oversamplingRatio;
         }
@@ -179,20 +188,9 @@ struct VoiceEffectTemplateBase : public VFXConfig::BaseClass
         }
     }
 
-    float envelope_rate_linear_nowrap(float f)
-    {
-        if constexpr (optionalEnvelopeTime<VFXConfig>)
-        {
-            return VFXConfig::envelope_rate_linear_nowrap(this, f);
-        }
-        else
-        {
-            return VFXConfig::blockSize * VFXConfig::getSampleRateInv(this) * std::pow(2, -f);
-        }
-    }
-
-    using BiquadFilterType = sst::filters::Biquad::BiquadFilter<VoiceEffectTemplateBase<VFXConfig>,
-                                                                VFXConfig::blockSize>;
+    using BiquadFilterType =
+        sst::filters::Biquad::BiquadFilter<VoiceEffectTemplateBase<VFXConfig>, VFXConfig::blockSize,
+                                           VoiceEffectTemplateBase<VFXConfig>>;
 };
 } // namespace sst::voice_effects::core
 

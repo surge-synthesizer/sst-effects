@@ -36,8 +36,6 @@ namespace sst::voice_effects::modulation
 {
 template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    using base_t = core::VoiceEffectTemplateBase<VFXConfig>;
-
     static constexpr const char *effectName{"Phaser"};
 
     static constexpr int numFloatParams{6};
@@ -143,7 +141,7 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
         return VFXConfig::blockSize * VFXConfig::getSampleRateInv(this) * std::pow(2, -f);
     }
 
-    using lfo_t = sst::basic_blocks::modulators::SimpleLFO<base_t, VFXConfig::blockSize>;
+    using lfo_t = sst::basic_blocks::modulators::SimpleLFO<Phaser, VFXConfig::blockSize>;
     lfo_t actualLFO{this, 1};
     typename lfo_t::Shape lfoShape = lfo_t::Shape::SINE;
 

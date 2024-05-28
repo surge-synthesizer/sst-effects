@@ -48,10 +48,6 @@ struct ConcreteConfig
         // It is painful that sst-filters makes us over-adapt
         // this class
         GS(double sr) : sampleRate(sr) {}
-
-        float noteToPitch(float f) { return 0; }
-        float dbToLinear(float f) { return 1.f; }
-        float getSampleRateInv() { return 1.0 / sampleRate; }
     };
     struct ES
     {
