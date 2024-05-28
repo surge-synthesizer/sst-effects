@@ -110,7 +110,19 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
         case ipStereo:
             return pmd().asBool().withDefault(false).withName("Stereo");
         case ipShape:
-            return pmd().asInt().withRange(0, 6).withName("LFO shape");
+            return pmd()
+                .asInt()
+                .withRange(0, 6)
+                .withUnorderedMapFormatting({
+                    {0, "Sine"},
+                    {1, "Triangle"},
+                    {2, "Ramp Up"},
+                    {3, "Ramp Down"},
+                    {4, "Square"},
+                    {5, "Noise"},
+                    {6, "S&H"},
+                })
+                .withName("LFO shape");
         }
         return pmd().asInt().withName("Error");
     }

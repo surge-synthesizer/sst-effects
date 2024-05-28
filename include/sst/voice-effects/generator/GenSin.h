@@ -63,12 +63,18 @@ template <typename VFXConfig> struct GenSin : core::VoiceEffectTemplateBase<VFXC
         switch ((GenSinFloatParams)idx)
         {
         case GenSinFloatParams::offset:
+            if (keytrackOn)
+            {
             return pmd()
                 .asFloat()
                 .withRange(-96, 96)
                 .withDefault(0)
                 .withLinearScaleFormatting("semitones")
                 .withName("Tune");
+            }
+            return pmd()
+                .asAudibleFrequency()
+                .withName("Frequency");
         case GenSinFloatParams::level:
             return pmd().asCubicDecibelAttenuation().withDefault(0.5f).withName("Level");
         default:
@@ -90,10 +96,20 @@ template <typename VFXConfig> struct GenSin : core::VoiceEffectTemplateBase<VFXC
     }
     void processMonoToMono(float *datainL, float *dataoutL, float pitch)
     {
+        if (keytrackOn)
+        {
         mQuadOsc.setRate(440.0 * 2 * M_PI *
                          this->note_to_pitch_ignoring_tuning(
                              this->getFloatParam((int)GenSinFloatParams::offset) + pitch) *
                          this->getSampleRateInv());
+        }
+        else
+        {
+            mQuadOsc.setRate(440.0 * 2 * M_PI *
+                             this->note_to_pitch_ignoring_tuning(
+                                 this->getFloatParam((int)GenSinFloatParams::offset)) *
+                             this->getSampleRateInv());
+        }
         auto levT = std::clamp(this->getFloatParam((int)GenSinFloatParams::level), 0.f, 1.f);
         levT = levT * levT * levT;
         mLevelLerp.set_target(levT);
@@ -104,8 +120,17 @@ template <typename VFXConfig> struct GenSin : core::VoiceEffectTemplateBase<VFXC
         }
         mLevelLerp.multiply_block(dataoutL);
     }
+    
+    bool enableKeytrack(bool b)
+    {
+        auto res = (b != keytrackOn);
+        keytrackOn = b;
+        return res;
+    }
+    bool getKeytrack() const { return keytrackOn; }
 
   protected:
+    bool keytrackOn{false};
     sst::basic_blocks::dsp::QuadratureOscillator<float> mQuadOsc;
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> mLevelLerp;
 };

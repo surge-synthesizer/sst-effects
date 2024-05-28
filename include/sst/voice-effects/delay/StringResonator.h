@@ -245,8 +245,13 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
             panParamTwo = 1.f;
         }
 
-        auto ptOne = pitch + this->getFloatParam(fpOffsetOne);
-        auto ptTwo = pitch + this->getFloatParam(fpOffsetTwo);
+        auto ptOne = this->getFloatParam(fpOffsetOne);
+        auto ptTwo = this->getFloatParam(fpOffsetTwo);
+        if (keytrackOn)
+        {
+            ptOne += pitch;
+            ptTwo += pitch;
+        }
         ptOne += pitchAdjustmentForStiffness();
         ptTwo += pitchAdjustmentForStiffness();
         setupFilters(ptOne);
@@ -331,7 +336,11 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
             panParam = 0.5f;
         }
 
-        auto pt = pitch + this->getFloatParam(fpOffsetOne);
+        auto pt = this->getFloatParam(fpOffsetOne);
+        if (keytrackOn)
+        {
+            pt += pitch;
+        }
         pt += pitchAdjustmentForStiffness();
         setupFilters(pt);
 
@@ -396,8 +405,13 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
         namespace sdsp = sst::basic_blocks::dsp;
         mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
 
-        auto ptOne = pitch + this->getFloatParam(fpOffsetOne);
-        auto ptTwo = pitch + this->getFloatParam(fpOffsetTwo);
+        auto ptOne = this->getFloatParam(fpOffsetOne);
+        auto ptTwo = this->getFloatParam(fpOffsetTwo);
+        if (keytrackOn)
+        {
+            ptOne += pitch;
+            ptTwo += pitch;
+        }
         ptOne += pitchAdjustmentForStiffness();
         ptTwo += pitchAdjustmentForStiffness();
         setupFilters(ptOne);
@@ -464,7 +478,11 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
         namespace sdsp = sst::basic_blocks::dsp;
         mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
 
-        auto pt = pitch + this->getFloatParam(fpOffsetOne);
+        auto pt = this->getFloatParam(fpOffsetOne);
+        if (keytrackOn)
+        {
+            pt += pitch;
+        }
         pt += pitchAdjustmentForStiffness();
         setupFilters(pt);
 
@@ -652,7 +670,16 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
 
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
 
+    bool enableKeytrack(bool b)
+    {
+        auto res = (b != keytrackOn);
+        keytrackOn = b;
+        return res;
+    }
+    bool getKeytrack() const { return keytrackOn; }
+
   protected:
+    bool keytrackOn{true};
     std::array<details::DelayLineSupport, 2> lineSupport;
     bool isShort{true};
     bool firstPitch{false};

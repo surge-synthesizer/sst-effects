@@ -23,27 +23,34 @@
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "../VoiceEffectCore.h"
+#include "sst/filters/CytomicSVF.h"
 
 namespace sst::voice_effects::distortion
 {
 template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<VFXConfig>
 {
     static constexpr const char *effectName{"BitCrusher"};
+    
+    static constexpr int numFloatParams{5};
+    static constexpr int numIntParams{1};
 
-    enum bc_fparams
+    enum FloatParams
     {
-        bc_samplerate,
-        bc_bitdepth,
-        bc_zeropoint,
-        bc_cutoff,
-        bc_resonance,
-        bc_num_params
+        fpSamplerate,
+        fpBitdepth,
+        fpZeropoint,
+        fpCutoff,
+        fpResonance,
     };
+    
+    enum IntParams
+    {
+        ipFilterSwitch
+    };
+    
 
-    static constexpr int numFloatParams{bc_num_params};
-    static constexpr int numIntParams{0};
 
-    BitCrusher() : core::VoiceEffectTemplateBase<VFXConfig>(), lp(this) {}
+    BitCrusher() : core::VoiceEffectTemplateBase<VFXConfig>() {}
 
     ~BitCrusher() {}
 
@@ -51,21 +58,39 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
     {
         using pmd = basic_blocks::params::ParamMetaData;
 
-        switch ((bc_fparams)idx)
+        switch (idx)
         {
-        case bc_samplerate:
+        case fpSamplerate:
+            if (keytrackOn)
+            {
+                return pmd()
+                    .asFloat()
+                    .withRange(0, 96)
+                    .withName("Samplerate Ratio")
+                    .withDefault(96)
+                    .withLinearScaleFormatting("semitones");
+            }
             return pmd()
                 .asAudibleFrequency()
                 .withRange(-12, 80)
-                .withName("sampleRate")
-                .withDefault(7.5);
-        case bc_bitdepth:
+                .withName("Samplerate")
+                .withDefault(80);
+        case fpBitdepth:
             return pmd().asPercent().withName("bitdepth").withDefault(1.f);
-        case bc_zeropoint:
+        case fpZeropoint:
             return pmd().asPercent().withName("zeropoint").withDefault(0.f);
-        case bc_cutoff:
-            return pmd().asAudibleFrequency().withName("cutoff");
-        case bc_resonance:
+        case fpCutoff:
+            if (keytrackOn)
+            {
+                return pmd()
+                    .asFloat()
+                    .withRange(0, 96)
+                    .withName("Cutoff Offset")
+                    .withDefault(96)
+                    .withLinearScaleFormatting("semitones");
+            }
+            return pmd().asAudibleFrequency().withName("Cutoff");
+            case fpResonance:
             return pmd().asPercent().withName("resonance").withDefault(0.707f);
         default:
             break;
@@ -73,19 +98,50 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
 
         return pmd().withName("Unknown " + std::to_string(idx));
     }
+    
+    basic_blocks::params::ParamMetaData intParamAt(int idx) const
+    {
+        using pmd = basic_blocks::params::ParamMetaData;
+        switch (idx)
+        {
+            case ipFilterSwitch:
+                return pmd().asBool().withName("Filter Engage");
+                break;
+        }
+        return pmd().withName("oops");
+    }
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
     {
+        bool filterSwitch = this->getIntParam(ipFilterSwitch);
+        float sRate = this->getFloatParam(fpSamplerate);
+        if (keytrackOn)
+        {
+            sRate += pitch;
+        }
         float t = this->getSampleRateInv() * 440 *
-                  this->equalNoteToPitch(this->getFloatParam(bc_samplerate));
-        float bd = 16.f * std::min(1.f, std::max(0.f, this->getFloatParam(bc_bitdepth)));
+                  this->equalNoteToPitch(sRate);
+        float bd = 16.f * std::min(1.f, std::max(0.f, this->getFloatParam(fpBitdepth)));
         float b = powf(2, bd), b_inv = 1.f / b;
+        
+        auto reso = std::clamp(this->getFloatParam(fpResonance), 0.f, 1.f);
+        auto cutoff = this->getFloatParam(fpCutoff);
+        if (keytrackOn)
+        {
+            cutoff += pitch;
+        }
+        auto filterFreq = 440 * this->note_to_pitch_ignoring_tuning(cutoff);
 
+        if (priorFreq != filterFreq && filterSwitch == true)
+        {
+        filter.template setCoeffForBlock<VFXConfig::blockSize>(filters::CytomicSVF::LP, filterFreq, reso, this->getSampleRateInv(), 0.f);
+        }
+        
         int k;
-        float dVal = this->getFloatParam(bc_zeropoint);
+        float dVal = this->getFloatParam(fpZeropoint);
         for (k = 0; k < VFXConfig::blockSize; k++)
         {
             float inputL = datainL[k];
@@ -111,15 +167,26 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
             dataoutL[k] = level[0];
             dataoutR[k] = level[1];
         }
-
-        lp.coeff_LP2B(lp.calc_omega(this->getFloatParam(bc_cutoff) / 12.f),
-                      std::clamp(this->getFloatParam(bc_resonance), 0.001f, 0.999f));
-        lp.process_block(dataoutL, dataoutR);
+        if (filterSwitch == true)
+        {
+        filter.processBlock<VFXConfig::blockSize>(dataoutL, dataoutR, dataoutL, dataoutR);
+        }
     }
+    
+    
+    bool enableKeytrack(bool b)
+    {
+        auto res = (b != keytrackOn);
+        keytrackOn = b;
+        return res;
+    }
+    bool getKeytrack() const { return keytrackOn; }
 
   protected:
     float time[2]{0.f, 0.f}, level[2]{0.f, 0.f};
-    typename core::VoiceEffectTemplateBase<VFXConfig>::BiquadFilterType lp;
+    bool keytrackOn{false};
+    float priorFreq = -1.f;
+    sst::filters::CytomicSVF filter;
 };
 } // namespace sst::voice_effects::distortion
 

@@ -95,9 +95,27 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
         switch (idx)
         {
         case fpCenterFrequency:
+            if (keytrackOn)
+            {
+                return pmd()
+                    .asFloat()
+                    .withRange(-48, 48)
+                    .withName("Offset")
+                    .withDefault(0)
+                    .withLinearScaleFormatting("semitones");
+            }
             return pmd().asAudibleFrequency().withName(std::string("Freq (L)")).withDefault(0);
 
         case fpCenterFrequencyR:
+            if (keytrackOn)
+            {
+                return pmd()
+                    .asFloat()
+                    .withRange(-48, 48)
+                    .withName("Offset")
+                    .withDefault(0)
+                    .withLinearScaleFormatting("semitones");
+            }
             return pmd().asAudibleFrequency().withName("Freq R").withDefault(0);
 
             break;
@@ -197,6 +215,10 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
         for (int i = 0; i < numFloatParams; i++)
         {
             param[i] = this->getFloatParam(i);
+            if (i < 2 && keytrackOn)
+            {
+                param[i] += pitch;
+            }
             diff = diff || (mLastParam[i] != param[i]);
         }
         for (int i = 0; i < numIntParams; ++i)
@@ -204,6 +226,9 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
             iparam[i] = this->getIntParam(i);
             idiff = idiff || (mLastIParam[i] != iparam[i]);
         }
+        
+        idiff |= (wasKeytrackOn != keytrackOn);
+        wasKeytrackOn = keytrackOn;
 
         if (diff || idiff)
         {
@@ -257,8 +282,16 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
                 apfs[i].template retainCoeffForBlock<VFXConfig::blockSize>();
         }
     }
+    bool enableKeytrack(bool b)
+    {
+        auto res = (b != keytrackOn);
+        keytrackOn = b;
+        return res;
+    }
+    bool getKeytrack() const { return keytrackOn; }
 
   protected:
+    bool keytrackOn{false}, wasKeytrackOn{false};
     float fbAmt[2]{0.f, 0.f};
     std::array<float, numFloatParams> mLastParam{};
     std::array<int, numIntParams> mLastIParam{};
