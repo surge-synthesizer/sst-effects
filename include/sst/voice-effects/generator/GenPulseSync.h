@@ -177,6 +177,7 @@ template <typename VFXConfig> struct GenPulseSync : core::VoiceEffectTemplateBas
         return res;
     }
     bool getKeytrack() const { return keytrackOn; }
+    bool getKeytrackDefault() const { return true; }
 
   protected:
     void convolute()

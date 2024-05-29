@@ -124,6 +124,7 @@ template <typename VFXConfig> struct GenSaw : core::VoiceEffectTemplateBase<VFXC
         return res;
     }
     bool getKeytrack() const { return keytrackOn; }
+    bool getKeytrackDefault() const { return true; }
 
   protected:
     bool keytrackOn{true};
