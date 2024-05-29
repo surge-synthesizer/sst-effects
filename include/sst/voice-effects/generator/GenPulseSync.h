@@ -169,6 +169,14 @@ template <typename VFXConfig> struct GenPulseSync : core::VoiceEffectTemplateBas
             }
         }
     }
+    
+    bool enableKeytrack(bool b)
+    {
+        auto res = (b != keytrackOn);
+        keytrackOn = b;
+        return res;
+    }
+    bool getKeytrack() const { return keytrackOn; }
 
   protected:
     void convolute()
@@ -226,14 +234,6 @@ template <typename VFXConfig> struct GenPulseSync : core::VoiceEffectTemplateBas
     static constexpr float kIntegratorHPF = 0.99999999f;
 
     float mOscBuffer alignas(16)[VFXConfig::blockSize];
-
-    bool enableKeytrack(bool b)
-    {
-        auto res = (b != keytrackOn);
-        keytrackOn = b;
-        return res;
-    }
-    bool getKeytrack() const { return keytrackOn; }
 
     bool keytrackOn{true};
     bool mFirstRun{true};
