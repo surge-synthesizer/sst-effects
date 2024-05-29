@@ -290,6 +290,7 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
         return res;
     }
     bool getKeytrack() const { return keytrackOn; }
+    bool getKeytrackDefault() const { return true; }
 
   protected:
     bool keytrackOn{true};
