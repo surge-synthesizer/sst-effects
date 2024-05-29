@@ -126,9 +126,10 @@ template <typename VFXConfig> struct GenSin : core::VoiceEffectTemplateBase<VFXC
         return res;
     }
     bool getKeytrack() const { return keytrackOn; }
+    bool getKeytrackDefault() const { return true; }
 
   protected:
-    bool keytrackOn{false};
+    bool keytrackOn{true};
     sst::basic_blocks::dsp::QuadratureOscillator<float> mQuadOsc;
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> mLevelLerp;
 };

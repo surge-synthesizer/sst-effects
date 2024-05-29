@@ -677,6 +677,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
         return res;
     }
     bool getKeytrack() const { return keytrackOn; }
+    bool getKeytrackDefault() const { return true; }
 
   protected:
     bool keytrackOn{true};
