@@ -30,6 +30,7 @@
 #include "sst/basic-blocks/dsp/MidSide.h"
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
 #include "sst/filters/BiquadFilter.h"
+#include "sst/filters/CytomicSVF.h"
 
 #include <type_traits>
 
@@ -114,6 +115,11 @@ template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig:
     static float sampleRateInv(VoiceEffectTemplateBase<VFXConfig> *that)
     {
         return that->getSampleRateInv();
+    }
+
+    float envelope_rate_linear_nowrap(float f)
+    {
+        return VFXConfig::blockSize * VFXConfig::getSampleRateInv(this) * std::pow(2, -f);
     }
 
     static_assert(std::is_same<decltype(VFXConfig::getSampleRate(

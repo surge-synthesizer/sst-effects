@@ -29,7 +29,6 @@
 
 #include <iostream>
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
-#include "sst/filters/CytomicSVF.h"
 
 namespace sst::voice_effects::modulation
 {
@@ -133,12 +132,6 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
     }
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
-
-    // This ain't in VFXConfig so put it here (the simpleLFO needs it):
-    float envelope_rate_linear_nowrap(float f)
-    {
-        return VFXConfig::blockSize * VFXConfig::getSampleRateInv(this) * std::pow(2, -f);
-    }
 
     // Ok, so let's introduce the simpleLFO with an alias.
     using lfo_t = sst::basic_blocks::modulators::SimpleLFO<Tremolo, VFXConfig::blockSize>;

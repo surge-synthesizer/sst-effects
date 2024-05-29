@@ -23,7 +23,6 @@
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "../VoiceEffectCore.h"
-#include "sst/filters/CytomicSVF.h"
 
 namespace sst::voice_effects::distortion
 {

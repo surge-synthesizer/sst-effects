@@ -30,7 +30,6 @@
 
 #include "sst/basic-blocks/mechanics/block-ops.h"
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
-#include "sst/filters/CytomicSVF.h"
 
 namespace sst::voice_effects::modulation
 {
@@ -134,11 +133,6 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
     }
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
-
-    float envelope_rate_linear_nowrap(float f)
-    {
-        return VFXConfig::blockSize * VFXConfig::getSampleRateInv(this) * std::pow(2, -f);
-    }
 
     using lfo_t = sst::basic_blocks::modulators::SimpleLFO<Phaser, VFXConfig::blockSize>;
     lfo_t actualLFO{this, 1};
