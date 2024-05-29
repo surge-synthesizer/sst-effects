@@ -63,15 +63,14 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
         fpRate,
         fpDepth,
     };
-    
+
     enum IntParams
     {
         ipShape,
         ipStereo,
     };
 
-    Chorus(const SincTable &st)
-        : sSincTable(st), core::VoiceEffectTemplateBase<VFXConfig>()
+    Chorus(const SincTable &st) : sSincTable(st), core::VoiceEffectTemplateBase<VFXConfig>()
     {
         std::fill(mLastParam.begin(), mLastParam.end(), -188888.f);
     }
@@ -123,7 +122,7 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
         }
         return pmd().withName("Error");
     }
-    
+
     basic_blocks::params::ParamMetaData intParamAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
@@ -222,14 +221,14 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
     }
 
     bool phaseSet = false;
-    
+
     template <typename T>
     void processImpl(const std::array<T *, 2> &lines, float *datainL, float *datainR,
                      float *dataoutL, float *dataoutR, float pitch)
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
-        
+
         bool stereo = this->getIntParam(ipStereo);
         auto lfoRate = this->getFloatParam(fpRate);
         auto lfoDepth = this->getFloatParam(fpDepth);
@@ -241,24 +240,22 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
         }
         shapeCheck();
         actualLFO.process_block(lfoRate, 0.f, lfoShape);
-        
+
         auto baseTime = this->getFloatParam(fpTime);
-        
+
         float lfoValueL = actualLFO.lastTarget * baseTime * lfoDepth;
         float lfoValueR = actualLFO.lastTarget * baseTime * lfoDepth * (stereo ? -1 : 1);
-        
+
         mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
         mech::copy_from_to<VFXConfig::blockSize>(datainR, dataoutR);
         float FIRipol = static_cast<float>(SincTable::FIRipol_N);
-        
-        lipolDelay[0].set_target(
-            std::max((std::clamp(baseTime + (lfoValueL), 0.f, maxMiliseconds) *
-                      this->getSampleRate() / 1000.f),
-                     FIRipol));
-        lipolDelay[1].set_target(
-            std::max((std::clamp(baseTime + (lfoValueR), 0.f, maxMiliseconds) *
-                      this->getSampleRate() / 1000.f),
-                     FIRipol));
+
+        lipolDelay[0].set_target(std::max((std::clamp(baseTime + (lfoValueL), 0.f, maxMiliseconds) *
+                                           this->getSampleRate() / 1000.f),
+                                          FIRipol));
+        lipolDelay[1].set_target(std::max((std::clamp(baseTime + (lfoValueR), 0.f, maxMiliseconds) *
+                                           this->getSampleRate() / 1000.f),
+                                          FIRipol));
 
         lipolFb.set_target(std::clamp(this->getFloatParam(fpFeedback), 0.f, 1.f));
 
@@ -268,7 +265,7 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
 
         float fb alignas(16)[VFXConfig::blockSize];
         lipolFb.store_block(fb);
-        
+
         for (int i = 0; i < VFXConfig::blockSize; ++i)
         {
             auto out0 = lines[0]->read(ld[0][i]);
@@ -317,7 +314,6 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
 
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> lipolFb, lipolCross,
         lipolDelay[2];
-
 };
 
 } // namespace sst::voice_effects::delay

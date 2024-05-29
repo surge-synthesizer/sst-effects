@@ -116,7 +116,7 @@ template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig:
     {
         return that->getSampleRateInv();
     }
-    
+
     float envelope_rate_linear_nowrap(float f)
     {
         return VFXConfig::blockSize * VFXConfig::getSampleRateInv(this) * std::pow(2, -f);

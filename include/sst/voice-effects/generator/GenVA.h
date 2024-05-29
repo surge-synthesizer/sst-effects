@@ -38,10 +38,10 @@ namespace sst::voice_effects::generator
 template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXConfig>
 {
     static constexpr const char *effectName{"VA Oscillator"};
-    
+
     static constexpr int numFloatParams{6};
     static constexpr int numIntParams{1};
-    
+
     using SincTable = sst::basic_blocks::tables::ShortcircuitSincTableProvider;
 
     const SincTable &sSincTable;
@@ -114,27 +114,23 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
         }
         return pmd().withName("Unknown " + std::to_string(idx)).asPercent();
     }
-    
+
     basic_blocks::params::ParamMetaData intParamAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
-        
+
         switch (idx)
         {
-            case ipWaveform:
-                return pmd()
+        case ipWaveform:
+            return pmd()
                 .asInt()
-                .withRange(0,2)
-                .withUnorderedMapFormatting({
-                    {0, "Sine"},
-                    {1, "Saw"},
-                    {2, "Pulse"}
-                })
+                .withRange(0, 2)
+                .withUnorderedMapFormatting({{0, "Sine"}, {1, "Saw"}, {2, "Pulse"}})
                 .withName("Waveform");
         }
         return pmd().withName("error");
     }
-    
+
     GenVA(const SincTable &st) : sSincTable(st), core::VoiceEffectTemplateBase<VFXConfig>()
     {
         mFirstRun = true;
@@ -152,21 +148,20 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
 
     void initVoiceEffect() {}
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
-    
+
     void processSine(float *datainL, float *dataoutL, float pitch)
     {
         if (keytrackOn)
         {
-            mQuadOsc.setRate(440.0 * 2 * M_PI *
-                             this->note_to_pitch_ignoring_tuning(
-                                 this->getFloatParam(fpOffset) + pitch) *
-                             this->getSampleRateInv());
+            mQuadOsc.setRate(
+                440.0 * 2 * M_PI *
+                this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpOffset) + pitch) *
+                this->getSampleRateInv());
         }
         else
         {
             mQuadOsc.setRate(440.0 * 2 * M_PI *
-                             this->note_to_pitch_ignoring_tuning(
-                                 this->getFloatParam(fpOffset)) *
+                             this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpOffset)) *
                              this->getSampleRateInv());
         }
         auto levT = std::clamp(this->getFloatParam(fpLevel), 0.f, 1.f);
@@ -179,22 +174,25 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
         }
         sLevelLerp.multiply_block(dataoutL);
     }
-    
+
     void processSaw(float *datainL, float *dataoutL, float pitch)
     {
         auto tune = this->getFloatParam(fpOffset);
         auto lp = this->getFloatParam(fpLowpass);
         auto hp = this->getFloatParam(fpHighpass);
-        
-        auto baseFreq = 440.0 * this->note_to_pitch_ignoring_tuning((keytrackOn) ? tune + pitch : tune);
+
+        auto baseFreq =
+            440.0 * this->note_to_pitch_ignoring_tuning((keytrackOn) ? tune + pitch : tune);
         auto lpFreq = 440 * this->note_to_pitch_ignoring_tuning((keytrackOn) ? lp + pitch : lp);
         auto hpFreq = 440 * this->note_to_pitch_ignoring_tuning((keytrackOn) ? hp + pitch : hp);
 
         mSawOsc.setFrequency(baseFreq, this->getSampleRateInv());
-        
-        filters[0].template setCoeffForBlock<VFXConfig::blockSize>(sst::filters::CytomicSVF::LP, lpFreq, 1.f, VFXConfig::getSampleRateInv(this), 0.f);
-        filters[1].template setCoeffForBlock<VFXConfig::blockSize>(sst::filters::CytomicSVF::HP, hpFreq, 1.f, VFXConfig::getSampleRateInv(this), 0.f);
-        
+
+        filters[0].template setCoeffForBlock<VFXConfig::blockSize>(
+            sst::filters::CytomicSVF::LP, lpFreq, 1.f, VFXConfig::getSampleRateInv(this), 0.f);
+        filters[1].template setCoeffForBlock<VFXConfig::blockSize>(
+            sst::filters::CytomicSVF::HP, hpFreq, 1.f, VFXConfig::getSampleRateInv(this), 0.f);
+
         auto levT = std::clamp(this->getFloatParam(fpLevel), 0.f, 1.f);
         levT = levT * levT * levT;
         sLevelLerp.set_target(levT);
@@ -207,7 +205,7 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
         }
         sLevelLerp.multiply_block(dataoutL);
     }
-    
+
     void processPulse(float *datainL, float *dataoutL, float pitch)
     {
         mTuneLerp.newValue(this->getFloatParam(fpOffset));
@@ -259,7 +257,7 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
             }
         }
     }
-    
+
     void processMonoToMono(float *datainL, float *dataoutL, float pitch)
     {
         int wave = this->getIntParam(ipWaveform);
@@ -276,7 +274,7 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
             processPulse(datainL, dataoutL, pitch);
         }
     }
-    
+
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
     {
@@ -299,25 +297,25 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
     sst::basic_blocks::dsp::DPWSawOscillator<
         sst::basic_blocks::dsp::BlockInterpSmoothingStrategy<VFXConfig::blockSize>>
         mSawOsc;
-    
+
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> sLevelLerp;
-    
+
     static constexpr int64_t kLarge = 0x10000000000;
     static constexpr float kIntegratorHPF = 0.99999999f;
 
     float mOscBuffer alignas(16)[VFXConfig::blockSize];
-    
+
     bool mFirstRun{true};
     int64_t mOscState{0}, mSyncState{0};
     bool mPolarity{false};
     float mOscOut{0};
     size_t mBufPos{0};
-    
+
     sst::basic_blocks::dsp::lipol<float, VFXConfig::blockSize, true> mPitchLerp, mTuneLerp,
-    mWidthLerp, mSyncLerp, levelLerp;
-    
+        mWidthLerp, mSyncLerp, levelLerp;
+
     std::array<sst::filters::CytomicSVF, 2> filters;
-    
+
     void convolute()
     {
         auto samplerate = this->getSampleRate();
@@ -355,10 +353,8 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
 
         // add time until next statechange
         double width = (0.5 - 0.499f * std::clamp(mWidthLerp.v, 0.01f, 0.99f));
-        double t = std::max(
-            0.5, samplerate /
-                     (440.0 * this->note_to_pitch_ignoring_tuning(
-                                  freq + this->getFloatParam(fpSync))));
+        double t = std::max(0.5, samplerate / (440.0 * this->note_to_pitch_ignoring_tuning(
+                                                           freq + this->getFloatParam(fpSync))));
         if (mPolarity)
         {
             width = 1 - width;

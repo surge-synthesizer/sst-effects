@@ -169,7 +169,7 @@ template <typename VFXConfig> struct GenPulseSync : core::VoiceEffectTemplateBas
             }
         }
     }
-    
+
     bool enableKeytrack(bool b)
     {
         auto res = (b != keytrackOn);
