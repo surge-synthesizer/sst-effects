@@ -47,7 +47,7 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
     }
 
     ~CytomicSVF() {}
-    
+
     enum floatParams
     {
         fpFreqL,
@@ -55,13 +55,13 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
         fpResonance,
         fpShelf,
     };
-    
+
     enum intParams
     {
         ipMode,
         ipStereo
     };
-    
+
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
@@ -79,7 +79,7 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
                     .withLinearScaleFormatting("semitones");
             }
             return pmd().asAudibleFrequency().withName("Cutoff (L)").withDefault(0);
-                
+
         case 1:
             if (keytrackOn)
             {
@@ -112,33 +112,32 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
         using md = sst::filters::CytomicSVF::Mode;
         switch (idx)
         {
-            case ipMode:
-        return pmd()
-            .asInt()
-            .withRange(0, 8)
-            .withName("Mode")
-            .withUnorderedMapFormatting({
-                {md::LP, "Low Pass"},
-                {md::HP, "High Pass"},
-                {md::BP, "Band Pass"},
-                {md::NOTCH, "Notch"},
-                {md::PEAK, "Peak"},
-                {md::ALL, "All Pass"},
-                {md::BELL, "Bell"},
-                {md::LOW_SHELF, "Low Shelf"},
-                {md::HIGH_SHELF, "High Shelf"},
-            })
-            .withDefault(md::LP);
+        case ipMode:
+            return pmd()
+                .asInt()
+                .withRange(0, 8)
+                .withName("Mode")
+                .withUnorderedMapFormatting({
+                    {md::LP, "Low Pass"},
+                    {md::HP, "High Pass"},
+                    {md::BP, "Band Pass"},
+                    {md::NOTCH, "Notch"},
+                    {md::PEAK, "Peak"},
+                    {md::ALL, "All Pass"},
+                    {md::BELL, "Bell"},
+                    {md::LOW_SHELF, "Low Shelf"},
+                    {md::HIGH_SHELF, "High Shelf"},
+                })
+                .withDefault(md::LP);
         case ipStereo:
             return pmd().asBool().withDefault(false).withName("Stereo");
         }
         return pmd().withName("error");
-        
     }
 
     void initVoiceEffect() {}
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
-    
+
     void calc_coeffs(float pitch = 0.f)
     {
         std::array<float, numFloatParams> param;
@@ -169,21 +168,21 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
             }
             auto mode = (sst::filters::CytomicSVF::Mode)(iparam[0]);
 
-
             auto res = std::clamp(param[2], 0.f, 1.f);
             auto shelf = this->dbToLinear(param[3]);
-            
+
             if (this->getIntParam(ipStereo))
             {
                 auto freqL = 440.0 * this->note_to_pitch_ignoring_tuning(param[0]);
                 auto freqR = 440.0 * this->note_to_pitch_ignoring_tuning(param[1]);
-                cySvf.setCoeffForBlock<VFXConfig::blockSize>(mode, freqL, freqR, res, res, this->getSampleRateInv(), shelf, shelf);
+                cySvf.setCoeffForBlock<VFXConfig::blockSize>(
+                    mode, freqL, freqR, res, res, this->getSampleRateInv(), shelf, shelf);
             }
             else
             {
                 auto freq = 440.0 * this->note_to_pitch_ignoring_tuning(param[0]);
-                cySvf.setCoeffForBlock<VFXConfig::blockSize>(mode, freq, res, this->getSampleRateInv(),
-                                                             shelf);
+                cySvf.setCoeffForBlock<VFXConfig::blockSize>(mode, freq, res,
+                                                             this->getSampleRateInv(), shelf);
             }
 
             mLastParam = param;
@@ -207,14 +206,13 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
         calc_coeffs(pitch);
         cySvf.processBlock<VFXConfig::blockSize>(datainL, dataoutL);
     }
-    
-    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR,
-                             float pitch)
+
+    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
     {
         calc_coeffs(pitch);
         cySvf.processBlock<VFXConfig::blockSize>(datainL, datainL, dataoutL, dataoutR);
     }
-    
+
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
 
     bool enableKeytrack(bool b)

@@ -61,12 +61,12 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
         fpLowCut,
         fpHighCut
     };
-    
+
     enum IntParams
     {
         ipStereo
     };
-    
+
     ShortDelay(const SincTable &st)
         : sSincTable(st), core::VoiceEffectTemplateBase<VFXConfig>(), lp(this), hp(this)
     {
@@ -120,7 +120,7 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
         }
         return pmd().withName("Error");
     }
-    
+
     basic_blocks::params::ParamMetaData intParamAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
@@ -165,36 +165,32 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
 
     template <typename T>
     void stereoImpl(const std::array<T *, 2> &lines, float *datainL, float *datainR,
-                     float *dataoutL, float *dataoutR)
+                    float *dataoutL, float *dataoutR)
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
         auto stereoSwitch = this->getIntParam(ipStereo);
-        
+
         mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
         mech::copy_from_to<VFXConfig::blockSize>(datainR, dataoutR);
         float FIRipol = static_cast<float>(SincTable::FIRipol_N);
-        
+
         auto timeL = this->getFloatParam(fpTimeL);
         auto timeR = (stereoSwitch) ? this->getFloatParam(fpTimeR) : timeL;
-        
-        lipolDelay[0].set_target(
-            std::max((std::clamp(timeL, 0.f, maxMiliseconds) *
-                      this->getSampleRate() / 1000.f),
-                     FIRipol));
-        lipolDelay[1].set_target(
-            std::max((std::clamp(timeR, 0.f, maxMiliseconds) *
-                      this->getSampleRate() / 1000.f),
-                     FIRipol));
+
+        lipolDelay[0].set_target(std::max(
+            (std::clamp(timeL, 0.f, maxMiliseconds) * this->getSampleRate() / 1000.f), FIRipol));
+        lipolDelay[1].set_target(std::max(
+            (std::clamp(timeR, 0.f, maxMiliseconds) * this->getSampleRate() / 1000.f), FIRipol));
 
         float ld alignas(16)[2][VFXConfig::blockSize];
         lipolDelay[0].store_block(ld[0]);
         lipolDelay[1].store_block(ld[1]);
-        
+
         lipolFb.set_target(std::clamp(this->getFloatParam(fpFeedback), 0.f, 1.f));
         float feedback alignas(16)[VFXConfig::blockSize];
         lipolFb.store_block(feedback);
-        
+
         lipolCross.set_target(std::clamp(this->getFloatParam(fpCrossFeed), 0.f, 1.f));
         float crossfeed alignas(16)[VFXConfig::blockSize];
         lipolCross.store_block(crossfeed);
@@ -215,11 +211,11 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
 
             auto fbc0 = feedback[i] * dataoutL[i];
             auto fbc1 = feedback[i] * dataoutR[i];
-            
+
             if (stereoSwitch)
             {
-            fbc0 += crossfeed[i] * dataoutR[i];
-            fbc1 += crossfeed[i] * dataoutL[i];
+                fbc0 += crossfeed[i] * dataoutR[i];
+                fbc1 += crossfeed[i] * dataoutL[i];
             }
 
             // soft clip for now
@@ -233,9 +229,8 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
             lines[1]->write(datainR[i] + fbc1);
         }
     }
-    
-    template <typename T>
-    void monoImpl(T *line, float *datainL, float *dataoutL)
+
+    template <typename T> void monoImpl(T *line, float *datainL, float *dataoutL)
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
@@ -284,33 +279,33 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
         if (isShort)
         {
             stereoImpl(std::array{lineSupport[0].template getLinePointer<shortLineSize>(),
-                                   lineSupport[1].template getLinePointer<shortLineSize>()},
-                        datainL, datainR, dataoutL, dataoutR);
+                                  lineSupport[1].template getLinePointer<shortLineSize>()},
+                       datainL, datainR, dataoutL, dataoutR);
         }
         else
         {
             stereoImpl(std::array{lineSupport[0].template getLinePointer<longLineSize>(),
-                                   lineSupport[1].template getLinePointer<longLineSize>()},
-                        datainL, datainR, dataoutL, dataoutR);
+                                  lineSupport[1].template getLinePointer<longLineSize>()},
+                       datainL, datainR, dataoutL, dataoutR);
         }
     }
-    
+
     void processMonoToStereo(float *datain, float *dataoutL, float *dataoutR, float pitch)
     {
         if (isShort)
         {
             stereoImpl(std::array{lineSupport[0].template getLinePointer<shortLineSize>(),
-                                   lineSupport[1].template getLinePointer<shortLineSize>()},
-                        datain, datain, dataoutL, dataoutR);
+                                  lineSupport[1].template getLinePointer<shortLineSize>()},
+                       datain, datain, dataoutL, dataoutR);
         }
         else
         {
             stereoImpl(std::array{lineSupport[0].template getLinePointer<longLineSize>(),
-                                   lineSupport[1].template getLinePointer<longLineSize>()},
-                        datain, datain, dataoutL, dataoutR);
+                                  lineSupport[1].template getLinePointer<longLineSize>()},
+                       datain, datain, dataoutL, dataoutR);
         }
     }
-    
+
     void processMonoToMono(float *datain, float *dataout, float pitch)
     {
         if (isShort)
@@ -322,9 +317,9 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
             monoImpl(lineSupport[0].template getLinePointer<shortLineSize>(), datain, dataout);
         }
     }
-    
+
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
-    
+
   protected:
     std::array<details::DelayLineSupport, 2> lineSupport;
     bool isShort{true};
