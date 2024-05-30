@@ -27,9 +27,7 @@
 #include "sst/voice-effects/modulation/RingMod.h"
 #include "sst/voice-effects/waveshaper/WaveShaper.h"
 #include "sst/voice-effects/modulation/FreqShiftMod.h"
-#include "sst/voice-effects/generator/GenPulseSync.h"
-#include "sst/voice-effects/generator/GenSin.h"
-#include "sst/voice-effects/generator/GenSaw.h"
+#include "sst/voice-effects/generator/GenVA.h"
 #include "sst/voice-effects/modulation/PhaseMod.h"
 #include "sst/voice-effects/generator/GenCorrelatedNoise.h"
 #include "sst/voice-effects/eq/EqNBandParametric.h"
@@ -96,8 +94,6 @@ TEST_CASE("Can Create Voice FX")
     {
         VTester<sst::voice_effects::modulation::FreqShiftMod<VTestConfig>>::TestVFX();
     }
-    SECTION("GenSin") { VTester<sst::voice_effects::generator::GenSin<VTestConfig>>::TestVFX(); }
-    SECTION("GenSaw") { VTester<sst::voice_effects::generator::GenSaw<VTestConfig>>::TestVFX(); }
     SECTION("GenPhaseMod")
     {
         VTester<sst::voice_effects::modulation::PhaseMod<VTestConfig>>::TestVFX();
@@ -106,10 +102,10 @@ TEST_CASE("Can Create Voice FX")
     {
         VTester<sst::voice_effects::generator::GenCorrelatedNoise<VTestConfig>>::TestVFX();
     }
-    SECTION("GenPulseSync")
+    SECTION("GenVA")
     {
         sst::basic_blocks::tables::ShortcircuitSincTableProvider s;
-        VTester<sst::voice_effects::generator::GenPulseSync<VTestConfig>>::TestVFX(s);
+        VTester<sst::voice_effects::generator::GenVA<VTestConfig>>::TestVFX(s);
     }
     SECTION("ParmEQ")
     {
