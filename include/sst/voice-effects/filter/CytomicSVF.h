@@ -78,7 +78,7 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
                     .withDefault(0)
                     .withLinearScaleFormatting("semitones");
             }
-            return pmd().asAudibleFrequency().withName("Cutoff (L)").withDefault(0);
+            return pmd().asAudibleFrequency().withName("Cutoff L").withDefault(0);
 
         case 1:
             if (keytrackOn)
@@ -93,11 +93,7 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
             return pmd().asAudibleFrequency().withName("Cutoff R").withDefault(0);
 
         case 2:
-            return pmd()
-                .asPercent()
-                .withDefault(0.7f)
-                .withName("Resonance")
-                .withLinearScaleFormatting("");
+            return pmd().asPercent().withName("Resonance").withLinearScaleFormatting("");
         case 3:
             return pmd().asDecibelNarrow().withRange(-12, 12).withName("Gain").withDefault(0);
         }
