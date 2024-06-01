@@ -88,7 +88,7 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
             }
             return pmd().asAudibleFrequency().withName("Cutoff");
         case fpResonance:
-            return pmd().asPercent().withName("resonance").withDefault(0.707f);
+            return pmd().asPercent().withName("resonance").withDefault(0.5f);
         default:
             break;
         }

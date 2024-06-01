@@ -126,7 +126,7 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
                 .withName("Spacing")
                 .withLinearScaleFormatting("semitones");
         case fpResonance:
-            return pmd().asPercent().withDefault(0.707).withName("Resonance");
+            return pmd().asPercent().withDefault(0.5f).withName("Resonance");
         case fpFeedback:
             return pmd().asPercent().withDefault(0.f).withName("Feedback");
 
