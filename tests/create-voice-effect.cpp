@@ -163,4 +163,8 @@ TEST_CASE("Can Create Voice FX")
     {
         VTester<sst::voice_effects::modulation::Phaser<VTestConfig>>::TestVFX();
     }
+    SECTION("FM Filter")
+    {
+        VTester<sst::voice_effects::modulation::FMFilter<VTestConfig>>::TestVFX();
+    }
 }
