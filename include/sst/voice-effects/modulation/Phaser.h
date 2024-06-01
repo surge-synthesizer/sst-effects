@@ -269,12 +269,12 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
     {
         auto resonance = this->getFloatParam(fpResonance);
         auto baseFreq = this->getFloatParam(fpCenterFreq);
-        
+
         if (keytrackOn)
         {
             baseFreq += pitch;
         }
-        
+
         auto spread{0.f};
         auto mode = sst::filters::CytomicSVF::Mode::ALL;
         auto stereo = this->getIntParam(ipStereo);
@@ -307,7 +307,7 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
                 mode, freqL, freqR, res, res, this->getSampleRateInv(), 1.f, 1.f);
         }
     }
-    
+
     bool enableKeytrack(bool b)
     {
         auto res = (b != keytrackOn);
