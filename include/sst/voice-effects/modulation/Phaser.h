@@ -244,7 +244,7 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
         sst::basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(dataIn, dataOut);
 
         this->lipolFb.set_target(
-            std::sqrt(std::clamp(this->getFloatParam(this->fpFeedback), 0.f, 1.f)));
+            std::sqrt(std::clamp(this->getFloatParam(this->fpFeedback), 0.f, 0.97f)));
         float fb alignas(16)[VFXConfig::blockSize];
         this->lipolFb.store_block(fb);
 
@@ -269,6 +269,12 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
     {
         auto resonance = this->getFloatParam(fpResonance);
         auto baseFreq = this->getFloatParam(fpCenterFreq);
+        
+        if (keytrackOn)
+        {
+            baseFreq += pitch;
+        }
+        
         auto spread{0.f};
         auto mode = sst::filters::CytomicSVF::Mode::ALL;
         auto stereo = this->getIntParam(ipStereo);
@@ -301,8 +307,17 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
                 mode, freqL, freqR, res, res, this->getSampleRateInv(), 1.f, 1.f);
         }
     }
+    
+    bool enableKeytrack(bool b)
+    {
+        auto res = (b != keytrackOn);
+        keytrackOn = b;
+        return res;
+    }
+    bool getKeytrack() const { return keytrackOn; }
 
   protected:
+    bool keytrackOn{false};
     std::array<float, numFloatParams> mLastParam{};
     std::array<int, numIntParams> mLastIParam{};
     std::array<sst::filters::CytomicSVF, 4> filters;
