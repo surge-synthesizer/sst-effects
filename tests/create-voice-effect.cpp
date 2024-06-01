@@ -42,6 +42,7 @@
 #include "sst/voice-effects/filter/StaticPhaser.h"
 #include "sst/voice-effects/modulation/Tremolo.h"
 #include "sst/voice-effects/modulation/Phaser.h"
+#include "sst/voice-effects/modulation/FMFilter.h"
 struct VTestConfig
 {
     struct BaseClass
