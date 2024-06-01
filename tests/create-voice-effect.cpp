@@ -42,6 +42,7 @@
 #include "sst/voice-effects/filter/StaticPhaser.h"
 #include "sst/voice-effects/modulation/Tremolo.h"
 #include "sst/voice-effects/modulation/Phaser.h"
+#include "sst/voice-effects/modulation/FMFilter.h"
 struct VTestConfig
 {
     struct BaseClass
@@ -162,5 +163,9 @@ TEST_CASE("Can Create Voice FX")
     SECTION("Phaser")
     {
         VTester<sst::voice_effects::modulation::Phaser<VTestConfig>>::TestVFX();
+    }
+    SECTION("FM Filter")
+    {
+        VTester<sst::voice_effects::modulation::FMFilter<VTestConfig>>::TestVFX();
     }
 }

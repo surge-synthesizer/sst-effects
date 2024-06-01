@@ -66,8 +66,8 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
             return pmd().asAudibleFrequency().withName("Frequency L");
         case fpFreqR:
             return pmd().asAudibleFrequency().withName("Frequency R");
-        case fpDepthL:
-            return pmd().asFloat().withRange(0.f, 1.f).withDefault(0.f).withName("FM Depth L");
+        case fpDepth:
+            return pmd().asFloat().withRange(0.f, 1.f).withDefault(0.f).withName("FM Depth");
         case fpRes:
             return pmd().asFloat().withRange(0.f, 1.f).withDefault(0.7f).withName("Resonance");
         }
@@ -129,8 +129,7 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
         auto res = std::clamp(this->getFloatParam(fpRes), 0.f, 1.f);
         bool stereo = this->getIntParam(ipStereo);
 
-        auto depthL = this->getFloatParam(fpDepthL);
-        auto depthR = this->getFloatParam(/*(stereo) ? fpDepthR : */ fpDepthL);
+        auto depth = this->getFloatParam(fpDepth);
 
         auto freqL = this->getFloatParam(fpFreqL);
         auto freqR = this->getFloatParam((stereo) ? fpFreqR : fpFreqL);
@@ -152,8 +151,8 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
 
             mSinOsc.step();
 
-            float modL = mSinOsc.v * freqL * 3 * depthL;
-            float modR = mSinOsc.v * freqR * 3 * depthR;
+            float modL = mSinOsc.v * freqL * 3 * depth;
+            float modR = mSinOsc.v * freqR * 3 * depth;
             auto modFreqL = freqL + modL;
             auto modFreqR = freqR + modR;
 
@@ -170,7 +169,7 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
     {
         auto mode = (sst::filters::CytomicSVF::Mode)(this->getIntParam(ipMode));
         auto res = std::clamp(this->getFloatParam(fpRes), 0.f, 1.f);
-        auto depth = std::clamp(this->getFloatParam(fpDepthL), 0.f, 1.f);
+        auto depth = std::clamp(this->getFloatParam(fpDepth), 0.f, 1.f);
 
         auto freq = this->getFloatParam(fpFreqL);
         if (keytrackOn)
