@@ -65,6 +65,7 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
+        bool stereo = this->getIntParam(ipStereo) > 0;
 
         switch (idx)
         {
@@ -74,11 +75,14 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
                 return pmd()
                     .asFloat()
                     .withRange(-48, 48)
-                    .withName("Offset")
+                    .withName(std::string("Offset") + (stereo ? " L" : ""))
                     .withDefault(0)
                     .withLinearScaleFormatting("semitones");
             }
-            return pmd().asAudibleFrequency().withName("Cutoff L").withDefault(0);
+            return pmd()
+                .asAudibleFrequency()
+                .withName(std::string("Cutoff") + (stereo ? " L" : ""))
+                .withDefault(0);
 
         case 1:
             if (keytrackOn)
@@ -86,14 +90,21 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
                 return pmd()
                     .asFloat()
                     .withRange(-48, 48)
-                    .withName("Offset")
+                    .withName(!stereo ? std::string() : "Offset R")
                     .withDefault(0)
                     .withLinearScaleFormatting("semitones");
             }
-            return pmd().asAudibleFrequency().withName("Cutoff R").withDefault(0);
+            return pmd()
+                .asAudibleFrequency()
+                .withName(!stereo ? std::string() : std::string("Cutoff R"))
+                .withDefault(0);
 
         case 2:
-            return pmd().asPercent().withName("Resonance").withLinearScaleFormatting("");
+            return pmd()
+                .asPercent()
+                .withName("Resonance")
+                .withLinearScaleFormatting("")
+                .withDefault(0.707);
         case 3:
             return pmd().asDecibelNarrow().withRange(-12, 12).withName("Gain").withDefault(0);
         }
@@ -210,6 +221,7 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
     }
 
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
+    bool checkParameterConsistency() const { return true; }
 
     bool enableKeytrack(bool b)
     {
