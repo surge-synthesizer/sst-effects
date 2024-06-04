@@ -112,24 +112,33 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
                 .withDecimalPlaces(2)
                 .withName("Level Two");
         case fpOffsetOne:
+            if (keytrackOn)
+            {
             return pmd()
                 .asFloat()
                 .withRange(-48, 48)
                 .withDefault(0)
                 .withLinearScaleFormatting("semitones")
                 .withName("Offset One");
+            }
+            return pmd().asAudibleFrequency().withName("Frequency One");
         case fpOffsetTwo:
+            if (keytrackOn)
+            {
             return pmd()
                 .asFloat()
                 .withRange(-48, 48)
                 .withDefault(0)
                 .withLinearScaleFormatting("semitones")
                 .withName("Offset Two");
+            }
+            return pmd().asAudibleFrequency().withName("Frequency Two");
         case fpPanOne:
             return pmd()
                 .asPercentBipolar()
                 .withCustomMinDisplay("L")
                 .withCustomMaxDisplay("R")
+                .withCustomDefaultDisplay("C")
                 .withDefault(-1.f)
                 .withName("Pan One");
         case fpPanTwo:
@@ -137,6 +146,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
                 .asPercentBipolar()
                 .withCustomMinDisplay("L")
                 .withCustomMaxDisplay("R")
+                .withCustomDefaultDisplay("C")
                 .withDefault(1.f)
                 .withName("Pan Two");
         case fpDecay:

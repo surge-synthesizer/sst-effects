@@ -99,11 +99,11 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
                 return pmd()
                     .asFloat()
                     .withRange(-48, 48)
-                    .withName("Offset")
+                    .withName("Offset L")
                     .withDefault(0)
                     .withLinearScaleFormatting("semitones");
             }
-            return pmd().asAudibleFrequency().withName(std::string("Freq (L)")).withDefault(0);
+            return pmd().asAudibleFrequency().withName("Frequency L").withDefault(0);
 
         case fpCenterFrequencyR:
             if (keytrackOn)
@@ -111,11 +111,11 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
                 return pmd()
                     .asFloat()
                     .withRange(-48, 48)
-                    .withName("Offset")
+                    .withName("Offset R")
                     .withDefault(0)
                     .withLinearScaleFormatting("semitones");
             }
-            return pmd().asAudibleFrequency().withName("Freq R").withDefault(0);
+            return pmd().asAudibleFrequency().withName("Frequency R").withDefault(0);
 
             break;
         case fpSpacing:
