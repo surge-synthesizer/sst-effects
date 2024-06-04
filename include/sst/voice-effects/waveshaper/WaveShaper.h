@@ -42,12 +42,16 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
         drive,
         bias,
         postgain,
+        highpass,
+        lowpass,
         num_params
     };
 
     enum struct WaveShaperIntParams : uint32_t
     {
         type,
+        hpOn,
+        lpOn,
         num_params
     };
 
@@ -70,6 +74,28 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
             return pmd().asPercentBipolar().withName("Bias");
         case WaveShaperFloatParams::postgain:
             return pmd().asLinearDecibel().withName("Gain");
+        case WaveShaperFloatParams::highpass:
+            if (keytrackOn)
+            {
+                return pmd()
+                    .asFloat()
+                    .withRange(-48, 48)
+                    .withName("Hp Offset")
+                    .withDefault(-48)
+                    .withLinearScaleFormatting("semitones");
+            }
+            return pmd().asAudibleFrequency().withDefault(-60).withName("Hp Frequency");
+        case WaveShaperFloatParams::lowpass:
+            if (keytrackOn)
+            {
+                return pmd()
+                    .asFloat()
+                    .withRange(-48, 48)
+                    .withName("Lp Offset")
+                    .withDefault(48)
+                    .withLinearScaleFormatting("semitones");
+            }
+            return pmd().asAudibleFrequency().withDefault(70).withName("Lp Frequency");
         default:
             break;
         }
@@ -98,6 +124,10 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
                 .withUnorderedMapFormatting(names)
                 .withDefault(1);
         }
+        case WaveShaperIntParams::hpOn:
+            return pmd().asBool().withDefault(false).withName("Highpass");
+        case WaveShaperIntParams::lpOn:
+            return pmd().asBool().withDefault(false).withName("Lowpass");
         default:
             break;
         }
@@ -149,9 +179,47 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
         }
     }
 
+    void setCoeffsHighpass(float pitch)
+    {
+        auto hpParam = this->getFloatParam((int)WaveShaperFloatParams::highpass);
+        auto hpFreq =
+            440.f * this->note_to_pitch_ignoring_tuning((keytrackOn) ? pitch + hpParam : hpParam);
+
+        if (hpFreq != hpFreqPrior)
+        {
+            filters[0].template setCoeffForBlock<VFXConfig::blockSize>(
+                sst::filters::CytomicSVF::HP, hpFreq, 0.5f, VFXConfig::getSampleRateInv(this), 0.f);
+            hpFreqPrior = hpFreq;
+        }
+        else
+        {
+            filters[0].template retainCoeffForBlock<VFXConfig::blockSize>();
+        }
+    }
+
+    void setCoeffsLowpass(float pitch)
+    {
+        auto lpParam = this->getFloatParam((int)WaveShaperFloatParams::lowpass);
+        auto lpFreq =
+            440.f * this->note_to_pitch_ignoring_tuning((keytrackOn) ? pitch + lpParam : lpParam);
+
+        if (lpFreq != lpFreqPrior)
+        {
+            filters[1].template setCoeffForBlock<VFXConfig::blockSize>(
+                sst::filters::CytomicSVF::LP, lpFreq, 0.5f, VFXConfig::getSampleRateInv(this), 0.f);
+            lpFreqPrior = lpFreq;
+        }
+        else
+        {
+            filters[1].template retainCoeffForBlock<VFXConfig::blockSize>();
+        }
+    }
+
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
     {
+        bool hpActive = this->getIntParam((int)WaveShaperIntParams::hpOn);
+        bool lpActive = this->getIntParam((int)WaveShaperIntParams::lpOn);
         namespace mech = sst::basic_blocks::mechanics;
 
         checkType();
@@ -163,11 +231,32 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
             return;
         }
 
-        processInternal<true>(datainL, datainR, dataoutL, dataoutR);
+        if (hpActive)
+        {
+            setCoeffsHighpass(pitch);
+            filters[0].template processBlock<VFXConfig::blockSize>(datainL, datainR, dataoutL,
+                                                                   dataoutR);
+        }
+        else
+        {
+            mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
+            mech::copy_from_to<VFXConfig::blockSize>(datainR, dataoutR);
+        }
+
+        processInternal<true>(dataoutL, dataoutR, dataoutL, dataoutR);
+
+        if (lpActive)
+        {
+            setCoeffsLowpass(pitch);
+            filters[1].template processBlock<VFXConfig::blockSize>(dataoutL, dataoutR, dataoutL,
+                                                                   dataoutR);
+        }
     }
 
     void processMonoToMono(float *datainL, float *dataoutL, float pitch)
     {
+        bool hpActive = this->getIntParam((int)WaveShaperIntParams::hpOn);
+        bool lpActive = this->getIntParam((int)WaveShaperIntParams::lpOn);
         namespace mech = sst::basic_blocks::mechanics;
 
         checkType();
@@ -178,7 +267,23 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
             return;
         }
 
-        processInternal<false>(datainL, nullptr, dataoutL, nullptr);
+        if (hpActive)
+        {
+            setCoeffsHighpass(pitch);
+            filters[0].template processBlock<VFXConfig::blockSize>(dataoutL, dataoutL);
+        }
+        else
+        {
+            mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
+        }
+
+        processInternal<false>(dataoutL, nullptr, dataoutL, nullptr);
+
+        if (lpActive)
+        {
+            setCoeffsLowpass(pitch);
+            filters[1].template processBlock<VFXConfig::blockSize>(dataoutL, dataoutL);
+        }
     }
 
     void checkType()
@@ -199,13 +304,25 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
         }
     }
 
+    bool enableKeytrack(bool b)
+    {
+        auto res = (b != keytrackOn);
+        keytrackOn = b;
+        return res;
+    }
+    bool getKeytrack() const { return keytrackOn; }
+
   protected:
+    bool keytrackOn{false};
+    float hpFreqPrior = -9999.f;
+    float lpFreqPrior = -9999.f;
     int mTypeParamVal{-1};
     sst::waveshapers::WaveshaperType mWSType;
     sst::waveshapers::QuadWaveshaperState mWss;
     sst::waveshapers::QuadWaveshaperPtr mWSOp{nullptr};
     sst::basic_blocks::dsp::lipol<float, VFXConfig::blockSize, true> mDriveLerp, mBiasLerp,
         mGainLerp;
+    std::array<sst::filters::CytomicSVF, 2> filters;
 };
 } // namespace sst::voice_effects::waveshaper
 

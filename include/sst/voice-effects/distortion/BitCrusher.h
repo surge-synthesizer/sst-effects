@@ -63,7 +63,7 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
                 return pmd()
                     .asFloat()
                     .withRange(0, 96)
-                    .withName("Samplerate Ratio")
+                    .withName("Samplerate Offset")
                     .withDefault(96)
                     .withLinearScaleFormatting("semitones");
             }

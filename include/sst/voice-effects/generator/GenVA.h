@@ -72,7 +72,7 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
             {
                 return pmd()
                     .asFloat()
-                    .withRange(-96, 96)
+                    .withRange(-48, 48)
                     .withDefault(0)
                     .withLinearScaleFormatting("semitones")
                     .withName("Tune");
