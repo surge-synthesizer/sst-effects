@@ -58,10 +58,7 @@ template <typename VFXConfig> struct VolumeAndPan : core::VoiceEffectTemplateBas
         switch (idx)
         {
         case fpVolume:
-            return pmd()
-                .asLinearDecibel(-60.f, 24.f)
-                .withDefault(0.f)
-                .withName("Volume");
+            return pmd().asLinearDecibel(-60.f, 24.f).withDefault(0.f).withName("Volume");
         case fpPan:
             return pmd()
                 .asPercentBipolar()
@@ -74,16 +71,15 @@ template <typename VFXConfig> struct VolumeAndPan : core::VoiceEffectTemplateBas
         return pmd().asFloat().withName("Error");
     }
 
-//    basic_blocks::params::ParamMetaData intParamAt(int idx) const
-//    {
-//        using pmd = basic_blocks::params::ParamMetaData;
-//        return pmd().asInt().withName("Error");
-//    }
+    //    basic_blocks::params::ParamMetaData intParamAt(int idx) const
+    //    {
+    //        using pmd = basic_blocks::params::ParamMetaData;
+    //        return pmd().asInt().withName("Error");
+    //    }
 
     void initVoiceEffect() {}
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
-
 
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
@@ -92,14 +88,14 @@ template <typename VFXConfig> struct VolumeAndPan : core::VoiceEffectTemplateBas
         auto pan = (this->getFloatParam(fpPan) + 1) / 2;
 
         basic_blocks::dsp::pan_laws::panmatrix_t pmat{1, 1, 0, 0};
-        
+
         basic_blocks::dsp::pan_laws::stereoEqualPower(pan, pmat);
 
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
             auto inL = datainL[i];
             auto inR = datainR[i];
-            
+
             dataoutL[i] = inL * pmat[0] * outputVolume;
             dataoutR[i] = inR * pmat[1] * outputVolume;
         }
@@ -109,7 +105,6 @@ template <typename VFXConfig> struct VolumeAndPan : core::VoiceEffectTemplateBas
     {
         processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
     }
-
 };
 } // namespace sst::voice_effects::utilities
 #endif // SCXT_VOLUMEANDPAN_H

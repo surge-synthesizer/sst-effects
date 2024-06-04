@@ -63,26 +63,26 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
         switch (idx)
         {
         case fpFreqL:
-                if (keytrackOn)
-                {
-                    return pmd()
-                        .asFloat()
-                        .withRange(-48, 48)
-                        .withName("Offset L")
-                        .withDefault(0)
-                        .withLinearScaleFormatting("semitones");
-                }
+            if (keytrackOn)
+            {
+                return pmd()
+                    .asFloat()
+                    .withRange(-48, 48)
+                    .withName("Offset L")
+                    .withDefault(0)
+                    .withLinearScaleFormatting("semitones");
+            }
             return pmd().asAudibleFrequency().withName("Frequency L");
         case fpFreqR:
-                if (keytrackOn)
-                {
-                    return pmd()
-                        .asFloat()
-                        .withRange(-48, 48)
-                        .withName("Offset R")
-                        .withDefault(0)
-                        .withLinearScaleFormatting("semitones");
-                }
+            if (keytrackOn)
+            {
+                return pmd()
+                    .asFloat()
+                    .withRange(-48, 48)
+                    .withName("Offset R")
+                    .withDefault(0)
+                    .withLinearScaleFormatting("semitones");
+            }
             return pmd().asAudibleFrequency().withName("Frequency R");
         case fpDepth:
             return pmd().asFloat().withRange(0.f, 1.f).withDefault(0.f).withName("FM Depth");
@@ -128,7 +128,7 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
 
     ~FMFilter() {}
 
-    void initVoiceEffect(){}
+    void initVoiceEffect() {}
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
@@ -139,38 +139,39 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
         auto ratio = num / denom;
         return 12 * std::log2(ratio);
     }
-    
+
     typename sst::filters::CytomicSVF::Mode mode = sst::filters::CytomicSVF::Mode::LP;
-    
+
     void whatMode()
     {
         switch (this->getIntParam(ipMode))
         {
-            case 0:
-                mode = sst::filters::CytomicSVF::Mode::LP;
-                break;
-            case 1:
-                mode = sst::filters::CytomicSVF::Mode::HP;
-                break;
-            case 2:
-                mode = sst::filters::CytomicSVF::Mode::BP;
-                break;
-            case 3:
-                mode = sst::filters::CytomicSVF::Mode::NOTCH;
-                break;
-            case 4:
-                mode = sst::filters::CytomicSVF::Mode::ALL;
-                break;
+        case 0:
+            mode = sst::filters::CytomicSVF::Mode::LP;
+            break;
+        case 1:
+            mode = sst::filters::CytomicSVF::Mode::HP;
+            break;
+        case 2:
+            mode = sst::filters::CytomicSVF::Mode::BP;
+            break;
+        case 3:
+            mode = sst::filters::CytomicSVF::Mode::NOTCH;
+            break;
+        case 4:
+            mode = sst::filters::CytomicSVF::Mode::ALL;
+            break;
         }
     }
-    
 
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
     {
         if (isFirst)
         {
-            DCfilter.template setCoeffForBlock<VFXConfig::blockSize>(sst::filters::CytomicSVF::Mode::HP, 18.f, 18.f, 0.5f, 0.5f, VFXConfig::getSampleRateInv(this), 0.f, 0.f);
+            DCfilter.template setCoeffForBlock<VFXConfig::blockSize>(
+                sst::filters::CytomicSVF::Mode::HP, 18.f, 18.f, 0.5f, 0.5f,
+                VFXConfig::getSampleRateInv(this), 0.f, 0.f);
             isFirst = false;
         }
         else
@@ -191,9 +192,9 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
         }
         freqL = 440.0f * this->note_to_pitch_ignoring_tuning(freqL);
         freqR = 440.0f * this->note_to_pitch_ignoring_tuning(freqR);
-        
+
         float ratio = 1.f;
-        
+
         if (this->getIntParam(ipNum) != priorNum || this->getIntParam(ipDenom) != priorDenom)
         {
             ratio = getRatio();
@@ -201,10 +202,10 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
 
         mSinOsc.setRate(440.0 * 2 * M_PI * this->note_to_pitch_ignoring_tuning(pitch + ratio) *
                         this->getSampleRateInv());
-        
+
         auto outputL = 0.f;
         auto outputR = 0.f;
-        
+
         whatMode();
         for (auto i = 0; i < VFXConfig::blockSize; ++i)
         {
@@ -223,7 +224,7 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
             sst::filters::CytomicSVF::step(filter, inL, inR);
 
             DCfilter.processBlockStep(inL, inR);
-            
+
             dataoutL[i] = inL;
             dataoutR[i] = inR;
         }
@@ -233,7 +234,9 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
     {
         if (isFirst)
         {
-            DCfilter.template setCoeffForBlock<VFXConfig::blockSize>(sst::filters::CytomicSVF::Mode::HP, 18.f, 0.5f, VFXConfig::getSampleRateInv(this), 0.f);
+            DCfilter.template setCoeffForBlock<VFXConfig::blockSize>(
+                sst::filters::CytomicSVF::Mode::HP, 18.f, 0.5f, VFXConfig::getSampleRateInv(this),
+                0.f);
             isFirst = false;
         }
         else
@@ -268,7 +271,7 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
             sst::filters::CytomicSVF::step(filter, input, dummyR);
 
             DCfilter.processBlockStep(input);
-            
+
             dataoutL[i] = input;
         }
     }

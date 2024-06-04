@@ -114,23 +114,23 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
         case fpOffsetOne:
             if (keytrackOn)
             {
-            return pmd()
-                .asFloat()
-                .withRange(-48, 48)
-                .withDefault(0)
-                .withLinearScaleFormatting("semitones")
-                .withName("Offset One");
+                return pmd()
+                    .asFloat()
+                    .withRange(-48, 48)
+                    .withDefault(0)
+                    .withLinearScaleFormatting("semitones")
+                    .withName("Offset One");
             }
             return pmd().asAudibleFrequency().withName("Frequency One");
         case fpOffsetTwo:
             if (keytrackOn)
             {
-            return pmd()
-                .asFloat()
-                .withRange(-48, 48)
-                .withDefault(0)
-                .withLinearScaleFormatting("semitones")
-                .withName("Offset Two");
+                return pmd()
+                    .asFloat()
+                    .withRange(-48, 48)
+                    .withDefault(0)
+                    .withLinearScaleFormatting("semitones")
+                    .withName("Offset Two");
             }
             return pmd().asAudibleFrequency().withName("Frequency Two");
         case fpPanOne:

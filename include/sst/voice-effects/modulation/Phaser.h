@@ -96,15 +96,15 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
                 .withLinearScaleFormatting("%", 100.f)
                 .withName("Depth");
         case fpCenterFreq:
-                if (keytrackOn)
-                {
-                    return pmd()
-                        .asFloat()
-                        .withRange(-48, 48)
-                        .withName("Center Freq Offset")
-                        .withDefault(0)
-                        .withLinearScaleFormatting("semitones");
-                }
+            if (keytrackOn)
+            {
+                return pmd()
+                    .asFloat()
+                    .withRange(-48, 48)
+                    .withName("Center Freq Offset")
+                    .withDefault(0)
+                    .withLinearScaleFormatting("semitones");
+            }
             return pmd().asAudibleFrequency().withName("Center Frequency").withDefault(0);
         }
         return pmd().asFloat().withName("Error");
