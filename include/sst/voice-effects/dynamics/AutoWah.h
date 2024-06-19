@@ -33,10 +33,10 @@ namespace sst::voice_effects::dynamics
 template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFXConfig>
 {
     static constexpr const char *effectName{"Auto Wah"};
-    
+
     static constexpr size_t rmsBufferSize{1024}; // TODO: SR invariance...
     float *rmsBlock{nullptr};
-    
+
     static constexpr int numFloatParams{5};
     static constexpr int numIntParams{1};
 
@@ -75,11 +75,11 @@ template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFX
         switch (idx)
         {
         case fpSens:
-                return pmd().asFloat().withRange(0.f, 1.f).withDefault(.5f).withName("Sensitivity");
+            return pmd().asFloat().withRange(0.f, 1.f).withDefault(.5f).withName("Sensitivity");
         case fpDepth:
-                return pmd().asFloat().withRange(0.f, 1.f).withDefault(.3f).withName("Depth");
+            return pmd().asFloat().withRange(0.f, 1.f).withDefault(.3f).withName("Depth");
         case fpSpeed:
-                return pmd()
+            return pmd()
                 .asFloat()
                 .withRange(0.015f, .3f)
                 .withDefault(0.1f)
@@ -106,15 +106,12 @@ template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFX
     basic_blocks::params::ParamMetaData intParamAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
-        
+
         return pmd()
-        .asBool()
-        .withDefault(false)
-        .withUnorderedMapFormatting({
-            {false, "LP"},
-            {true, "BP"}
-        })
-        .withName("Mode");
+            .asBool()
+            .withDefault(false)
+            .withUnorderedMapFormatting({{false, "LP"}, {true, "BP"}})
+            .withName("Mode");
     }
 
     void initVoiceEffect()
@@ -129,11 +126,9 @@ template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFX
     }
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
-    
-    float decibelsToAmplitude(float db) {
-        return powf(10.0f, db * 0.05f);
-    }
-    
+
+    float decibelsToAmplitude(float db) { return powf(10.0f, db * 0.05f); }
+
     float amplitudeToDecibels(float amplitude)
     {
         if (amplitude < 0.000001f)
@@ -142,8 +137,6 @@ template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFX
         }
         return 20.0f * log10f(amplitude);
     }
-    
-    
 
     void saturateNext(float &L, float &R)
     {
@@ -153,7 +146,7 @@ template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFX
         R = std::clamp(R, -1.5f, 1.5f);
         R = R - 4.0 / 27.0 * R * R * R;
     }
-    
+
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
     {
@@ -161,11 +154,11 @@ template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFX
         sens *= sens;
         auto thresholdDecibel = amplitudeToDecibels(sens);
         float envDecibel = 0.f;
-        
+
         float speed = this->getFloatParam(fpSpeed) * 1000.f;
         float samplerate = this->getSampleRate();
         speedLimiter.setParams(speed, 1.f, samplerate);
-        
+
         bool modeSwitch = this->getIntParam(ipMode);
         sst::filters::CytomicSVF::Mode mode = sst::filters::CytomicSVF::Mode::LP;
         if (modeSwitch)
@@ -176,7 +169,7 @@ template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFX
         auto centerFreq = (keytrackOn) ? centerFreqParam + pitch : centerFreqParam;
         auto res = this->getFloatParam(fpRes);
         res = (res / 2) + .5f;
-        
+
         if (first)
         {
             RA.reset();
@@ -184,15 +177,15 @@ template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFX
             filter[0].init();
             filter[1].init();
             DCfilter.template setCoeffForBlock<VFXConfig::blockSize>(
-                sst::filters::CytomicSVF::Mode::HP, 10.f, 0.5f,
-                VFXConfig::getSampleRateInv(this), 0.f);
+                sst::filters::CytomicSVF::Mode::HP, 10.f, 0.5f, VFXConfig::getSampleRateInv(this),
+                0.f);
             first = false;
         }
         else
         {
             DCfilter.template retainCoeffForBlock<VFXConfig::blockSize>();
         }
-        
+
         auto depth = this->getFloatParam(fpDepth);
         auto modFreq = 0.f;
         for (int i = 0; i < VFXConfig::blockSize; i++)
@@ -200,11 +193,11 @@ template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFX
             float inL = datainL[i];
             float inR = datainR[i];
             modFreq = centerFreq;
-            
+
             float env = RA.step(fabsf(inL + inR));
-            
+
             env = speedLimiter.step(env);
-            
+
             envDecibel = amplitudeToDecibels(env);
             if (envDecibel > thresholdDecibel)
             {
@@ -213,30 +206,28 @@ template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFX
                 modFreq += modAmount;
             }
             modFreq = 440.f * this->note_to_pitch_ignoring_tuning(modFreq);
-            
 
-            
             filter[0].setCoeff(mode, modFreq, res, VFXConfig::getSampleRateInv(this), 0.f);
             sst::filters::CytomicSVF::step(filter[0], inL, inR);
-                        
+
             inL += .2f; // some bias for assymetrical saturation
             inR += .2f;
             saturateNext(inL, inR);
 
             filter[1].fetchCoeffs(filter[0]);
             sst::filters::CytomicSVF::step(filter[1], inL, inR);
-            
+
             saturateNext(inL, inR);
-            
+
             DCfilter.processBlockStep(inL, inR); // Filter out the bias DC
-            inL *= 1.17f; // Compensate for some lost level
+            inL *= 1.17f;                        // Compensate for some lost level
             inR *= 1.17f;
-            
+
             dataoutL[i] = inL;
             dataoutR[i] = inR;
         }
     }
-    
+
     bool enableKeytrack(bool b)
     {
         auto res = (b != keytrackOn);
@@ -244,16 +235,16 @@ template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFX
         return res;
     }
     bool getKeytrack() const { return keytrackOn; }
-    
-protected:
+
+  protected:
     std::array<float, numFloatParams> mLastParam{};
     std::array<int, numIntParams> mLastIParam{};
     bool first = true;
     bool keytrackOn = false;
     sst::basic_blocks::dsp::SlewLimiter speedLimiter;
-    
+
     sst::basic_blocks::dsp::RunningAverage RA;
-    
+
     float FreqPrior = -1.f;
     std::array<sst::filters::CytomicSVF, 2> filter;
     sst::filters::CytomicSVF DCfilter;
