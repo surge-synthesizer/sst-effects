@@ -325,8 +325,14 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
 
             panLineToOutput(panParamOne, toLineOne, leftOutOne, rightOutOne);
             panLineToOutput(panParamTwo, toLineTwo, leftOutTwo, rightOutTwo);
-            dataoutL[i] = ((leftOutOne + leftOutTwo) / 2) * levelOne;
-            dataoutR[i] = ((rightOutOne + rightOutTwo) / 2) * levelTwo;
+
+            leftOutOne *= levelOne;
+            rightOutOne *= levelOne;
+            leftOutTwo *= levelTwo;
+            rightOutTwo *= levelTwo;
+
+            dataoutL[i] = (leftOutOne + leftOutTwo) / 2;
+            dataoutR[i] = (rightOutOne + rightOutTwo) / 2;
         }
     }
 
