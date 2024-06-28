@@ -37,6 +37,9 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
 {
     static constexpr const char *effectName{"Compressor"};
 
+    static constexpr size_t rmsBufferSize{1024}; // TODO: SR invariance...
+    float *rmsBlock{nullptr};
+
     static constexpr int numFloatParams{7};
     static constexpr int numIntParams{1};
 
@@ -57,9 +60,19 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
         //        ipKnee,
     };
 
-    Compressor() : core::VoiceEffectTemplateBase<VFXConfig>() {}
+    Compressor() : core::VoiceEffectTemplateBase<VFXConfig>()
+    {
+        this->preReservePool(rmsBufferSize * sizeof(float));
+    }
 
-    ~Compressor() = default;
+    ~Compressor()
+    {
+        if (rmsBlock)
+        {
+            VFXConfig::returnBlock(this, (uint8_t *)rmsBlock, rmsBufferSize * sizeof(float));
+            rmsBlock = nullptr;
+        }
+    }
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
@@ -176,7 +189,16 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
             .withName("Detector");
     }
 
-    void initVoiceEffect() { lastEnv = {}; }
+    void initVoiceEffect()
+    {
+        if (!rmsBlock)
+        {
+            auto block = VFXConfig::checkoutBlock(this, rmsBufferSize * sizeof(float));
+            memset(block, 0, rmsBufferSize * sizeof(float));
+            rmsBlock = (float *)block;
+            RA.setStorage(rmsBlock, rmsBufferSize);
+        }
+    }
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
@@ -205,21 +227,12 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
         return coeffs;
     }
 
-    static float envelope_peak(float abs_x, float &z, BallisticCoeffs attack_coeffs,
+    static float setBallistics(float abs_x, float &z, BallisticCoeffs attack_coeffs,
                                BallisticCoeffs release_coeffs)
     {
         const auto b0 = abs_x > z ? attack_coeffs.b0 : release_coeffs.b0;
         z += b0 * (abs_x - z);
         return z;
-    }
-
-    static float envelope_rms(float abs_x, float &z, BallisticCoeffs attack_coeffs,
-                              BallisticCoeffs release_coeffs)
-    {
-        const auto x_sq = abs_x * abs_x;
-        const auto coeffs = x_sq > z ? attack_coeffs : release_coeffs;
-        z = coeffs.a1 * z + coeffs.b0 * x_sq;
-        return std::sqrt(z);
     }
 
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
@@ -238,6 +251,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
         if (first)
         {
             lastEnv = 0.f;
+            RA.reset();
             first = false;
         }
         
@@ -246,25 +260,20 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
 
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
-            float sidechainL = datainL[i];
-            float sidechainR = datainR[i];
-            filters[0].processBlockStep(sidechainL, sidechainR);
-            filters[1].processBlockStep(sidechainL, sidechainR);
-            float env = fabsf(sidechainL + sidechainR) /2;
+            auto outputL = datainL[i];
+            auto outputR = datainR[i];
+            
+            float sidechain = (outputL + outputR) / 2;
+            filters[0].processBlockStep(sidechain);
+            filters[1].processBlockStep(sidechain);
+            float env = fabsf(sidechain);
             
             if (RMS)
             {
-                env = envelope_rms(env, lastEnv, attack_coeffs, release_coeffs);
+                env = RA.step(env);
             }
-            else
-            {
-                env = envelope_peak(env, lastEnv, attack_coeffs, release_coeffs);
-            }
-
+            env = setBallistics(env, lastEnv, attack_coeffs, release_coeffs);
             env = amplitudeToDecibels(env);
-
-            auto outputL = datainL[i];
-            auto outputR = datainR[i];
 
             auto over = env - threshold_db;
             float reductionFactorDB = 0.0f;
@@ -304,24 +313,20 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
 
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
-            float sidechain = datain[i];
+            float output = datain[i];
+            
+            float sidechain = output;
             filters[0].processBlockStep(sidechain);
             filters[1].processBlockStep(sidechain);
             float env = fabsf(sidechain);
 
             if (RMS)
             {
-                env = envelope_rms(env, lastEnv, attack_coeffs, release_coeffs);
+                env = RA.step(env);
             }
-            else
-            {
-                env = envelope_peak(env, lastEnv, attack_coeffs, release_coeffs);
-            }
-
+            env = setBallistics(env, lastEnv, attack_coeffs, release_coeffs);
             env = amplitudeToDecibels(env);
-
-            float output = datain[i];
-
+            
             auto over = env - threshold_db;
             float reductionFactorDB = 0.0f;
             if (env > threshold_db)
@@ -386,6 +391,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
     bool first = true;
     bool keytrackOn = false;
     float lastEnv = -1.f;
+    sst::basic_blocks::dsp::RunningAverage RA;
 
     float hpFreqPrior = -1.f;
     float lpFreqPrior = -1.f;
