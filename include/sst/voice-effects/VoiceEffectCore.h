@@ -119,7 +119,13 @@ template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig:
 
     float envelope_rate_linear_nowrap(float f)
     {
-        return VFXConfig::blockSize * VFXConfig::getSampleRateInv(this) * std::pow(2, -f);
+        auto res = VFXConfig::blockSize * VFXConfig::getSampleRateInv(this) * std::pow(2, -f);
+        if (getIsTemposync())
+        {
+            updateTempo();
+            res = res * temposyncratio;
+        }
+        return res;
     }
 
     static_assert(std::is_same<decltype(VFXConfig::getSampleRate(
@@ -173,30 +179,54 @@ template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig:
         }
     }
 
-    template <typename T, typename = void> struct has_oversampling : std::false_type
-    {
+#define HASMEM(M, GetSig, DVAL, PARENS)                                                            \
+    template <typename T, typename = void> struct has_##M : std::false_type                        \
+    {                                                                                              \
+    };                                                                                             \
+    template <typename T> struct has_##M<T, std::void_t<decltype(&T::M)>> : std::true_type         \
+    {                                                                                              \
+    };                                                                                             \
+    GetSig                                                                                         \
+    {                                                                                              \
+        if constexpr (has_##M<VFXConfig>::value)                                                   \
+        {                                                                                          \
+            return VFXConfig::M PARENS;                                                            \
+        }                                                                                          \
+        else                                                                                       \
+        {                                                                                          \
+            return DVAL;                                                                           \
+        }                                                                                          \
     };
 
-    template <typename T>
-    struct has_oversampling<T, std::void_t<decltype(&T::oversamplingRatio)>> : std::true_type
-    {
-    };
+    HASMEM(oversamplingRatio, constexpr int16_t getOversamplingRatio(), 1, );
+    HASMEM(getTempoPointer, double *getBaseTempoPointer(), &defaultTempo, (asBase()));
+    HASMEM(isTemposync, bool getIsTemposync(), false, (asBase()));
 
-    constexpr int16_t getOversamplingRatio()
-    {
-        if constexpr (has_oversampling<VFXConfig>::value)
-        {
-            return VFXConfig::oversamplingRatio;
-        }
-        else
-        {
-            return 1;
-        }
-    }
+#undef HASMEM
 
     using BiquadFilterType =
         sst::filters::Biquad::BiquadFilter<VoiceEffectTemplateBase<VFXConfig>, VFXConfig::blockSize,
                                            VoiceEffectTemplateBase<VFXConfig>>;
+
+    void updateTempo()
+    {
+        auto tempoPointer = getBaseTempoPointer();
+        assert(tempoPointer);
+        if (tempo != *tempoPointer)
+        {
+            std::cout << "Updating tempo " << *tempoPointer << " " << __FILE__ << std::endl;
+            tempo = *tempoPointer;
+            temposyncratio = tempo / 120.0;
+            temposyncratioinv = 1.0 / temposyncratio;
+        }
+    }
+
+  private:
+    double defaultTempo{120.0};
+
+  protected:
+    double tempo{defaultTempo}, temposyncratio{defaultTempo / 120.0},
+        temposyncratioinv{120.0 / defaultTempo};
 };
 } // namespace sst::voice_effects::core
 

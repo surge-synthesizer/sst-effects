@@ -80,14 +80,7 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
         case fpResonance:
             return pmd().asPercent().withDefault(0.707).withName("Resonance");
         case fpRate:
-            return pmd()
-                .asFloat()
-                .withRange(-3, 4)
-                .withPolarity(pmd::ParamMetaData::Polarity::UNIPOLAR_POSITIVE)
-                // .temposyncable()
-                // .withTemposyncMultiplier(-1)
-                .withATwoToTheBFormatting(1, 1, "Hz")
-                .withName("Rate");
+            return pmd().asLfoRate(-3, 4).withName("Rate");
         case fpDepth:
             return pmd()
                 .asFloat()

@@ -67,14 +67,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         case fpVolume:
             return pmd().asLinearDecibel(-60.f, 12.f).withName("Volume");
         case fpRate:
-            return pmd()
-                .asFloat()
-                .withRange(-3, 4)
-                .withPolarity(pmd::ParamMetaData::Polarity::UNIPOLAR_POSITIVE)
-                // .temposyncable()
-                // .withTemposyncMultiplier(-1)
-                .withATwoToTheBFormatting(1, 1, "Hz")
-                .withName("Rate");
+            return pmd().asLfoRate(-3, 4).withName("Rate");
         case fpDepth:
             return pmd()
                 .asFloat()
@@ -444,7 +437,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
 
     // How does it know which MonoTo... function to choose? By first calling this.
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
-
+    
     bool enableKeytrack(bool b)
     {
         auto res = (b != keytrackOn);
