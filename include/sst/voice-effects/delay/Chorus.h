@@ -104,14 +104,7 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
         case fpFeedback:
             return pmd().asPercent().withDefault(0.f).withName("Feedback");
         case fpRate:
-            return pmd()
-                .asFloat()
-                .withRange(-3, 4)
-                .withPolarity(pmd::ParamMetaData::Polarity::UNIPOLAR_POSITIVE)
-                // .temposyncable()
-                // .withTemposyncMultiplier(-1)
-                .withATwoToTheBFormatting(1, 1, "Hz")
-                .withName("Rate");
+            return pmd().asLfoRate(-3, 4).withName("Rate");
         case fpDepth:
             return pmd()
                 .asFloat()
