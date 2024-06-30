@@ -214,7 +214,6 @@ template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig:
         assert(tempoPointer);
         if (tempo != *tempoPointer)
         {
-            std::cout << "Updating tempo " << *tempoPointer << " " << __FILE__ << std::endl;
             tempo = *tempoPointer;
             temposyncratio = tempo / 120.0;
             temposyncratioinv = 1.0 / temposyncratio;
