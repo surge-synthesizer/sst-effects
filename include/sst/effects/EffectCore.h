@@ -76,6 +76,7 @@
 // For shared width calculations
 #include "sst/basic-blocks/dsp/MidSide.h"
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
+#include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/filters/BiquadFilter.h"
 
 #include "EffectCoreDetails.h"
@@ -243,6 +244,35 @@ template <typename FXConfig> struct EffectTemplateBase : public FXConfig::BaseCl
     }
 
     static constexpr int slowrate{8}, slowrate_m1{slowrate - 1};
+
+    static constexpr bool useLinearWidth()
+    {
+        if constexpr (details::Has_widthIsLinear<FXConfig>::value)
+        {
+            return FXConfig::widthIsLinear;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    basic_blocks::params::ParamMetaData getWidthParam() const
+    {
+        auto res = basic_blocks::params::ParamMetaData().withName("Width");
+        if constexpr (!useLinearWidth())
+            return res.asDecibelNarrow().withDefault(0.f);
+        else
+            return res.asPercentBipolar().withRange(-2.f, 2.f).withDefault(1.f);
+    }
+
+    template <typename Smoother> void setWidthTarget(Smoother &width, int idx, float scale = 1.f)
+    {
+        if constexpr (!useLinearWidth())
+            width.set_target_smoothed(this->dbToLinear(this->floatValue(idx)) * scale);
+        else
+            width.set_target_smoothed(this->floatValue(idx));
+    }
 };
 } // namespace sst::effects::core
 

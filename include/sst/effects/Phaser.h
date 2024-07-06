@@ -229,7 +229,8 @@ template <typename FXConfig> struct Phaser : core::EffectTemplateBase<FXConfig>
 
         feedback.newValue(0.95f * this->floatValue(ph_feedback));
         tone.newValue(std::clamp(this->floatValue(ph_tone), -1.f, 1.f));
-        width.set_target_smoothed(this->dbToLinear(this->floatValue(ph_width)));
+
+        this->setWidthTarget(width, ph_width);
 
         // lowpass range is from MIDI note 136 down to 57 (~21.1 kHz down to 220 Hz)
         // highpass range is from MIDI note 34 to 136(~61 Hz to ~21.1 kHz)
@@ -324,7 +325,7 @@ fxdata->p[ph_mod_rate].deactivated = false;
         case ph_mix:
             return pmd().asPercent().withName("Mix").withDefault(0.5);
         case ph_width:
-            return pmd().withName("Width").asDecibelNarrow().withDefault(0.f);
+            return this->getWidthParam();
         case ph_tone:
             return pmd().withName("Tone").asPercentBipolar().deactivatable(true).withDefault(0.f);
         case ph_mod_rate:

@@ -146,7 +146,7 @@ template <typename FXConfig> struct Flanger : core::EffectTemplateBase<FXConfig>
         case fl_damping:
             return result.withName("HF Damping").asPercent().withDefault(0.1f);
         case fl_width:
-            return result.withName("Width").asDecibelNarrow().withDefault(0.f);
+            return this->getWidthParam();
         case fl_mix:
             return result.withName("Mix").asPercentBipolar().withDefault(0.8f);
         case fl_num_params:
@@ -591,8 +591,7 @@ inline void Flanger<FXConfig>::processBlock(float *__restrict dataL, float *__re
         voices.process();
     }
 
-    width.set_target_smoothed(this->dbToLinear(this->floatValue(fl_width)) / 3);
-
+    this->setWidthTarget(width, fl_width, 1.0 / 3.0);
     this->applyWidth(dataL, dataR, width);
 }
 

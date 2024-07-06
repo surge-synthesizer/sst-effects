@@ -191,7 +191,7 @@ template <typename FXConfig> struct Reverb2 : core::EffectTemplateBase<FXConfig>
             return pmd().asPercent().withName("Mix").withDefault(0.33f);
 
         case rev2_width:
-            return pmd().withName("Width").asDecibelNarrow().withDefault(0.f);
+            return this->getWidthParam();
 
         default:
             return pmd().asPercentBipolar().withName("ERROR " + std::to_string(idx));
@@ -329,7 +329,7 @@ template <typename FXConfig> void Reverb2<FXConfig>::update_rtime()
     // * 2.f is to get the dB120 time
     auto pdlyt = std::max(0.1f, powf(2.f, this->floatValue(rev2_predelay)) * ts) * 2.f;
     auto dcyt = std::max(1.0f, powf(2.f, this->floatValue(rev2_decay_time))) * 2.f;
-    float t =  (this->sampleRate() * (dcyt + pdlyt)) / FXConfig::blockSize;
+    float t = (this->sampleRate() * (dcyt + pdlyt)) / FXConfig::blockSize;
 
     ringout_time = (int)t;
 }
@@ -407,14 +407,15 @@ template <typename FXConfig> void Reverb2<FXConfig>::processBlock(float *dataL, 
     _lf_damp_coefficent.newValue(0.2 * this->floatValue(rev2_lf_damping));
     _modulation.newValue(this->floatValue(rev2_modulation) * this->sampleRate() * 0.001f * 5.f);
 
-    width.set_target_smoothed(this->dbToLinear(this->floatValue(rev2_width)));
+    this->setWidthTarget(width, rev2_width);
+
     mix.set_target_smoothed(this->floatValue(rev2_mix));
 
     _lfo.set_rate(2.0 * M_PI * powf(2, -2.f) / this->sampleRate());
 
     int pdt = std::clamp((int)(this->sampleRate() * pow(2.f, this->floatValue(rev2_predelay)) *
-                                this->temposyncRatioInv(rev2_predelay)),
-                          1, PREDELAY_BUFFER_SIZE_LIMIT - 1);
+                               this->temposyncRatioInv(rev2_predelay)),
+                         1, PREDELAY_BUFFER_SIZE_LIMIT - 1);
 
     for (int k = 0; k < FXConfig::blockSize; k++)
     {
