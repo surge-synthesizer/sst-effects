@@ -238,7 +238,7 @@ template <typename FXConfig> struct Reverb2 : core::EffectTemplateBase<FXConfig>
         return (int)(b);
     }
 
-    static constexpr double db60{1000.0}; // powf(10.f, 0.05f * -60.f);
+    static constexpr double db60{0.001}; // powf(10.f, 0.05f * -60.f);
 };
 
 template <typename FXConfig>
