@@ -156,14 +156,8 @@ TEST_CASE("Can Create Voice FX")
     {
         VTester<sst::voice_effects::filter::StaticPhaser<VTestConfig>>::TestVFX();
     }
-    SECTION("Tremolo")
-    {
-        VTester<sst::voice_effects::modulation::Tremolo<VTestConfig>>::TestVFX();
-    }
-    SECTION("Phaser")
-    {
-        VTester<sst::voice_effects::modulation::Phaser<VTestConfig>>::TestVFX();
-    }
+    SECTION("Tremolo") { VTester<sst::voice_effects::modulation::Tremolo<VTestConfig>>::TestVFX(); }
+    SECTION("Phaser") { VTester<sst::voice_effects::modulation::Phaser<VTestConfig>>::TestVFX(); }
     SECTION("FM Filter")
     {
         VTester<sst::voice_effects::modulation::FMFilter<VTestConfig>>::TestVFX();

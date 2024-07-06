@@ -30,6 +30,7 @@
 #include "sst/effects/Reverb1.h"
 #include "sst/effects/Bonsai.h"
 #include "sst/effects/Phaser.h"
+#include "sst/effects/Reverb2.h"
 
 namespace sfx = sst::effects;
 
@@ -93,6 +94,7 @@ TEST_CASE("Can Run Types with Concrete Config")
 {
     SECTION("Flanger") { Tester<sfx::flanger::Flanger<sfx::core::ConcreteConfig>>::TestFX(); }
     SECTION("Reverb1") { Tester<sfx::reverb1::Reverb1<sfx::core::ConcreteConfig>>::TestFX(); }
+    SECTION("Reverb2") { Tester<sfx::reverb2::Reverb2<sfx::core::ConcreteConfig>>::TestFX(); }
     SECTION("Delay") { Tester<sfx::delay::Delay<sfx::core::ConcreteConfig>>::TestFX(); }
     SECTION("Bonsai") { Tester<sfx::bonsai::Bonsai<sfx::core::ConcreteConfig>>::TestFX(); }
     SECTION("Phaser") { Tester<sfx::phaser::Phaser<sfx::core::ConcreteConfig>>::TestFX(); }

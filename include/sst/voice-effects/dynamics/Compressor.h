@@ -157,27 +157,27 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
     {
         using pmd = basic_blocks::params::ParamMetaData;
 
-//        switch (idx)
-//        {
-//        case ipKnee:
-//            return pmd()
-//                .asBool()
-//                .withUnorderedMapFormatting({
-//                    {false, "hard"},
-//                    {true, "soft"},
-//                })
-//                .withDefault(false)
-//                .withName("Knee");
-//        case ipDetector:
-//            return pmd()
-//                .asBool()
-//                .withUnorderedMapFormatting({
-//                    {false, "Peak"},
-//                    {true, "RMS"},
-//                })
-//                .withDefault(false)
-//                .withName("Detector");
-//        }
+        //        switch (idx)
+        //        {
+        //        case ipKnee:
+        //            return pmd()
+        //                .asBool()
+        //                .withUnorderedMapFormatting({
+        //                    {false, "hard"},
+        //                    {true, "soft"},
+        //                })
+        //                .withDefault(false)
+        //                .withName("Knee");
+        //        case ipDetector:
+        //            return pmd()
+        //                .asBool()
+        //                .withUnorderedMapFormatting({
+        //                    {false, "Peak"},
+        //                    {true, "RMS"},
+        //                })
+        //                .withDefault(false)
+        //                .withName("Detector");
+        //        }
 
         return pmd()
             .asBool()
@@ -239,7 +239,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
                        float pitch)
     {
         auto gain = this->getFloatParam(fpMakeUp);
-//        bool knee = this->getIntParam(ipKnee);
+        //        bool knee = this->getIntParam(ipKnee);
         bool RMS = this->getIntParam(ipDetector);
         auto threshold_db = this->getFloatParam(fpThreshold);
         auto ratio_recip = 1 / this->getFloatParam(fpRatio);
@@ -254,7 +254,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
             RA.reset();
             first = false;
         }
-        
+
         setCoeffsHighpass(pitch);
         setCoeffsLowpass(pitch);
 
@@ -262,12 +262,12 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
         {
             auto outputL = datainL[i];
             auto outputR = datainR[i];
-            
+
             float sidechain = (outputL + outputR) / 2;
             filters[0].processBlockStep(sidechain);
             filters[1].processBlockStep(sidechain);
             float env = fabsf(sidechain);
-            
+
             if (RMS)
             {
                 env = RA.step(env);
@@ -293,7 +293,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
     void processMonoToMono(float *datain, float *dataout, float pitch)
     {
         auto gain = this->getFloatParam(fpMakeUp);
-//        bool knee = this->getIntParam(ipKnee);
+        //        bool knee = this->getIntParam(ipKnee);
         bool RMS = this->getIntParam(ipDetector);
         auto threshold_db = this->getFloatParam(fpThreshold);
         auto ratio_recip = 1 / this->getFloatParam(fpRatio);
@@ -307,14 +307,14 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
             lastEnv = 0.f;
             first = false;
         }
-        
+
         setCoeffsHighpass(pitch);
         setCoeffsLowpass(pitch);
 
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
             float output = datain[i];
-            
+
             float sidechain = output;
             filters[0].processBlockStep(sidechain);
             filters[1].processBlockStep(sidechain);
@@ -326,7 +326,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
             }
             env = setBallistics(env, lastEnv, attack_coeffs, release_coeffs);
             env = amplitudeToDecibels(env);
-            
+
             auto over = env - threshold_db;
             float reductionFactorDB = 0.0f;
             if (env > threshold_db)
@@ -334,7 +334,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
                 reductionFactorDB = threshold_db + over * ratio_recip - env;
             }
             float reductionFactor = decibelsToAmplitude(reductionFactorDB);
-                        
+
             output *= reductionFactor;
 
             dataout[i] = output * gain;
@@ -395,7 +395,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
 
     float hpFreqPrior = -1.f;
     float lpFreqPrior = -1.f;
-    std::array<sst::filters::CytomicSVF, 2 > filters;
+    std::array<sst::filters::CytomicSVF, 2> filters;
 };
 } // namespace sst::voice_effects::dynamics
 #endif // SCXT_COMPRESSOR_H

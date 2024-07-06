@@ -53,7 +53,7 @@ template <typename FXConfig> struct Reverb1 : core::EffectTemplateBase<FXConfig>
     };
 
     static constexpr int numParams{rev1_width + 1};
-    static constexpr const char *effectName{"flanger"};
+    static constexpr const char *effectName{"reverb1"};
 
     Reverb1(typename FXConfig::GlobalStorage *s, typename FXConfig::EffectStorage *e,
             typename FXConfig::ValueStorage *p);
