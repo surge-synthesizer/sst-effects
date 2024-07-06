@@ -18,8 +18,8 @@
  * https://github.com/surge-synthesizer/sst-effects
  */
 
-#ifndef INCLUDE_SST_VOICE_EFFECTS_MODULATION_FM_FILTER_H
-#define INCLUDE_SST_VOICE_EFFECTS_MODULATION_FM_FILTER_H
+#ifndef INCLUDE_SST_VOICE_EFFECTS_MODULATION_FMFILTER_H
+#define INCLUDE_SST_VOICE_EFFECTS_MODULATION_FMFILTER_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/QuadratureOscillators.h"

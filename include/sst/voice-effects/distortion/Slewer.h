@@ -18,8 +18,8 @@
  * https://github.com/surge-synthesizer/sst-effects
  */
 
-#ifndef INCLUDE_SST_VOICE_EFFECTS_FILTER_SLEWER_H
-#define INCLUDE_SST_VOICE_EFFECTS_FILTER_SLEWER_H
+#ifndef INCLUDE_SST_VOICE_EFFECTS_DISTORTION_SLEWER_H
+#define INCLUDE_SST_VOICE_EFFECTS_DISTORTION_SLEWER_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "../VoiceEffectCore.h"

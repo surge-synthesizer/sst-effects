@@ -437,7 +437,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
 
     // How does it know which MonoTo... function to choose? By first calling this.
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
-    
+
     bool enableKeytrack(bool b)
     {
         auto res = (b != keytrackOn);
