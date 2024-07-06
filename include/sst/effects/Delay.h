@@ -156,7 +156,7 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
         case dly_mix:
             return pmd().withName("Mix").asPercent().withDefault(0.5f);
         case dly_width:
-            return pmd().withName("Width").asDecibelNarrow().withDefault(0.f);
+            return this->getWidthParam();
         }
         return {};
     }
@@ -282,7 +282,7 @@ template <typename FXConfig> inline void Delay<FXConfig>::setvars(bool init)
     }
 
     mix.set_target_smoothed(this->floatValue(dly_mix));
-    width.set_target_smoothed(this->dbToLinear(this->floatValue(dly_width)));
+    this->setWidthTarget(width, dly_width);
     pan.set_target_smoothed(std::clamp(this->floatValue(dly_input_channel), -1.f, 1.f));
 
     lp.coeff_LP2B(lp.calc_omega(this->floatValue(dly_highcut) / 12.0), 0.707);

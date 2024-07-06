@@ -51,6 +51,9 @@ HAS_MEMBER(floatValueExtendedAt);
 HAS_MEMBER(temposyncInitialized);
 HAS_MEMBER(temposyncRatioInv);
 HAS_MEMBER(deformType);
+
+HAS_MEMBER(widthIsLinear);
+
 #undef HAS_MEMBER
 
 } // namespace sst::effects::core::details

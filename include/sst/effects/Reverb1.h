@@ -108,7 +108,7 @@ template <typename FXConfig> struct Reverb1 : core::EffectTemplateBase<FXConfig>
         case rev1_mix:
             return result.withName("Mix").asPercent().withDefault(0.5f);
         case rev1_width:
-            return result.withName("Width").asDecibelNarrow().withDefault(0.f);
+            return this->getWidthParam();
         default:
             break;
         }
@@ -224,7 +224,7 @@ inline void Reverb1<FXConfig>::processBlock(float *__restrict dataL, float *__re
     b = (b + 1) & 31;
 
     mix.set_target_smoothed(this->floatValue(rev1_mix));
-    width.set_target_smoothed(this->dbToLinear(this->floatValue(rev1_width)));
+    this->setWidthTarget(width, rev1_width);
 
     int pdtime = (int)(float)this->sampleRate() *
                  this->noteToPitchIgnoringTuning(12 * this->floatValue(rev1_predelay)) *
