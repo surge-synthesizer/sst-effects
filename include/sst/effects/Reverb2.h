@@ -215,12 +215,12 @@ template <typename FXConfig> struct Reverb2 : core::EffectTemplateBase<FXConfig>
     float _tap_gainL[NUM_BLOCKS];
     float _tap_gainR[NUM_BLOCKS];
     float _state;
-    lipol<float, true> _decay_multiply;
-    lipol<float, true> _diffusion;
-    lipol<float, true> _buildup;
-    lipol<float, true> _hf_damp_coefficent;
-    lipol<float, true> _lf_damp_coefficent;
-    lipol<float, true> _modulation;
+    sdsp::lipol<float, FXConfig::blockSize, true> _decay_multiply;
+    sdsp::lipol<float, FXConfig::blockSize, true> _diffusion;
+    sdsp::lipol<float, FXConfig::blockSize, true> _buildup;
+    sdsp::lipol<float, FXConfig::blockSize, true> _hf_damp_coefficent;
+    sdsp::lipol<float, FXConfig::blockSize, true> _lf_damp_coefficent;
+    sdsp::lipol<float, FXConfig::blockSize, true> _modulation;
 
     using quadr_osc = sst::basic_blocks::dsp::SurgeQuadrOsc<float>;
     quadr_osc _lfo;
@@ -329,7 +329,7 @@ template <typename FXConfig> void Reverb2<FXConfig>::update_rtime()
     // * 2.f is to get the dB120 time
     auto pdlyt = std::max(0.1f, powf(2.f, this->floatValue(rev2_predelay)) * ts) * 2.f;
     auto dcyt = std::max(1.0f, powf(2.f, this->floatValue(rev2_decay_time))) * 2.f;
-    float t = BLOCK_SIZE_INV * (this->sampleRate() * (dcyt + pdlyt));
+    float t =  (this->sampleRate() * (dcyt + pdlyt)) / FXConfig::blockSize;
 
     ringout_time = (int)t;
 }
@@ -395,7 +395,7 @@ template <typename FXConfig> void Reverb2<FXConfig>::processBlock(float *dataL, 
 
     last_decay_time = this->floatValue(rev2_decay_time);
 
-    float wetL alignas(16)[BLOCK_SIZE], wetR alignas(16)[BLOCK_SIZE];
+    float wetL alignas(16)[FXConfig::blockSize], wetR alignas(16)[FXConfig::blockSize];
 
     float loop_time_s = 0.5508 * scale;
     float decay = powf(db60, loop_time_s / (4.f * (powf(2.f, this->floatValue(rev2_decay_time)))));
@@ -412,11 +412,11 @@ template <typename FXConfig> void Reverb2<FXConfig>::processBlock(float *dataL, 
 
     _lfo.set_rate(2.0 * M_PI * powf(2, -2.f) / this->sampleRate());
 
-    int pdt = limit_range((int)(this->sampleRate() * pow(2.f, this->floatValue(rev2_predelay)) *
+    int pdt = std::clamp((int)(this->sampleRate() * pow(2.f, this->floatValue(rev2_predelay)) *
                                 this->temposyncRatioInv(rev2_predelay)),
                           1, PREDELAY_BUFFER_SIZE_LIMIT - 1);
 
-    for (int k = 0; k < BLOCK_SIZE; k++)
+    for (int k = 0; k < FXConfig::blockSize; k++)
     {
         float in = (dataL[k] + dataR[k]) * 0.5f;
 
@@ -437,8 +437,8 @@ template <typename FXConfig> void Reverb2<FXConfig>::processBlock(float *dataL, 
         lfos[2] = -_lfo.r;
         lfos[3] = -_lfo.i;
 
-        auto hdc = limit_range(_hf_damp_coefficent.v, 0.01f, 0.99f);
-        auto ldc = limit_range(_lf_damp_coefficent.v, 0.01f, 0.99f);
+        auto hdc = std::clamp(_hf_damp_coefficent.v, 0.01f, 0.99f);
+        auto ldc = std::clamp(_lf_damp_coefficent.v, 0.01f, 0.99f);
         for (int b = 0; b < NUM_BLOCKS; b++)
         {
             x = x + in;
@@ -474,7 +474,7 @@ template <typename FXConfig> void Reverb2<FXConfig>::processBlock(float *dataL, 
     // scale width
     this->applyWidth(wetL, wetR, width);
 
-    mix.fade_2_blocks_inplace(dataL, wetL, dataR, wetR, BLOCK_SIZE_QUAD);
+    mix.fade_2_blocks_inplace(dataL, wetL, dataR, wetR);
 }
 
 } // namespace sst::effects::reverb2
