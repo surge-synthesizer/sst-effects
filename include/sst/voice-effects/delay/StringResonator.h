@@ -93,6 +93,9 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
+        bool dual = this->getIntParam(ipDualString) > 0;
+        bool stereo = this->getIntParam(ipStereo) > 0;
+
         switch (idx)
         {
         case fpLevelOne:
@@ -102,7 +105,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
                 .withDefault(1.f)
                 .withLinearScaleFormatting("%", 100.f)
                 .withDecimalPlaces(2)
-                .withName("Level One");
+                .withName(std::string("Level") + (dual ? " One" : ""));
         case fpLevelTwo:
             return pmd()
                 .asFloat()
@@ -110,7 +113,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
                 .withDefault(1.f)
                 .withLinearScaleFormatting("%", 100.f)
                 .withDecimalPlaces(2)
-                .withName("Level Two");
+                .withName(!dual ? std::string() : "Level Two");
         case fpOffsetOne:
             if (keytrackOn)
             {
@@ -119,9 +122,10 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
                     .withRange(-48, 48)
                     .withDefault(0)
                     .withLinearScaleFormatting("semitones")
-                    .withName("Offset One");
+                    .withName(std::string("Offset") + (dual ? " One" : ""));
             }
-            return pmd().asAudibleFrequency().withName("Frequency One");
+            return pmd().asAudibleFrequency().withName(std::string("Frequency") +
+                                                       (dual ? " One" : ""));
         case fpOffsetTwo:
             if (keytrackOn)
             {
@@ -130,9 +134,12 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
                     .withRange(-48, 48)
                     .withDefault(0)
                     .withLinearScaleFormatting("semitones")
-                    .withName("Offset Two");
+                    .withName(!dual ? std::string() : "Offset Two");
             }
-            return pmd().asAudibleFrequency().withName("Frequency Two");
+            return pmd()
+                .asAudibleFrequency()
+                .withName(!dual ? std::string() : "Frequency Two")
+                .withDefault(0);
         case fpPanOne:
             return pmd()
                 .asPercentBipolar()
@@ -140,7 +147,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
                 .withCustomMaxDisplay("R")
                 .withCustomDefaultDisplay("C")
                 .withDefault(-1.f)
-                .withName("Pan One");
+                .withName(!stereo ? std::string() : (std::string("Pan") + (dual ? " One" : "")));
         case fpPanTwo:
             return pmd()
                 .asPercentBipolar()
@@ -148,7 +155,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
                 .withCustomMaxDisplay("R")
                 .withCustomDefaultDisplay("C")
                 .withDefault(1.f)
-                .withName("Pan Two");
+                .withName((dual && stereo) ? "Pan Two" : std::string());
         case fpDecay:
             return pmd()
                 .asFloat()
@@ -251,8 +258,8 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
 
         if (this->getIntParam(ipStereo) == false)
         {
-            panParamOne = 0.f;
-            panParamTwo = 1.f;
+            panParamOne = 0.5f;
+            panParamTwo = 0.5f;
         }
 
         auto ptOne = this->getFloatParam(fpOffsetOne);
@@ -685,6 +692,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
     }
 
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
+    bool checkParameterConsistency() const { return true; }
 
     bool enableKeytrack(bool b)
     {

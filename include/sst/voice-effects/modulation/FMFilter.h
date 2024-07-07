@@ -59,6 +59,7 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
+        bool stereo = this->getIntParam(ipStereo) > 0;
 
         switch (idx)
         {
@@ -68,22 +69,25 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
                 return pmd()
                     .asFloat()
                     .withRange(-48, 48)
-                    .withName("Offset L")
+                    .withName(std::string("Offset") + (stereo ? " L" : ""))
                     .withDefault(0)
                     .withLinearScaleFormatting("semitones");
             }
-            return pmd().asAudibleFrequency().withName("Frequency L");
+            return pmd()
+                .asAudibleFrequency()
+                .withName(std::string("Frequency L") + (stereo ? " L" : ""))
+                .withDefault(0);
         case fpFreqR:
             if (keytrackOn)
             {
                 return pmd()
                     .asFloat()
                     .withRange(-48, 48)
-                    .withName("Offset R")
+                    .withName(!stereo ? std::string() : "Offset R")
                     .withDefault(0)
                     .withLinearScaleFormatting("semitones");
             }
-            return pmd().asAudibleFrequency().withName("Frequency R");
+            return pmd().asAudibleFrequency().withName(!stereo ? std::string() : "Frequency R");
         case fpDepth:
             return pmd().asFloat().withRange(0.f, 1.f).withDefault(0.f).withName("FM Depth");
         case fpRes:
@@ -290,6 +294,7 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
         return res;
     }
     bool getKeytrack() const { return keytrackOn; }
+    bool checkParameterConsistency() const { return true; }
 
   protected:
     bool keytrackOn{false};

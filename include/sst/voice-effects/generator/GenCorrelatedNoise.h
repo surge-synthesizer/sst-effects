@@ -72,6 +72,7 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
+        bool stereo = this->getIntParam(ipStereo) > 0;
 
         switch (idx)
         {
@@ -80,7 +81,8 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
         case FloatParams::fpLevel:
             return pmd().asCubicDecibelAttenuation().withDefault(0.5f).withName("Level");
         case FloatParams::fpStereoWidth:
-            return pmd().asFloat().withRange(0.f, 2.f).withDefault(1.f).withName("Stereo Width");
+            return pmd().asFloat().withRange(0.f, 2.f).withDefault(1.f).withName(
+                !stereo ? std::string() : "Stereo Width");
         default:
             break;
         }
@@ -179,6 +181,7 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
     }
 
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
+    bool checkParameterConsistency() const { return true; }
 
   protected:
     float mPrior[2][2]{{0.f, 0.f}, {0.f, 0.f}};

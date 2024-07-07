@@ -90,6 +90,8 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
+        bool stereo = this->getIntParam(ipStereo) > 0;
+
         switch (idx)
         {
         case fpTimeL:
@@ -98,7 +100,7 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
                 .withRange(0, maxMiliseconds)
                 .withDefault(50)
                 .withLinearScaleFormatting("ms")
-                .withName("Time L");
+                .withName(std::string("Time") + (stereo ? " L" : ""));
 
         case fpTimeR:
             return pmd()
@@ -106,12 +108,13 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
                 .withRange(0, maxMiliseconds)
                 .withDefault(50)
                 .withLinearScaleFormatting("ms")
-                .withName("Time R");
+                .withName(!stereo ? std::string() : "Time R");
 
         case fpFeedback:
             return pmd().asPercent().withDefault(0.f).withName("Feedback");
         case fpCrossFeed:
-            return pmd().asPercent().withDefault(0.f).withName("CrossFeed");
+            return pmd().asPercent().withDefault(0.f).withName(!stereo ? std::string()
+                                                                       : "CrossFeed");
 
         case fpLowCut:
             return pmd().asAudibleFrequency().withDefault(-60).withName("LowCut");
@@ -319,6 +322,7 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
     }
 
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
+    bool checkParameterConsistency() const { return true; }
 
   protected:
     std::array<details::DelayLineSupport, 2> lineSupport;

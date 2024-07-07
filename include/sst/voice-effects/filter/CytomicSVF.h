@@ -67,6 +67,14 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
         using pmd = basic_blocks::params::ParamMetaData;
         bool stereo = this->getIntParam(ipStereo) > 0;
 
+        bool gain{false};
+        using md = sst::filters::CytomicSVF::Mode;
+        auto mode = (md)this->getIntParam(ipMode);
+        if (mode == md::BELL || mode == md::HIGH_SHELF || mode == md::LOW_SHELF)
+        {
+            gain = true;
+        }
+
         switch (idx)
         {
         case 0:
@@ -106,7 +114,11 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
                 .withLinearScaleFormatting("")
                 .withDefault(0.707);
         case 3:
-            return pmd().asDecibelNarrow().withRange(-12, 12).withName("Gain").withDefault(0);
+            return pmd()
+                .asDecibelNarrow()
+                .withRange(-12, 12)
+                .withName(!gain ? std::string() : "Gain")
+                .withDefault(0);
         }
 
         return pmd().withName("Unknown " + std::to_string(idx)).asPercent();
