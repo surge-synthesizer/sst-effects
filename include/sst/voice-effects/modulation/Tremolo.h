@@ -61,6 +61,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
+        bool harmonic = this->getIntParam(ipHarmonic) > 0;
 
         switch (idx)
         {
@@ -81,11 +82,11 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
                 return pmd()
                     .asFloat()
                     .withRange(-24, 48)
-                    .withName("Crossover Offset")
+                    .withName(!harmonic ? "Harmonic" : "Crossover Offset")
                     .withDefault(0)
                     .withLinearScaleFormatting("semitones");
             }
-            return pmd().asAudibleFrequency().withName("Crossover");
+            return pmd().asAudibleFrequency().withName(!harmonic ? "Harmonic" : "Crossover");
         }
         return pmd().asFloat().withName("Error");
     }
@@ -445,6 +446,8 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         return res;
     }
     bool getKeytrack() const { return keytrackOn; }
+
+    bool checkParameterConsistency() const { return true; }
 
   protected:
     bool keytrackOn{false};

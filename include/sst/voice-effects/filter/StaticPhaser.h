@@ -44,9 +44,9 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
 
     enum FloatParams
     {
-        fpCenterFrequency,
+        fpCenterFrequencyL,
         fpCenterFrequencyR,
-        fpSpacing, // = fpCenterFrequency + (stereo ? 2 : 1) <-re-implement this?
+        fpSpacing,
         fpResonance,
         fpFeedback
     };
@@ -68,6 +68,8 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
     basic_blocks::params::ParamMetaData intParamAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
+        bool stereo = this->getIntParam(ipStereo) > 0;
+
         switch (idx)
         {
         case ipStages:
@@ -90,20 +92,24 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
+        bool stereo = this->getIntParam(ipStereo) > 0;
 
         switch (idx)
         {
-        case fpCenterFrequency:
+        case fpCenterFrequencyL:
             if (keytrackOn)
             {
                 return pmd()
                     .asFloat()
                     .withRange(-48, 48)
-                    .withName("Offset L")
+                    .withName(std::string("Offset L") + (stereo ? " L" : ""))
                     .withDefault(0)
                     .withLinearScaleFormatting("semitones");
             }
-            return pmd().asAudibleFrequency().withName("Frequency L").withDefault(0);
+            return pmd()
+                .asAudibleFrequency()
+                .withName(std::string("Frequency") + (stereo ? " L" : ""))
+                .withDefault(0);
 
         case fpCenterFrequencyR:
             if (keytrackOn)
@@ -111,11 +117,14 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
                 return pmd()
                     .asFloat()
                     .withRange(-48, 48)
-                    .withName("Offset R")
+                    .withName(!stereo ? std::string() : "Offset R")
                     .withDefault(0)
                     .withLinearScaleFormatting("semitones");
             }
-            return pmd().asAudibleFrequency().withName("Frequency R").withDefault(0);
+            return pmd()
+                .asAudibleFrequency()
+                .withName(!stereo ? std::string() : "Frequency R")
+                .withDefault(0);
 
             break;
         case fpSpacing:
@@ -240,7 +249,7 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
             }
             auto mode = sst::filters::CytomicSVF::Mode::ALL;
             auto spread{0.f};
-            auto baseL{param[fpCenterFrequency]}, baseR{baseL};
+            auto baseL{param[fpCenterFrequencyL]}, baseR{baseL};
             if (iparam[ipStereo])
             {
                 baseR = param[fpCenterFrequencyR];
@@ -288,6 +297,7 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
         return res;
     }
     bool getKeytrack() const { return keytrackOn; }
+    bool checkParameterConsistency() const { return true; }
 
   protected:
     bool keytrackOn{false}, wasKeytrackOn{false};

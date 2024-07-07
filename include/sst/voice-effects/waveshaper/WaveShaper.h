@@ -65,6 +65,8 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
+        bool hp = this->getIntParam((int)WaveShaperIntParams::hpOn) > 0;
+        bool lp = this->getIntParam((int)WaveShaperIntParams::lpOn) > 0;
 
         switch ((WaveShaperFloatParams)idx)
         {
@@ -80,22 +82,24 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
                 return pmd()
                     .asFloat()
                     .withRange(-48, 48)
-                    .withName("Hp Offset")
+                    .withName(!hp ? "Highpass" : "HP Offset")
                     .withDefault(-48)
                     .withLinearScaleFormatting("semitones");
             }
-            return pmd().asAudibleFrequency().withDefault(-60).withName("Hp Frequency");
+            return pmd().asAudibleFrequency().withDefault(-60).withName(!hp ? "Highpass"
+                                                                            : "HP Frequency");
         case WaveShaperFloatParams::lowpass:
             if (keytrackOn)
             {
                 return pmd()
                     .asFloat()
                     .withRange(-48, 48)
-                    .withName("Lp Offset")
+                    .withName(!lp ? "Lowpass" : "LP Offset")
                     .withDefault(48)
                     .withLinearScaleFormatting("semitones");
             }
-            return pmd().asAudibleFrequency().withDefault(70).withName("Lp Frequency");
+            return pmd().asAudibleFrequency().withDefault(70).withName(!lp ? "Lowpass"
+                                                                           : "LP Frequency");
         default:
             break;
         }
@@ -311,6 +315,8 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
         return res;
     }
     bool getKeytrack() const { return keytrackOn; }
+
+    bool checkParameterConsistency() const { return true; }
 
   protected:
     bool keytrackOn{false};
