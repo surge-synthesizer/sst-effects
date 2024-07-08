@@ -38,7 +38,7 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
     static constexpr const char *effectName{"Fast SVF"};
 
     static constexpr int numFloatParams{4};
-    static constexpr int numIntParams{2};
+    static constexpr int numIntParams{3};
 
     CytomicSVF() : core::VoiceEffectTemplateBase<VFXConfig>()
     {
@@ -59,7 +59,8 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
     enum intParams
     {
         ipMode,
-        ipStereo
+        ipStereo,
+        ipSlope
     };
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
@@ -150,6 +151,15 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
                 .withDefault(md::LP);
         case ipStereo:
             return pmd().asBool().withDefault(false).withName("Stereo");
+        case ipSlope:
+            return pmd()
+                .asBool()
+                .withDefault(false)
+                .withUnorderedMapFormatting({
+                    {false, "12 dB/oct"},
+                    {true, "24 dB/oct"},
+                })
+                .withName("Slope");
         }
         return pmd().withName("error");
     }
@@ -183,25 +193,42 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
         {
             if (idiff)
             {
-                cySvf.init();
+                cySvf[0].init();
+                if (iparam[2])
+                {
+                    cySvf[1].init();
+                }
             }
             auto mode = (sst::filters::CytomicSVF::Mode)(iparam[0]);
 
             auto res = std::clamp(param[2], 0.f, 1.f);
+            if (iparam[2] == true)
+            {
+                res *= .885f; // I just checked on a specrum analyzer.
+            }
+
             auto shelf = this->dbToLinear(param[3]);
 
             if (this->getIntParam(ipStereo))
             {
                 auto freqL = 440.0 * this->note_to_pitch_ignoring_tuning(param[0]);
                 auto freqR = 440.0 * this->note_to_pitch_ignoring_tuning(param[1]);
-                cySvf.setCoeffForBlock<VFXConfig::blockSize>(
+                cySvf[0].template setCoeffForBlock<VFXConfig::blockSize>(
                     mode, freqL, freqR, res, res, this->getSampleRateInv(), shelf, shelf);
+                if (iparam[2])
+                {
+                    cySvf[1].fetchCoeffs(cySvf[0]);
+                }
             }
             else
             {
                 auto freq = 440.0 * this->note_to_pitch_ignoring_tuning(param[0]);
-                cySvf.setCoeffForBlock<VFXConfig::blockSize>(mode, freq, res,
-                                                             this->getSampleRateInv(), shelf);
+                cySvf[0].template setCoeffForBlock<VFXConfig::blockSize>(
+                    mode, freq, res, this->getSampleRateInv(), shelf);
+                if (iparam[2])
+                {
+                    cySvf[1].fetchCoeffs(cySvf[0]);
+                }
             }
 
             mLastParam = param;
@@ -209,7 +236,11 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
         }
         else
         {
-            cySvf.retainCoeffForBlock<VFXConfig::blockSize>();
+            cySvf[0].template retainCoeffForBlock<VFXConfig::blockSize>();
+            if (iparam[2])
+            {
+                cySvf[1].template retainCoeffForBlock<VFXConfig::blockSize>();
+            }
         }
     }
 
@@ -217,19 +248,33 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
                        float pitch)
     {
         calc_coeffs(pitch);
-        cySvf.processBlock<VFXConfig::blockSize>(datainL, datainR, dataoutL, dataoutR);
+        cySvf[0].template processBlock<VFXConfig::blockSize>(datainL, datainR, dataoutL, dataoutR);
+        if (this->getIntParam(ipSlope) == true)
+        {
+            cySvf[1].template processBlock<VFXConfig::blockSize>(dataoutL, dataoutR, dataoutL,
+                                                                 dataoutR);
+        }
     }
 
     void processMonoToMono(float *datainL, float *dataoutL, float pitch)
     {
         calc_coeffs(pitch);
-        cySvf.processBlock<VFXConfig::blockSize>(datainL, dataoutL);
+        cySvf[0].template processBlock<VFXConfig::blockSize>(datainL, dataoutL);
+        if (this->getIntParam(ipSlope))
+        {
+            cySvf[1].template processBlock<VFXConfig::blockSize>(dataoutL, dataoutL);
+        }
     }
 
     void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
     {
         calc_coeffs(pitch);
-        cySvf.processBlock<VFXConfig::blockSize>(datainL, datainL, dataoutL, dataoutR);
+        cySvf[0].template processBlock<VFXConfig::blockSize>(datainL, datainL, dataoutL, dataoutR);
+        if (this->getIntParam(ipSlope))
+        {
+            cySvf[1].template processBlock<VFXConfig::blockSize>(dataoutL, dataoutL, dataoutL,
+                                                                 dataoutR);
+        }
     }
 
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
@@ -247,7 +292,7 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
     bool keytrackOn{false}, wasKeytrackOn{false};
     std::array<float, numFloatParams> mLastParam{};
     std::array<int, numIntParams> mLastIParam{};
-    sst::filters::CytomicSVF cySvf;
+    std::array<sst::filters::CytomicSVF, 2> cySvf;
 };
 
 } // namespace sst::voice_effects::filter
