@@ -75,7 +75,7 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
             }
             return pmd()
                 .asAudibleFrequency()
-                .withName(std::string("Frequency L") + (stereo ? " L" : ""))
+                .withName(std::string("Frequency") + (stereo ? " L" : ""))
                 .withDefault(0);
         case fpFreqR:
             if (keytrackOn)
