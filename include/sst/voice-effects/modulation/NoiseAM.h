@@ -18,18 +18,17 @@
  * https://github.com/surge-synthesizer/sst-effects
  */
 
-#ifndef INCLUDE_SST_VOICE_EFFECTS_UTILITIES_NOISEAM_H
-#define INCLUDE_SST_VOICE_EFFECTS_UTILITIES_NOISEAM_H
+#ifndef INCLUDE_SST_VOICE_EFFECTS_MODULATION_NOISEAM_H
+#define INCLUDE_SST_VOICE_EFFECTS_MODULATION_NOISEAM_H
 
 #include "../VoiceEffectCore.h"
 
 #include <iostream>
-#include <random>
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
-#include "sst/basic-blocks/dsp/CorrelatedNoise.h"
 #include "sst/basic-blocks/mechanics/block-ops.h"
+#include "sst/basic-blocks/dsp/rng_gen.h"
 
 namespace sst::voice_effects::modulation
 {
@@ -37,15 +36,16 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
 {
     static constexpr const char *effectName{"Noise AM"};
 
-    static constexpr int numFloatParams{4};
+    static constexpr int numFloatParams{3};
     static constexpr int numIntParams{2};
+
+    basic_blocks::dsp::RNGGen rngGen;
 
     enum FloatParams
     {
         fpThreshold,
         fpDepth,
-        fpHighpass,
-        fpLowpass
+        fpTilt
     };
 
     enum IntParams
@@ -54,17 +54,7 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
         ipStereo
     };
 
-    NoiseAM()
-        : core::VoiceEffectTemplateBase<VFXConfig>(), mGenerator((size_t)this), mDistro(-1.f, 1.f)
-    {
-        for (int i = 0; i < 7; ++i)
-        {
-            sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
-                mPrior[0][0], mPrior[0][1], 0, mDistro(mGenerator));
-            sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
-                mPrior[1][0], mPrior[1][1], 0, mDistro(mGenerator));
-        }
-    }
+    NoiseAM() : core::VoiceEffectTemplateBase<VFXConfig>() {}
 
     ~NoiseAM() {}
 
@@ -76,13 +66,18 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
         switch (idx)
         {
         case fpThreshold:
-            return pmd().asPercent().withName("Threshold");
+            return pmd().asPercent().withDefault(.75f).withName("Threshold");
         case fpDepth:
-            return pmd().asPercent().withDefault(1.f).withName("Depth");
-        case fpHighpass:
-            return pmd().asAudibleFrequency().withName("HP Frequency");
-        case fpLowpass:
-            return pmd().asAudibleFrequency().withName("LP Frequency");
+            return pmd().asPercent().withDefault(.5f).withName("Depth");
+        case fpTilt:
+            return pmd()
+                .asDecibelNarrow()
+                .withRange(-6.f, 6.f)
+                .withName("Tilt")
+                .withCustomMinDisplay("Red")
+                .withCustomDefaultDisplay("White")
+                .withCustomMaxDisplay("Violet")
+                .withDefault(0);
         }
         return pmd().asFloat().withName("Error");
     }
@@ -108,40 +103,139 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
     void initVoiceEffect() {}
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
-    void setCoeffsHighpass()
+    void setCoeffs()
     {
-        auto hpFreq = 440.f * this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpHighpass));
+        float slope = this->getFloatParam(fpTilt) / 2;
+        float posGain = this->dbToLinear(slope);
+        float negGain = this->dbToLinear(-1 * slope);
+        float res = .07f;
 
-        if (hpFreq != hpFreqPrior)
+        if (slope != priorSlope)
         {
-            filters[0].template setCoeffForBlock<VFXConfig::blockSize>(
-                sst::filters::CytomicSVF::HP, hpFreq, 0.5f, VFXConfig::getSampleRateInv(this), 0.f);
-            hpFreqPrior = hpFreq;
+            for (int i = 0; i < 11; ++i)
+            {
+                float freq = std::powf(2, (i + 1.f)) * 10.f;
+                if (i < 6)
+                {
+                    filters[i].template setCoeffForBlock<VFXConfig::blockSize>(
+                        filters::CytomicSVF::Mode::LOW_SHELF, freq, res, this->getSampleRateInv(),
+                        negGain);
+                }
+                else
+                {
+                    filters[i].template setCoeffForBlock<VFXConfig::blockSize>(
+                        filters::CytomicSVF::Mode::HIGH_SHELF, freq, res, this->getSampleRateInv(),
+                        posGain);
+                }
+            }
+            priorSlope = slope;
         }
         else
         {
-            filters[0].template retainCoeffForBlock<VFXConfig::blockSize>();
+            for (int i = 0; i < 11; i++)
+            {
+                filters[i].template retainCoeffForBlock<VFXConfig::blockSize>();
+            }
         }
     }
 
-    void setCoeffsLowpass()
+    void makeNoise(float *L, float *R)
     {
-        auto lpFreq = 440.f * this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpLowpass));
-
-        if (lpFreq != lpFreqPrior)
+        float atten = this->getFloatParam(fpTilt);
+        if (atten > 0)
         {
-            filters[1].template setCoeffForBlock<VFXConfig::blockSize>(
-                sst::filters::CytomicSVF::LP, lpFreq, 0.5f, VFXConfig::getSampleRateInv(this), 0.f);
-            lpFreqPrior = lpFreq;
+            atten *= -4.f;
         }
-        else
+        atten = this->dbToLinear(atten);
+
+        setCoeffs();
+
+        for (int i = 0; i < VFXConfig::blockSize; i++)
         {
-            filters[1].template retainCoeffForBlock<VFXConfig::blockSize>();
+            L[i] = rngGen.randPM1();
+            R[i] = rngGen.randPM1();
+
+            L[i] *= atten;
+            R[i] *= atten;
+        }
+        for (int i = 0; i < 11; ++i)
+        {
+            filters[i].template processBlock<VFXConfig::blockSize>(L, R, L, R);
+        }
+    }
+
+    void makeNoise(float *C)
+    {
+        float atten = this->getFloatParam(fpTilt);
+        if (atten > 0)
+        {
+            atten *= -4.f;
+        }
+        atten = this->dbToLinear(atten);
+
+        setCoeffs();
+
+        for (int i = 0; i < VFXConfig::blockSize; i++)
+        {
+            C[i] = rngGen.randPM1();
+
+            C[i] *= atten;
+        }
+        for (int i = 0; i < 11; ++i)
+        {
+            filters[i].template processBlock<VFXConfig::blockSize>(C, C);
         }
     }
 
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
+    {
+        bool stereo = this->getIntParam(ipStereo);
+        float threshold = this->getFloatParam(fpThreshold);
+        auto depth = this->getFloatParam(fpDepth);
+        bool mode = this->getIntParam(ipMode) > 0;
+
+        if (mode)
+        {
+            threshold *= 2.f;
+            threshold -= 1.f;
+        }
+
+        float noiseL alignas(16)[VFXConfig::blockSize];
+        float noiseR alignas(16)[VFXConfig::blockSize];
+        basic_blocks::mechanics::clear_block<VFXConfig::blockSize>(noiseL);
+        basic_blocks::mechanics::clear_block<VFXConfig::blockSize>(noiseR);
+
+        if (stereo)
+        {
+            makeNoise(noiseL, noiseR);
+        }
+        else
+        {
+            makeNoise(noiseL);
+            basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(noiseL, noiseR);
+        }
+
+        for (int i = 0; i < VFXConfig::blockSize; i++)
+        {
+            noiseL[i] *= depth;
+            noiseR[i] *= depth;
+
+            auto envL = mode ? datainL[i] : std::fabsf(datainL[i]);
+            auto envR = mode ? datainR[i] : std::fabsf(datainR[i]);
+
+            auto overL = std::min(threshold - envL, 0.f);
+            auto overR = std::min(threshold - envR, 0.f);
+
+            noiseL[i] *= overL;
+            noiseR[i] *= overR;
+
+            dataoutL[i] = datainL[i] + noiseL[i];
+            dataoutR[i] = datainR[i] + noiseR[i];
+        }
+    }
+
+    void processMonoToMono(float *datain, float *dataout, float pitch)
     {
         float threshold = this->getFloatParam(fpThreshold);
         auto depth = this->getFloatParam(fpDepth);
@@ -153,70 +247,35 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
             threshold -= 1.f;
         }
 
-        setCoeffsHighpass();
-        setCoeffsLowpass();
+        float noise alignas(16)[VFXConfig::blockSize];
+        basic_blocks::mechanics::clear_block<VFXConfig::blockSize>(noise);
+
+        makeNoise(noise);
 
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
-            auto noiseL = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
-                mPrior[0][0], mPrior[0][1], 0, mDistro(mGenerator));
-            auto noiseR = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
-                mPrior[1][0], mPrior[1][1], 0, mDistro(mGenerator));
+            noise[i] *= depth;
 
-            filters[0].processBlockStep(noiseL, noiseR);
-            filters[1].processBlockStep(noiseL, noiseR);
+            auto env = mode ? datain[i] : std::fabsf(datain[i]);
 
-            noiseL *= depth;
-            noiseR *= depth;
+            auto over = std::min(threshold - env, 0.f);
 
-            auto envL = mode ? datainL[i] : std::fabsf(datainL[i]);
-            auto envR = mode ? datainR[i] : std::fabsf(datainR[i]);
+            noise[i] *= over;
 
-            auto overL = std::min(threshold - envL, 0.f);
-            auto overR = std::min(threshold - envR, 0.f);
-
-            noiseL *= overL;
-            noiseR *= overR;
-
-            dataoutL[i] = datainL[i] + noiseL;
-            dataoutR[i] = datainR[i] + noiseR;
+            dataout[i] = datain[i] + noise[i];
         }
     }
 
-    //    void processMonoToMono(float *datain, float *dataout, float pitch)
-    //    {
-    //        for (int i = 0; i < VFXConfig::blockSize; i++)
-    //        {
-    //            auto input = datain[i];
-    //
-    //            dataout[i] = input;
-    //        }
-    //    }
-    //
-    //    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
-    //    {
-    //
-    //        for (int i = 0; i < VFXConfig::blockSize; i++)
-    //        {
-    //            auto inL = datainL[i];
-    //            auto inR = datainL[i];
-    //
-    //            dataoutL[i] = inL;
-    //            dataoutR[i] = inR;
-    //        }
-    //    }
-    //
-    //    bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
+    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
+    {
+        processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
+    }
+
+    bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
 
   protected:
-    float mPrior[2][2]{{0.f, 0.f}, {0.f, 0.f}};
-
-    std::minstd_rand mGenerator;
-    std::uniform_real_distribution<float> mDistro;
-
-    float hpFreqPrior = -1.f;
-    float lpFreqPrior = -1.f;
-    std::array<sst::filters::CytomicSVF, 2> filters;
+    float priorSlope = -1234.f;
+    std::array<sst::filters::CytomicSVF, 11> filters;
 };
 } // namespace sst::voice_effects::modulation
 #endif // SCXT_NOISEAM_H
