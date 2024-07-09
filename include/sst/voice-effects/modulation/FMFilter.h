@@ -140,6 +140,11 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
     {
         auto num = (float)(this->getIntParam(ipNum));
         auto denom = (float)(this->getIntParam(ipDenom));
+        if (num == denom)
+        {
+            return 0.f;
+        }
+
         auto ratio = num / denom;
         return 12 * std::log2(ratio);
     }
@@ -197,14 +202,7 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
         freqL = 440.0f * this->note_to_pitch_ignoring_tuning(freqL);
         freqR = 440.0f * this->note_to_pitch_ignoring_tuning(freqR);
 
-        float ratio = 1.f;
-
-        if (this->getIntParam(ipNum) != priorNum || this->getIntParam(ipDenom) != priorDenom)
-        {
-            ratio = getRatio();
-        }
-
-        mSinOsc.setRate(440.0 * 2 * M_PI * this->note_to_pitch_ignoring_tuning(pitch + ratio) *
+        mSinOsc.setRate(440.0 * 2 * M_PI * this->note_to_pitch_ignoring_tuning(pitch + getRatio()) *
                         this->getSampleRateInv());
 
         auto outputL = 0.f;
@@ -301,8 +299,6 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
     sst::filters::CytomicSVF filter;
     sst::filters::CytomicSVF DCfilter;
     sst::basic_blocks::dsp::QuadratureOscillator<float> mSinOsc;
-    int priorNum = -1;
-    int priorDenom = -1;
     bool isFirst = true;
 };
 } // namespace sst::voice_effects::modulation

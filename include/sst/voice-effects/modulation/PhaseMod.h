@@ -36,21 +36,20 @@ namespace sst::voice_effects::modulation
 template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VFXConfig>
 {
     static constexpr const char *effectName{"PhaseMod"};
+    static constexpr int numFloatParams{2};
+    static constexpr int numIntParams{2};
 
-    enum struct PhaseModFloatParams : uint32_t
+    enum FloatParams
     {
-        transpose,
-        depth,
-        num_params
+        fpTranspose,
+        fpDepth,
     };
 
-    enum struct PhaseModIntParams : uint32_t
+    enum IntParams
     {
-        num_params
+        ipNum,
+        ipDenom,
     };
-
-    static constexpr int numFloatParams{(int)PhaseModFloatParams::num_params};
-    static constexpr int numIntParams{(int)PhaseModIntParams::num_params};
 
     PhaseMod() : core::VoiceEffectTemplateBase<VFXConfig>(), pre(6, true), post(6, true) {}
 
@@ -60,16 +59,23 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
     {
         using pmd = basic_blocks::params::ParamMetaData;
 
-        switch ((PhaseModFloatParams)idx)
+        switch (idx)
         {
-        case PhaseModFloatParams::transpose:
-            return pmd()
-                .asFloat()
-                .withRange(-96, 96)
-                .withLinearScaleFormatting("semitones")
-                .withDefault(0)
-                .withName("Transpose");
-        case PhaseModFloatParams::depth:
+        case fpTranspose:
+            if (keytrackOn)
+            {
+                return pmd()
+                    .asFloat()
+                    .withRange(-96, 96)
+                    .withLinearScaleFormatting("semitones")
+                    .withDefault(0)
+                    .withName("Offset");
+            }
+            else
+            {
+                return pmd().asAudibleFrequency().withDefault(0).withName("Frequency");
+            }
+        case fpDepth:
             return pmd().asDecibel().withName("Depth").withDefault(0);
         default:
             break;
@@ -78,20 +84,51 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
         return pmd().withName("Unknown " + std::to_string(idx)).asPercent();
     }
 
+    basic_blocks::params::ParamMetaData intParamAt(int idx) const
+    {
+        using pmd = basic_blocks::params::ParamMetaData;
+
+        switch (idx)
+        {
+        case ipNum:
+            return pmd().asInt().withRange(1, 16).withDefault(1).withName("Numerator");
+        case ipDenom:
+            return pmd().asInt().withRange(1, 16).withDefault(1).withName("Denominator");
+        }
+
+        return pmd().withName("Error");
+    }
+
     void initVoiceEffect() {}
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
+
+    float getRatio()
+    {
+        auto num = (float)(this->getIntParam(ipNum));
+        auto denom = (float)(this->getIntParam(ipDenom));
+        if (num == denom)
+        {
+            return 0.f;
+        }
+
+        auto ratio = num / denom;
+        return 12 * std::log2(ratio);
+    }
 
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
     {
         namespace sdsp = sst::basic_blocks::dsp;
 
-        omega.set_target(0.5 * 440 *
-                         this->note_to_pitch_ignoring_tuning(
-                             pitch + this->getFloatParam((int)PhaseModFloatParams::transpose)) *
-                         M_PI_2 * this->getSampleRateInv());
-        pregain.set_target(3.1415 *
-                           this->dbToLinear(this->getFloatParam((int)PhaseModFloatParams::depth)));
+        auto freq = this->getFloatParam(fpTranspose) + getRatio();
+        if (keytrackOn)
+        {
+            freq += pitch;
+        }
+
+        omega.set_target(0.5 * 440 * this->note_to_pitch_ignoring_tuning(freq) * M_PI_2 *
+                         this->getSampleRateInv());
+        pregain.set_target(3.1415 * this->dbToLinear(this->getFloatParam(fpDepth)));
 
         constexpr int bs2 = VFXConfig::blockSize << 1;
         float OS alignas(16)[2][bs2];
@@ -111,7 +148,6 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
         if (phase > M_PI)
             phase -= 2 * M_PI;
 
-        namespace bd = sst::basic_blocks::dsp;
         const auto half = _mm_set1_ps(0.5f);
         for (int k = 0; k < bs2; k += 4)
         {
@@ -136,12 +172,15 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
     {
         namespace sdsp = sst::basic_blocks::dsp;
 
-        omega.set_target(0.5 * 440 *
-                         this->note_to_pitch_ignoring_tuning(
-                             pitch + this->getFloatParam((int)PhaseModFloatParams::transpose)) *
-                         M_PI_2 * this->getSampleRateInv());
-        pregain.set_target(3.1415 *
-                           this->dbToLinear(this->getFloatParam((int)PhaseModFloatParams::depth)));
+        auto freq = this->getFloatParam(fpTranspose) + getRatio();
+        if (keytrackOn)
+        {
+            freq += pitch;
+        }
+
+        omega.set_target(0.5 * 440 * this->note_to_pitch_ignoring_tuning(freq) * M_PI_2 *
+                         this->getSampleRateInv());
+        pregain.set_target(3.1415 * this->dbToLinear(this->getFloatParam(fpDepth)));
 
         constexpr int bs2 = VFXConfig::blockSize << 1;
         float OS alignas(16)[2][bs2];
@@ -161,7 +200,6 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
         if (phase > M_PI)
             phase -= 2 * M_PI;
 
-        namespace bd = sst::basic_blocks::dsp;
         const auto half = _mm_set1_ps(0.5f);
         for (int k = 0; k < bs2; k += 4)
         {
@@ -178,7 +216,16 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
         post.process_block_D2(OS[0], OS[0], bs2, dataoutL, 0);
     }
 
+    bool enableKeytrack(bool b)
+    {
+        auto res = (b != keytrackOn);
+        keytrackOn = b;
+        return res;
+    }
+    bool getKeytrack() const { return keytrackOn; }
+
   protected:
+    bool keytrackOn{true};
     double phase{0.0};
     sst::filters::HalfRate::HalfRateFilter pre, post;
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize> pregain;
