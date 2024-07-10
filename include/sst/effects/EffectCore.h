@@ -88,6 +88,8 @@ namespace sst::effects::core
 // Todo: as we port consider this FXConfig::BaseClass being a bit more configurable.
 template <typename FXConfig> struct EffectTemplateBase : public FXConfig::BaseClass
 {
+    using FXConfig_t = FXConfig;
+
     static_assert(std::is_integral<decltype(FXConfig::blockSize)>::value);
     static_assert(!(FXConfig::blockSize & (FXConfig::blockSize - 1))); // 2^n
     static_assert(FXConfig::blockSize >= 4);                           // > simd register length
