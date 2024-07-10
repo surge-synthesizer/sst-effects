@@ -24,6 +24,7 @@
 #include "../VoiceEffectCore.h"
 
 #include <iostream>
+#include <math.h>
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
@@ -114,7 +115,7 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
         {
             for (int i = 0; i < 11; ++i)
             {
-                float freq = std::powf(2, (i + 1.f)) * 10.f;
+                float freq = powf(2, (i + 1.f)) * 10.f;
                 if (i < 6)
                 {
                     filters[i].template setCoeffForBlock<VFXConfig::blockSize>(
@@ -221,8 +222,8 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
             noiseL[i] *= depth;
             noiseR[i] *= depth;
 
-            auto envL = mode ? datainL[i] : std::fabsf(datainL[i]);
-            auto envR = mode ? datainR[i] : std::fabsf(datainR[i]);
+            auto envL = mode ? datainL[i] : fabsf(datainL[i]);
+            auto envR = mode ? datainR[i] : fabsf(datainR[i]);
 
             auto overL = std::min(threshold - envL, 0.f);
             auto overR = std::min(threshold - envR, 0.f);
@@ -256,7 +257,7 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
         {
             noise[i] *= depth;
 
-            auto env = mode ? datain[i] : std::fabsf(datain[i]);
+            auto env = mode ? datain[i] : fabsf(datain[i]);
 
             auto over = std::min(threshold - env, 0.f);
 

@@ -24,6 +24,7 @@
 #include "../VoiceEffectCore.h"
 
 #include <iostream>
+#include <math.h>
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/rng_gen.h"
@@ -36,7 +37,7 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
 
     static constexpr int numFloatParams{2};
     static constexpr int numIntParams{1};
-    
+
     basic_blocks::dsp::RNGGen rngGen;
 
     enum FloatParams
@@ -83,26 +84,30 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
 
     void initVoiceEffect() {}
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
-    
+
     void setCoeffs()
     {
         float slope = this->getFloatParam(fpTilt) / 2;
         float posGain = this->dbToLinear(slope);
         float negGain = this->dbToLinear(-1 * slope);
         float res = .07f;
-        
+
         if (slope != priorSlope)
         {
             for (int i = 0; i < 11; ++i)
             {
-                float freq = std::powf(2, (i + 1.f)) * 10.f;
+                float freq = powf(2, (i + 1.f)) * 10.f;
                 if (i < 6)
                 {
-                    filters[i].template setCoeffForBlock<VFXConfig::blockSize>(filters::CytomicSVF::Mode::LOW_SHELF, freq, res, this->getSampleRateInv(), negGain);
+                    filters[i].template setCoeffForBlock<VFXConfig::blockSize>(
+                        filters::CytomicSVF::Mode::LOW_SHELF, freq, res, this->getSampleRateInv(),
+                        negGain);
                 }
                 else
                 {
-                    filters[i].template setCoeffForBlock<VFXConfig::blockSize>(filters::CytomicSVF::Mode::HIGH_SHELF, freq, res, this->getSampleRateInv(), posGain);
+                    filters[i].template setCoeffForBlock<VFXConfig::blockSize>(
+                        filters::CytomicSVF::Mode::HIGH_SHELF, freq, res, this->getSampleRateInv(),
+                        posGain);
                 }
             }
             priorSlope = slope;
@@ -120,7 +125,7 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
                        float pitch)
     {
         bool stereo = this->getIntParam(ipStereo);
-        
+
         float atten = this->getFloatParam(fpTilt);
         if (atten > 0)
         {
@@ -129,20 +134,21 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
         atten = this->dbToLinear(atten);
         float level = this->getFloatParam(fpLevel);
         level = level * level * level;
-        
+
         setCoeffs();
-        
+
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
             dataoutL[i] = rngGen.randPM1();
             dataoutR[i] = stereo ? rngGen.randPM1() : dataoutL[i];
-            
+
             dataoutL[i] *= level * atten;
             dataoutR[i] *= level * atten;
         }
         for (int i = 0; i < 11; ++i)
         {
-            filters[i].template processBlock<VFXConfig::blockSize>(dataoutL, dataoutR, dataoutL, dataoutR);
+            filters[i].template processBlock<VFXConfig::blockSize>(dataoutL, dataoutR, dataoutL,
+                                                                   dataoutR);
         }
     }
 
@@ -154,29 +160,29 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
             atten *= -4.f;
         }
         atten = this->dbToLinear(atten);
-        
+
         float level = this->getFloatParam(fpLevel);
         level = level * level * level;
-        
+
         setCoeffs();
-        
+
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
             dataout[i] = rngGen.randPM1();
             dataout[i] *= level * atten;
         }
-        
+
         for (int i = 0; i < 11; ++i)
         {
             filters[i].template processBlock<VFXConfig::blockSize>(dataout, dataout);
         }
     }
-    
+
     void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
     {
         processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
     }
-    
+
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
 
   protected:
