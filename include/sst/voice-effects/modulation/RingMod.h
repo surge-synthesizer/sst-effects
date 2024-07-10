@@ -38,11 +38,17 @@ template <typename VFXConfig> struct RingMod : core::VoiceEffectTemplateBase<VFX
     static constexpr const char *effectName{"Ring Mod"};
 
     static constexpr int numFloatParams{1};
-    static constexpr int numIntParams{0};
+    static constexpr int numIntParams{2};
 
     enum FloatParams
     {
         fpCarrierFrequency,
+    };
+
+    enum IntParams
+    {
+        ipNum,
+        ipDenom
     };
 
     RingMod() : core::VoiceEffectTemplateBase<VFXConfig>()
@@ -82,11 +88,32 @@ template <typename VFXConfig> struct RingMod : core::VoiceEffectTemplateBase<VFX
     {
         using pmd = basic_blocks::params::ParamMetaData;
 
+        switch (idx)
+        {
+        case ipNum:
+            return pmd().asInt().withRange(1, 16).withDefault(1).withName("Numerator");
+        case ipDenom:
+            return pmd().asInt().withRange(1, 16).withDefault(1).withName("Denominator");
+        }
+
         return pmd().withName("Error");
     }
 
     void initVoiceEffect() {}
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
+
+    float getRatio()
+    {
+        auto num = (float)(this->getIntParam(ipNum));
+        auto denom = (float)(this->getIntParam(ipDenom));
+        if (num == denom)
+        {
+            return 0.f;
+        }
+
+        auto ratio = num / denom;
+        return 12 * std::log2(ratio);
+    }
 
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
@@ -95,7 +122,7 @@ template <typename VFXConfig> struct RingMod : core::VoiceEffectTemplateBase<VFX
 
         auto pt = this->getFloatParam(fpCarrierFrequency) + (keytrackOn ? pitch : 0);
 
-        qosc.setRate(440.0 * 2 * M_PI * this->note_to_pitch_ignoring_tuning(pt) *
+        qosc.setRate(440.0 * 2 * M_PI * this->note_to_pitch_ignoring_tuning(pt + getRatio()) *
                      this->getSampleRateInv());
         for (int i = 0; i < VFXConfig::blockSize; ++i)
         {
@@ -112,7 +139,7 @@ template <typename VFXConfig> struct RingMod : core::VoiceEffectTemplateBase<VFX
         namespace mech = sst::basic_blocks::mechanics;
         auto pt = this->getFloatParam(fpCarrierFrequency) + (keytrackOn ? pitch : 0);
 
-        qosc.setRate(440.0 * 2 * M_PI * this->note_to_pitch_ignoring_tuning(pt) *
+        qosc.setRate(440.0 * 2 * M_PI * this->note_to_pitch_ignoring_tuning(pt + getRatio()) *
                      this->getSampleRateInv());
         for (int i = 0; i < VFXConfig::blockSize; ++i)
         {
@@ -131,10 +158,12 @@ template <typename VFXConfig> struct RingMod : core::VoiceEffectTemplateBase<VFX
     bool getKeytrack() const { return keytrackOn; }
 
   protected:
-    bool keytrackOn{false}, wasKeytrackOn{false};
+    bool keytrackOn{true};
     std::array<float, numFloatParams> mLastParam{};
     std::array<int, numIntParams> mLastIParam{};
     sst::basic_blocks::dsp::QuadratureOscillator<float> qosc;
+    int priorNum = -1;
+    int priorDenom = -1;
 };
 
 } // namespace sst::voice_effects::modulation
