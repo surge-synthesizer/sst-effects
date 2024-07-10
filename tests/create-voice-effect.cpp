@@ -43,6 +43,9 @@
 #include "sst/voice-effects/modulation/Tremolo.h"
 #include "sst/voice-effects/modulation/Phaser.h"
 #include "sst/voice-effects/modulation/FMFilter.h"
+#include "sst/voice-effects/generator/TiltNoise.h"
+#include "sst/voice-effects/modulation/NoiseAM.h"
+
 struct VTestConfig
 {
     struct BaseClass
@@ -162,4 +165,6 @@ TEST_CASE("Can Create Voice FX")
     {
         VTester<sst::voice_effects::modulation::FMFilter<VTestConfig>>::TestVFX();
     }
+    SECTION("Tilt Noise") { VTester<sst::voice_effects::generator::TiltNoise<VTestConfig>>::TestVFX(); }
+    SECTION("Phaser") { VTester<sst::voice_effects::modulation::NoiseAM<VTestConfig>>::TestVFX(); }
 }

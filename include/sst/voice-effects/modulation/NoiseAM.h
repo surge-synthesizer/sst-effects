@@ -24,6 +24,7 @@
 #include "../VoiceEffectCore.h"
 
 #include <iostream>
+#include <cmath>
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
