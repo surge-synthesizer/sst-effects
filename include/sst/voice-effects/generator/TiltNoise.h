@@ -24,7 +24,7 @@
 #include "../VoiceEffectCore.h"
 
 #include <iostream>
-#include <cmath>
+#include <math>
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/rng_gen.h"
@@ -96,7 +96,7 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
         {
             for (int i = 0; i < 11; ++i)
             {
-                float freq = std::powf(2, (i + 1.f)) * 10.f;
+                float freq = powf(2, (i + 1.f)) * 10.f;
                 if (i < 6)
                 {
                     filters[i].template setCoeffForBlock<VFXConfig::blockSize>(
