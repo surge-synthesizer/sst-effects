@@ -24,7 +24,7 @@
 #include "../VoiceEffectCore.h"
 
 #include <iostream>
-#include <math>
+#include <math.h>
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/rng_gen.h"
