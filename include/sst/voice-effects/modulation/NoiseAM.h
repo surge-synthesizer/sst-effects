@@ -29,7 +29,7 @@
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
 #include "sst/basic-blocks/mechanics/block-ops.h"
-#include "sst/basic-blocks/dsp/rng_gen.h"
+#include "sst/basic-blocks/dsp/RNG.h"
 
 namespace sst::voice_effects::modulation
 {
@@ -40,7 +40,7 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
     static constexpr int numFloatParams{3};
     static constexpr int numIntParams{2};
 
-    basic_blocks::dsp::RNGGen rngGen;
+    basic_blocks::dsp::RNG rng;
 
     enum FloatParams
     {
@@ -102,6 +102,7 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
     }
 
     void initVoiceEffect() {}
+    
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     void setCoeffs()
@@ -153,8 +154,8 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
 
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
-            L[i] = rngGen.randPM1();
-            R[i] = rngGen.randPM1();
+            L[i] = rng.unifPM1();
+            R[i] = rng.unifPM1();
 
             L[i] *= atten;
             R[i] *= atten;
@@ -178,8 +179,7 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
 
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
-            C[i] = rngGen.randPM1();
-
+            C[i] = rng.unifPM1();
             C[i] *= atten;
         }
         for (int i = 0; i < 11; ++i)
@@ -194,12 +194,13 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
         bool stereo = this->getIntParam(ipStereo);
         float threshold = this->getFloatParam(fpThreshold);
         auto depth = this->getFloatParam(fpDepth);
-        bool mode = this->getIntParam(ipMode) > 0;
+        bool mode = this->getIntParam(ipMode);
 
         if (mode)
         {
             threshold *= 2.f;
             threshold -= 1.f;
+            depth *= .5;
         }
 
         float noiseL alignas(16)[VFXConfig::blockSize];
@@ -225,8 +226,8 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
             auto envL = mode ? datainL[i] : fabsf(datainL[i]);
             auto envR = mode ? datainR[i] : fabsf(datainR[i]);
 
-            auto overL = std::min(threshold - envL, 0.f);
-            auto overR = std::min(threshold - envR, 0.f);
+            auto overL = std::max(envL - threshold, 0.f);
+            auto overR = std::max(envR - threshold, 0.f);
 
             noiseL[i] *= overL;
             noiseR[i] *= overR;
@@ -246,6 +247,7 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
         {
             threshold *= 2.f;
             threshold -= 1.f;
+            depth *= .5f;
         }
 
         float noise alignas(16)[VFXConfig::blockSize];
@@ -259,7 +261,7 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
 
             auto env = mode ? datain[i] : fabsf(datain[i]);
 
-            auto over = std::min(threshold - env, 0.f);
+            auto over = std::max(env - threshold, 0.f);
 
             noise[i] *= over;
 

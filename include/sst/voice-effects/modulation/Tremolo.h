@@ -24,11 +24,9 @@
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "../VoiceEffectCore.h"
 
-#include <random>
-#include <chrono>
-
 #include <iostream>
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
+#include "sst/basic-blocks/dsp/RNG.h"
 
 namespace sst::voice_effects::modulation
 {
@@ -38,6 +36,8 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
 
     static constexpr int numFloatParams{4};
     static constexpr int numIntParams{3};
+    
+    basic_blocks::dsp::RNG rng;
 
     enum FloatParams
     {
@@ -163,15 +163,6 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         }
     }
 
-    // Here's a little RNG engine we'll use to randomize start phase
-    float randUniZeroToOne()
-    {
-        std::random_device rd;
-        std::mt19937 gen(rd());
-        std::uniform_real_distribution<> dis(0, 1);
-        return static_cast<float>(dis(gen));
-    }
-
     /*
      Next is the actual DSP.
      Tremolo is a really simple effect: Multiply each audio sample (or block of samples in our case)
@@ -201,7 +192,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         // PhaseSet is false by default so this will run at note-on.
         if (!phaseSet)
         {
-            auto phase = randUniZeroToOne();   // get a random number
+            auto phase = rng.unif01();   // get a random number
             actualLFO.applyPhaseOffset(phase); // and initialize the LFO phase with it.
             phaseSet = true;                   // then set this true so it doesn't run next block.
         }
@@ -296,7 +287,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
 
         if (!phaseSet)
         {
-            auto phase = randUniZeroToOne();
+            auto phase = rng.unif01();
             actualLFO.applyPhaseOffset(phase);
             phaseSet = true;
         }
@@ -333,7 +324,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
 
         if (!phaseSet)
         {
-            auto phase = randUniZeroToOne();
+            auto phase = rng.unif01();
             actualLFO.applyPhaseOffset(phase);
             phaseSet = true;
         }
@@ -383,7 +374,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
 
         if (!phaseSet)
         {
-            auto phase = randUniZeroToOne();
+            auto phase = rng.unif01();
             actualLFO.applyPhaseOffset(phase);
             phaseSet = true;
         }
