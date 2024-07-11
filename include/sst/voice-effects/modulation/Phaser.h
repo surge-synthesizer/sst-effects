@@ -24,12 +24,11 @@
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "../VoiceEffectCore.h"
 
-#include <random>
-#include <chrono>
 #include <iostream>
 
 #include "sst/basic-blocks/mechanics/block-ops.h"
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
+#include "sst/basic-blocks/dsp/RNG.h"
 
 namespace sst::voice_effects::modulation
 {
@@ -42,6 +41,8 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
 
     static constexpr int maxPhases{6};
 
+    basic_blocks::dsp::RNG rng;
+    
     enum FloatParams
     {
         fpFeedback,
@@ -168,14 +169,6 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
         }
     }
 
-    float randUniZeroToOne()
-    {
-        std::random_device rd;
-        std::mt19937 gen(rd());
-        std::uniform_real_distribution<> dis(0, 1);
-        return static_cast<float>(dis(gen));
-    }
-
     bool phaseSet = false;
 
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
@@ -186,7 +179,7 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
 
         if (!phaseSet)
         {
-            auto phase = randUniZeroToOne();
+            auto phase = rng.unif01();
             actualLFO.applyPhaseOffset(phase);
             phaseSet = true;
         }
@@ -231,7 +224,7 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
 
         if (!phaseSet)
         {
-            auto phase = randUniZeroToOne();
+            auto phase = rng.unif01();
             actualLFO.applyPhaseOffset(phase);
             phaseSet = true;
         }

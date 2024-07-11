@@ -31,6 +31,7 @@
 #include <random>
 
 #include "sst/basic-blocks/mechanics/block-ops.h"
+#include "sst/basic-blocks/dsp/RNG.h"
 
 namespace sst::voice_effects::generator
 {
@@ -40,6 +41,8 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
 
     static constexpr int numFloatParams{3};
     static constexpr int numIntParams{1};
+    
+    basic_blocks::dsp::RNG rng;
 
     enum FloatParams
     {
@@ -55,15 +58,15 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
 
     // provide a function which is uniform bipolar float -1.f .. 1.f random values
     GenCorrelatedNoise()
-        : core::VoiceEffectTemplateBase<VFXConfig>(), mGenerator((size_t)this), mDistro(-1.f, 1.f)
+        : core::VoiceEffectTemplateBase<VFXConfig>()
     {
         // Warm up
         for (int i = 0; i < 7; ++i)
         {
             sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
-                mPrior[0][0], mPrior[0][1], 0, mDistro(mGenerator));
+                mPrior[0][0], mPrior[0][1], 0, rng.unifPM1());
             sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
-                mPrior[1][0], mPrior[1][1], 0, mDistro(mGenerator));
+                mPrior[1][0], mPrior[1][1], 0, rng.unifPM1());
         }
     }
 
@@ -136,9 +139,9 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
         for (int k = 0; k < VFXConfig::blockSize; k += this->getOversamplingRatio())
         {
             auto runLeft = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
-                mPrior[0][0], mPrior[0][1], mColorLerp.v, mDistro(mGenerator));
+                mPrior[0][0], mPrior[0][1], mColorLerp.v, rng.unifPM1());
             auto runRight = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
-                mPrior[1][0], mPrior[1][1], mColorLerp.v, mDistro(mGenerator));
+                mPrior[1][0], mPrior[1][1], mColorLerp.v, rng.unifPM1());
 
             midSideAdjust(widthParam, runLeft, runRight, dataoutL[k], dataoutR[k]);
 
@@ -164,7 +167,7 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
         for (int k = 0; k < VFXConfig::blockSize; k += this->getOversamplingRatio())
         {
             dataoutL[k] = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
-                mPrior[0][0], mPrior[0][1], mColorLerp.v, mDistro(mGenerator));
+                mPrior[0][0], mPrior[0][1], mColorLerp.v, rng.unifPM1());
             for (auto kk = 1; kk < this->getOversamplingRatio(); ++kk)
             {
                 dataoutL[k + kk] = dataoutL[k];
@@ -185,9 +188,7 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
 
   protected:
     float mPrior[2][2]{{0.f, 0.f}, {0.f, 0.f}};
-
-    std::minstd_rand mGenerator;
-    std::uniform_real_distribution<float> mDistro;
+    
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> mLevelLerp;
     sst::basic_blocks::dsp::lipol<float, VFXConfig::blockSize, true> mColorLerp;
 };

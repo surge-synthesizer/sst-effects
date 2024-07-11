@@ -27,7 +27,7 @@
 #include <math.h>
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
-#include "sst/basic-blocks/dsp/rng_gen.h"
+#include "sst/basic-blocks/dsp/RNG.h"
 
 namespace sst::voice_effects::generator
 {
@@ -38,7 +38,7 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
     static constexpr int numFloatParams{2};
     static constexpr int numIntParams{1};
 
-    basic_blocks::dsp::RNGGen rngGen;
+    basic_blocks::dsp::RNG rng;
 
     enum FloatParams
     {
@@ -139,8 +139,8 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
 
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
-            dataoutL[i] = rngGen.randPM1();
-            dataoutR[i] = stereo ? rngGen.randPM1() : dataoutL[i];
+            dataoutL[i] = rng.unifPM1();
+            dataoutR[i] = stereo ? rng.unifPM1() : dataoutL[i];
 
             dataoutL[i] *= level * atten;
             dataoutR[i] *= level * atten;
@@ -168,7 +168,7 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
 
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
-            dataout[i] = rngGen.randPM1();
+            dataout[i] = rng.unifPM1();
             dataout[i] *= level * atten;
         }
 

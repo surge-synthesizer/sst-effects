@@ -26,13 +26,12 @@
 
 #include "../VoiceEffectCore.h"
 
-#include <random>
-#include <chrono>
 #include <iostream>
 
 #include "sst/basic-blocks/mechanics/block-ops.h"
 #include "sst/basic-blocks/dsp/SSESincDelayLine.h"
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
+#include "sst/basic-blocks/dsp/RNG.h"
 #include "sst/basic-blocks/tables/SincTableProvider.h"
 #include "DelaySupport.h"
 
@@ -55,6 +54,8 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
 
     static constexpr int shortLineSize{15}; // enough for 250ms at 96k
     static constexpr int longLineSize{17};  // enough for 250ms at 96k
+    
+    basic_blocks::dsp::RNG rng;
 
     enum FloatParams
     {
@@ -205,14 +206,6 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
         }
     }
 
-    float randUniZeroToOne()
-    {
-        std::random_device rd;
-        std::mt19937 gen(rd());
-        std::uniform_real_distribution<> dis(0, 1);
-        return static_cast<float>(dis(gen));
-    }
-
     bool phaseSet = false;
 
     template <typename T>
@@ -227,7 +220,7 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
         auto lfoDepth = this->getFloatParam(fpDepth);
         if (!phaseSet)
         {
-            auto phase = randUniZeroToOne();
+            auto phase = rng.unif01();
             actualLFO.applyPhaseOffset(phase);
             phaseSet = true;
         }
