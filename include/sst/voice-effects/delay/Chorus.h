@@ -175,7 +175,7 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     using lfo_t = sst::basic_blocks::modulators::SimpleLFO<Chorus, VFXConfig::blockSize>;
-    lfo_t actualLFO{this, 1};
+    lfo_t actualLFO{this};
     typename lfo_t::Shape lfoShape = lfo_t::Shape::SINE;
 
     void shapeCheck()
