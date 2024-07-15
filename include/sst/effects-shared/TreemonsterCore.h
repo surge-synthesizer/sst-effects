@@ -197,7 +197,7 @@ void TreemonsterCore<BaseClass, BiquadType>::processWithoutMixOrWith(float *data
      */
     constexpr float smallest_wavelength = 16.0;
 
-    float qs = clamp01(this->floatValue(tm_speed));
+    float qs = std::clamp(this->floatValue(tm_speed), 0.f, 1.f);
     qs *= qs * qs * qs;
     float speed = 0.9999 - qs * 0.0999 / 128;
     float numberOfSteps = FXConfig::blockSize * 48000 / this->sampleRate();
@@ -303,7 +303,7 @@ void TreemonsterCore<BaseClass, BiquadType>::processWithoutMixOrWith(float *data
     mech::mul_block<FXConfig::blockSize>(R, dataR, tbuf[1]);
 
     // mix pure pitch tracked sine with ring modulated signal
-    rm.set_target_smoothed(clamp01(this->floatValue(tm_ring_mix)));
+    rm.set_target_smoothed(std::clamp(this->floatValue(tm_ring_mix), 0.f, 1.f));
     rm.fade_2_blocks_to(envscaledSineWave[0], tbuf[0], envscaledSineWave[1], tbuf[1], L, R);
 }
 
