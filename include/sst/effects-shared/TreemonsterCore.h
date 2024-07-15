@@ -216,7 +216,7 @@ void TreemonsterCore<BaseClass, BiquadType>::processWithoutMixOrWith(float *data
     {
         auto l2c = log2(this->sampleRate() / std::max(lsCache[c], 2.f) / MIDI_0_FREQ);
         auto l2s = log2(this->sampleRate() / std::max(length_smooth[c], 2.f) / MIDI_0_FREQ);
-        auto dl = (l2s - l2c) * FXConfig::blockSize_INV;
+        auto dl = (l2s - l2c) / FXConfig::blockSize;
 
         for (auto k = 0; k < FXConfig::blockSize; ++k)
         {
@@ -304,8 +304,7 @@ void TreemonsterCore<BaseClass, BiquadType>::processWithoutMixOrWith(float *data
 
     // mix pure pitch tracked sine with ring modulated signal
     rm.set_target_smoothed(clamp01(this->floatValue(tm_ring_mix)));
-    rm.fade_2_blocks_to(envscaledSineWave[0], tbuf[0], envscaledSineWave[1], tbuf[1], L, R,
-                        FXConfig::blockSize_QUAD);
+    rm.fade_2_blocks_to(envscaledSineWave[0], tbuf[0], envscaledSineWave[1], tbuf[1], L, R);
 }
 
 } // namespace sst::effects_shared
