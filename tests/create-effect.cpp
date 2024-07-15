@@ -29,6 +29,7 @@
 #include "sst/effects/Bonsai.h"
 #include "sst/effects/Phaser.h"
 #include "sst/effects/Reverb2.h"
+#include "sst/effects/TreeMonster.h"
 
 struct TestConfig
 {
@@ -118,4 +119,5 @@ TEST_CASE("Can Create Types")
     SECTION("Bonsai") { Tester<sst::effects::bonsai::Bonsai<TestConfig>>::TestFX(); }
     SECTION("Phaser") { Tester<sst::effects::phaser::Phaser<TestConfig>>::TestFX(); }
     SECTION("Reverb2") { Tester<sst::effects::reverb2::Reverb2<TestConfig>>::TestFX(); }
+    SECTION("TreeMonster") { Tester<sst::effects::treemonster::TreeMonster<TestConfig>>::TestFX(); }
 }

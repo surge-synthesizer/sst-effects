@@ -42,7 +42,7 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
     static constexpr int maxPhases{6};
 
     basic_blocks::dsp::RNG rng;
-    
+
     enum FloatParams
     {
         fpFeedback,

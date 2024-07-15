@@ -102,7 +102,7 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
     }
 
     void initVoiceEffect() {}
-    
+
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     void setCoeffs()
