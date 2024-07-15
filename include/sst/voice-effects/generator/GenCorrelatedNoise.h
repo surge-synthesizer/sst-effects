@@ -41,7 +41,7 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
 
     static constexpr int numFloatParams{3};
     static constexpr int numIntParams{1};
-    
+
     basic_blocks::dsp::RNG rng;
 
     enum FloatParams
@@ -57,8 +57,7 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
     };
 
     // provide a function which is uniform bipolar float -1.f .. 1.f random values
-    GenCorrelatedNoise()
-        : core::VoiceEffectTemplateBase<VFXConfig>()
+    GenCorrelatedNoise() : core::VoiceEffectTemplateBase<VFXConfig>()
     {
         // Warm up
         for (int i = 0; i < 7; ++i)
@@ -188,7 +187,7 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
 
   protected:
     float mPrior[2][2]{{0.f, 0.f}, {0.f, 0.f}};
-    
+
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> mLevelLerp;
     sst::basic_blocks::dsp::lipol<float, VFXConfig::blockSize, true> mColorLerp;
 };

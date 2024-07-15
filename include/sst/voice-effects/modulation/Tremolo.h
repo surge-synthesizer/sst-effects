@@ -36,7 +36,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
 
     static constexpr int numFloatParams{4};
     static constexpr int numIntParams{3};
-    
+
     basic_blocks::dsp::RNG rng;
 
     enum FloatParams
@@ -192,7 +192,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         // PhaseSet is false by default so this will run at note-on.
         if (!phaseSet)
         {
-            auto phase = rng.unif01();   // get a random number
+            auto phase = rng.unif01();         // get a random number
             actualLFO.applyPhaseOffset(phase); // and initialize the LFO phase with it.
             phaseSet = true;                   // then set this true so it doesn't run next block.
         }

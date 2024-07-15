@@ -54,7 +54,7 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
 
     static constexpr int shortLineSize{15}; // enough for 250ms at 96k
     static constexpr int longLineSize{17};  // enough for 250ms at 96k
-    
+
     basic_blocks::dsp::RNG rng;
 
     enum FloatParams

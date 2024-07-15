@@ -165,6 +165,9 @@ TEST_CASE("Can Create Voice FX")
     {
         VTester<sst::voice_effects::modulation::FMFilter<VTestConfig>>::TestVFX();
     }
-    SECTION("Tilt Noise") { VTester<sst::voice_effects::generator::TiltNoise<VTestConfig>>::TestVFX(); }
+    SECTION("Tilt Noise")
+    {
+        VTester<sst::voice_effects::generator::TiltNoise<VTestConfig>>::TestVFX();
+    }
     SECTION("Phaser") { VTester<sst::voice_effects::modulation::NoiseAM<VTestConfig>>::TestVFX(); }
 }
