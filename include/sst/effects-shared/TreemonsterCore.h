@@ -22,6 +22,7 @@
 #define INCLUDE_SST_EFFECTS_SHARED_TREEMONSTERCORE_H
 
 #include <utility>
+#include <cassert>
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/Lag.h"
@@ -41,7 +42,8 @@ template <typename T> struct FXConfigAdapter
 namespace sdsp = sst::basic_blocks::dsp;
 namespace mech = sst::basic_blocks::mechanics;
 
-template <typename BaseClass, typename BiquadType> struct TreemonsterCore : public BaseClass
+template <typename BaseClass, typename BiquadType, bool addHPLP = true>
+struct TreemonsterCore : public BaseClass
 {
     using FXConfig = typename FXConfigAdapter<BaseClass>::config_t;
 
@@ -63,7 +65,6 @@ template <typename BaseClass, typename BiquadType> struct TreemonsterCore : publ
 
     template <typename... Args>
     TreemonsterCore(Args &&...args) : BaseClass(std::forward<Args>(args)...)
-    // TODO: , lp(s), hp(s) move here from parent
     {
         rm.set_blocksize(FXConfig::blockSize);
         width.set_blocksize(FXConfig::blockSize);
@@ -98,6 +99,11 @@ template <typename BaseClass, typename BiquadType> struct TreemonsterCore : publ
 
     void initialize()
     {
+        if constexpr (addHPLP)
+        {
+            assert(hp.storage);
+            assert(lp.storage);
+        }
         setvars(true);
         bi = 0;
     }
@@ -113,21 +119,24 @@ template <typename BaseClass, typename BiquadType> struct TreemonsterCore : publ
     float envV[2];
 };
 
-template <typename BaseClass, typename BiquadType>
-inline void TreemonsterCore<BaseClass, BiquadType>::setvars(bool init)
+template <typename BaseClass, typename BiquadType, bool addHPLP>
+inline void TreemonsterCore<BaseClass, BiquadType, addHPLP>::setvars(bool init)
 {
     if (init)
     {
-        lp.suspend();
-        hp.suspend();
+        if constexpr (addHPLP)
+        {
+            lp.suspend();
+            hp.suspend();
 
-        auto hpv = this->floatValue(tm_hp);
-        hp.coeff_HP(hp.calc_omega(hpv / 12.0), 0.707);
-        hp.coeff_instantize();
+            auto hpv = this->floatValue(tm_hp);
+            hp.coeff_HP(hp.calc_omega(hpv / 12.0), 0.707);
+            hp.coeff_instantize();
 
-        auto lpv = this->floatValue(tm_lp);
-        lp.coeff_LP2B(lp.calc_omega(lpv / 12.0), 0.707);
-        lp.coeff_instantize();
+            auto lpv = this->floatValue(tm_lp);
+            lp.coeff_LP2B(lp.calc_omega(lpv / 12.0), 0.707);
+            lp.coeff_instantize();
+        }
 
         oscL.set_rate(0.f);
         oscR.set_rate(0.f);
@@ -158,9 +167,10 @@ inline void TreemonsterCore<BaseClass, BiquadType>::setvars(bool init)
         oscR.set_phase(M_PI / 2.0);
     }
 }
-template <typename BaseClass, typename BiquadType>
-void TreemonsterCore<BaseClass, BiquadType>::processWithoutMixOrWith(float *dataL, float *dataR,
-                                                                     float *L, float *R)
+template <typename BaseClass, typename BiquadType, bool addHPLP>
+void TreemonsterCore<BaseClass, BiquadType, addHPLP>::processWithoutMixOrWith(float *dataL,
+                                                                              float *dataR,
+                                                                              float *L, float *R)
 {
     static constexpr double MIDI_0_FREQ = 8.17579891564371; // or 440.0 * pow( 2.0, - (69.0/12.0 ) )
 
@@ -178,17 +188,20 @@ void TreemonsterCore<BaseClass, BiquadType>::processWithoutMixOrWith(float *data
     mech::copy_from_to<FXConfig::blockSize>(dataL, tbuf[0]);
     mech::copy_from_to<FXConfig::blockSize>(dataR, tbuf[1]);
 
-    // apply filters to the pitch detection buffer
-    if (!this->isDeactivated(tm_hp))
+    if constexpr (addHPLP)
     {
-        hp.coeff_HP(hp.calc_omega(this->floatValue(tm_hp) / 12.0), 0.707);
-        hp.process_block(tbuf[0], tbuf[1]);
-    }
+        // apply filters to the pitch detection buffer
+        if (!this->isDeactivated(tm_hp))
+        {
+            hp.coeff_HP(hp.calc_omega(this->floatValue(tm_hp) / 12.0), 0.707);
+            hp.process_block(tbuf[0], tbuf[1]);
+        }
 
-    if (!this->isDeactivated(tm_lp))
-    {
-        lp.coeff_LP2B(lp.calc_omega(this->floatValue(tm_lp) / 12.0), 0.707);
-        lp.process_block(tbuf[0], tbuf[1]);
+        if (!this->isDeactivated(tm_lp))
+        {
+            lp.coeff_LP2B(lp.calc_omega(this->floatValue(tm_lp) / 12.0), 0.707);
+            lp.process_block(tbuf[0], tbuf[1]);
+        }
     }
 
     /*
