@@ -41,38 +41,37 @@ namespace sst::effects::delay
 {
 namespace sdsp = sst::basic_blocks::dsp;
 namespace mech = sst::basic_blocks::mechanics;
+enum delay_params
+{
+    dly_time_left = 0,
+    dly_time_right,
+    dly_feedback,
+    dly_crossfeed,
+    dly_lowcut,
+    dly_highcut,
+    dly_mod_rate,
+    dly_mod_depth,
+    dly_input_channel,
+    dly_reserved, // looks like this one got removed at one point
+    dly_mix,
+    dly_width,
+
+    dly_num_params,
+};
+
+enum delay_clipping_modes
+{
+    dly_clipping_off,
+    dly_clipping_soft,
+    dly_clipping_tanh,
+    dly_clipping_hard,
+    dly_clipping_hard18,
+
+    num_dly_clipping_modes,
+};
 
 template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
 {
-    enum delay_params
-    {
-        dly_time_left = 0,
-        dly_time_right,
-        dly_feedback,
-        dly_crossfeed,
-        dly_lowcut,
-        dly_highcut,
-        dly_mod_rate,
-        dly_mod_depth,
-        dly_input_channel,
-        dly_reserved, // looks like this one got removed at one point
-        dly_mix,
-        dly_width,
-
-        dly_num_params,
-    };
-
-    enum delay_clipping_modes
-    {
-        dly_clipping_off,
-        dly_clipping_soft,
-        dly_clipping_tanh,
-        dly_clipping_hard,
-        dly_clipping_hard18,
-
-        num_dly_clipping_modes,
-    };
-
     static constexpr int numParams{dly_num_params};
     static constexpr const char *effectName{"delay"};
 
