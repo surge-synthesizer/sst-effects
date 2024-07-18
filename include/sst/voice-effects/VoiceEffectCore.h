@@ -201,6 +201,7 @@ template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig:
     HASMEM(oversamplingRatio, constexpr int16_t getOversamplingRatio(), 1, );
     HASMEM(getTempoPointer, double *getBaseTempoPointer(), &defaultTempo, (asBase()));
     HASMEM(isTemposync, bool getIsTemposync(), false, (asBase()));
+    HASMEM(isDeactivated, bool getIsDeactivated(int index), false, (asBase(), index));
 
 #undef HASMEM
 

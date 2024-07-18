@@ -50,8 +50,6 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
     enum struct WaveShaperIntParams : uint32_t
     {
         type,
-        hpOn,
-        lpOn,
         num_params
     };
 
@@ -65,8 +63,6 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
-        bool hp = this->getIntParam((int)WaveShaperIntParams::hpOn) > 0;
-        bool lp = this->getIntParam((int)WaveShaperIntParams::lpOn) > 0;
 
         switch ((WaveShaperFloatParams)idx)
         {
@@ -82,24 +78,24 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
                 return pmd()
                     .asFloat()
                     .withRange(-48, 48)
-                    .withName(!hp ? "Highpass" : "HP Offset")
+                    .withName("HP Off")
                     .withDefault(-48)
+                    .deactivatable()
                     .withLinearScaleFormatting("semitones");
             }
-            return pmd().asAudibleFrequency().withDefault(-60).withName(!hp ? "Highpass"
-                                                                            : "HP Frequency");
+            return pmd().asAudibleFrequency().withDefault(-60).withName("LoCut").deactivatable();
         case WaveShaperFloatParams::lowpass:
             if (keytrackOn)
             {
                 return pmd()
                     .asFloat()
                     .withRange(-48, 48)
-                    .withName(!lp ? "Lowpass" : "LP Offset")
+                    .withName("LP Off")
                     .withDefault(48)
-                    .withLinearScaleFormatting("semitones");
+                    .withLinearScaleFormatting("semitones")
+                    .deactivatable();
             }
-            return pmd().asAudibleFrequency().withDefault(70).withName(!lp ? "Lowpass"
-                                                                           : "LP Frequency");
+            return pmd().asAudibleFrequency().withDefault(70).withName("HiCut").deactivatable();
         default:
             break;
         }
@@ -128,10 +124,6 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
                 .withUnorderedMapFormatting(names)
                 .withDefault(1);
         }
-        case WaveShaperIntParams::hpOn:
-            return pmd().asBool().withDefault(false).withName("Highpass");
-        case WaveShaperIntParams::lpOn:
-            return pmd().asBool().withDefault(false).withName("Lowpass");
         default:
             break;
         }
@@ -222,8 +214,8 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
     {
-        bool hpActive = this->getIntParam((int)WaveShaperIntParams::hpOn);
-        bool lpActive = this->getIntParam((int)WaveShaperIntParams::lpOn);
+        bool hpActive = this->getIsDeactivated((int)WaveShaperFloatParams::highpass);
+        bool lpActive = this->getIsDeactivated((int)WaveShaperFloatParams::lowpass);
         namespace mech = sst::basic_blocks::mechanics;
 
         checkType();
@@ -259,8 +251,8 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
 
     void processMonoToMono(float *datainL, float *dataoutL, float pitch)
     {
-        bool hpActive = this->getIntParam((int)WaveShaperIntParams::hpOn);
-        bool lpActive = this->getIntParam((int)WaveShaperIntParams::lpOn);
+        bool hpActive = this->getIsDeactivated((int)WaveShaperFloatParams::highpass);
+        bool lpActive = this->getIsDeactivated((int)WaveShaperFloatParams::lowpass);
         namespace mech = sst::basic_blocks::mechanics;
 
         checkType();
