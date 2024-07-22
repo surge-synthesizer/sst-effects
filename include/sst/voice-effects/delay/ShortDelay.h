@@ -117,9 +117,9 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
                                                                        : "CrossFeed");
 
         case fpLowCut:
-            return pmd().asAudibleFrequency().withDefault(-60).withName("LowCut");
+            return pmd().asAudibleFrequency().withDefault(-60).withName("LowCut").deactivatable();
         case fpHighCut:
-            return pmd().asAudibleFrequency().withDefault(70).withName("HighCut");
+            return pmd().asAudibleFrequency().withDefault(70).withName("HighCut").deactivatable();
         }
         return pmd().withName("Error");
     }
@@ -198,16 +198,23 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
         float crossfeed alignas(16)[VFXConfig::blockSize];
         lipolCross.store_block(crossfeed);
 
-        lp.coeff_LP2B(lp.calc_omega(this->getFloatParam(fpHighCut) / 12.0), 0.707);
-        hp.coeff_HP(hp.calc_omega(this->getFloatParam(fpLowCut) / 12.0), 0.707);
+        auto lpen = !this->getIsDeactivated(fpHighCut);
+        auto hpen = !this->getIsDeactivated(fpLowCut);
+
+        if (lpen)
+            lp.coeff_LP2B(lp.calc_omega(this->getFloatParam(fpHighCut) / 12.0), 0.707);
+        if (hpen)
+            hp.coeff_HP(hp.calc_omega(this->getFloatParam(fpLowCut) / 12.0), 0.707);
 
         for (int i = 0; i < VFXConfig::blockSize; ++i)
         {
             auto out0 = lines[0]->read(ld[0][i]);
             auto out1 = lines[1]->read(ld[1][i]);
 
-            lp.process_sample(out0, out1, out0, out1);
-            hp.process_sample(out0, out1, out0, out1);
+            if (lpen)
+                lp.process_sample(out0, out1, out0, out1);
+            if (hpen)
+                hp.process_sample(out0, out1, out0, out1);
 
             dataoutL[i] = out0;
             dataoutR[i] = out1;
@@ -253,16 +260,22 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
         float fb alignas(16)[VFXConfig::blockSize];
         lipolFb.store_block(fb);
 
-        lp.coeff_LP2B(lp.calc_omega(this->getFloatParam(fpHighCut) / 12.0), 0.707);
-        hp.coeff_HP(hp.calc_omega(this->getFloatParam(fpLowCut) / 12.0), 0.707);
+        auto lpen = !this->getIsDeactivated(fpHighCut);
+        auto hpen = !this->getIsDeactivated(fpLowCut);
+        if (lpen)
+            lp.coeff_LP2B(lp.calc_omega(this->getFloatParam(fpHighCut) / 12.0), 0.707);
+        if (hpen)
+            hp.coeff_HP(hp.calc_omega(this->getFloatParam(fpLowCut) / 12.0), 0.707);
 
         for (int i = 0; i < VFXConfig::blockSize; ++i)
         {
             auto output = line->read(ld[i]);
 
             auto nope = 0.f;
-            lp.process_sample(output, nope, output, nope);
-            hp.process_sample(output, nope, output, nope);
+            if (lpen)
+                lp.process_sample(output, nope, output, nope);
+            if (hpen)
+                hp.process_sample(output, nope, output, nope);
 
             dataoutL[i] = output;
 

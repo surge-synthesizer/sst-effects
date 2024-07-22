@@ -214,8 +214,8 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
     {
-        bool hpActive = this->getIsDeactivated((int)WaveShaperFloatParams::highpass);
-        bool lpActive = this->getIsDeactivated((int)WaveShaperFloatParams::lowpass);
+        bool hpActive = !this->getIsDeactivated((int)WaveShaperFloatParams::highpass);
+        bool lpActive = !this->getIsDeactivated((int)WaveShaperFloatParams::lowpass);
         namespace mech = sst::basic_blocks::mechanics;
 
         checkType();
@@ -251,8 +251,8 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
 
     void processMonoToMono(float *datainL, float *dataoutL, float pitch)
     {
-        bool hpActive = this->getIsDeactivated((int)WaveShaperFloatParams::highpass);
-        bool lpActive = this->getIsDeactivated((int)WaveShaperFloatParams::lowpass);
+        bool hpActive = !this->getIsDeactivated((int)WaveShaperFloatParams::highpass);
+        bool lpActive = !this->getIsDeactivated((int)WaveShaperFloatParams::lowpass);
         namespace mech = sst::basic_blocks::mechanics;
 
         checkType();
@@ -266,7 +266,7 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
         if (hpActive)
         {
             setCoeffsHighpass(pitch);
-            filters[0].template processBlock<VFXConfig::blockSize>(dataoutL, dataoutL);
+            filters[0].template processBlock<VFXConfig::blockSize>(datainL, dataoutL);
         }
         else
         {
