@@ -204,7 +204,6 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
         {
             threshold *= 2.f;
             threshold -= 1.f;
-            depth *= .5;
         }
 
         float noiseL alignas(16)[VFXConfig::blockSize];
@@ -224,17 +223,47 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
 
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
-            noiseL[i] *= depth;
-            noiseR[i] *= depth;
+            auto envL = datainL[i];
+            auto envR = datainR[i];
 
-            auto envL = mode ? datainL[i] : fabsf(datainL[i]);
-            auto envR = mode ? datainR[i] : fabsf(datainR[i]);
+            float overL = 0.f;
+            float overR = 0.f;
 
-            auto overL = std::max(envL - threshold, 0.f);
-            auto overR = std::max(envR - threshold, 0.f);
+            if (!mode) // in bipolar mode
+            {
+                // the env is absolute
+                envL = fabsf(envL);
+                envR = fabsf(envR);
 
-            noiseL[i] *= overL;
-            noiseR[i] *= overR;
+                // and we add some offset to the noise, more so at high depth
+                noiseL[i] = noiseL[i] + (0.75f * (depth * depth * depth));
+                noiseR[i] = noiseR[i] + (0.75f * (depth * depth * depth));
+
+                // subtracting the noise if the input is positive
+                if (datainL[i] > 0)
+                {
+                    noiseL[i] *= -1;
+                }
+                if (datainR[i] > 0)
+                {
+                    noiseR[i] *= -1;
+                }
+                // this keeps the combined peaks under control and saturates the signal a bit
+
+                // this is the overshoot calculation
+                overL = std::max(envL - threshold, 0.f);
+                overR = std::max(envR - threshold, 0.f);
+            }
+            else
+            {
+                // which is reversed in unipolar mode, just so it plays nicer with asym waveshapes
+                overL = std::min(envL + threshold, 0.f);
+                overR = std::min(envR + threshold, 0.f);
+                // runaway peaks are a bit less problematic here so don't mess with the noise
+            }
+
+            noiseL[i] *= depth * overL;
+            noiseR[i] *= depth * overR;
 
             dataoutL[i] = datainL[i] + noiseL[i];
             dataoutR[i] = datainR[i] + noiseR[i];
@@ -251,7 +280,6 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
         {
             threshold *= 2.f;
             threshold -= 1.f;
-            depth *= .5f;
         }
 
         float noise alignas(16)[VFXConfig::blockSize];
@@ -261,13 +289,29 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
 
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
-            noise[i] *= depth;
+            auto env = datain[i];
 
-            auto env = mode ? datain[i] : fabsf(datain[i]);
+            float over = 0.f;
 
-            auto over = std::max(env - threshold, 0.f);
+            if (!mode)
+            {
+                env = fabsf(env);
 
-            noise[i] *= over;
+                noise[i] = noise[i] + (0.75f * (depth * depth * depth));
+
+                if (datain[i] > 0)
+                {
+                    noise[i] *= -1;
+                }
+
+                over = std::max(env - threshold, 0.f);
+            }
+            else
+            {
+                over = std::min(env + threshold, 0.f);
+            }
+
+            noise[i] *= depth * over;
 
             dataout[i] = datain[i] + noise[i];
         }
