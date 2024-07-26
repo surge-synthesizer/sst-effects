@@ -31,6 +31,9 @@
 #include "sst/effects/Bonsai.h"
 #include "sst/effects/Phaser.h"
 #include "sst/effects/Reverb2.h"
+#include "sst/effects/TreeMonster.h"
+#include "sst/effects/Nimbus.h"
+#include "sst/effects/NimbusImpl.h"
 
 namespace sfx = sst::effects;
 
@@ -98,4 +101,9 @@ TEST_CASE("Can Run Types with Concrete Config")
     SECTION("Delay") { Tester<sfx::delay::Delay<sfx::core::ConcreteConfig>>::TestFX(); }
     SECTION("Bonsai") { Tester<sfx::bonsai::Bonsai<sfx::core::ConcreteConfig>>::TestFX(); }
     SECTION("Phaser") { Tester<sfx::phaser::Phaser<sfx::core::ConcreteConfig>>::TestFX(); }
+    SECTION("TreeMonster")
+    {
+        Tester<sst::effects::treemonster::TreeMonster<sfx::core::ConcreteConfig>>::TestFX();
+    }
+    SECTION("Nimbus") { Tester<sst::effects::nimbus::Nimbus<sfx::core::ConcreteConfig>>::TestFX(); }
 }

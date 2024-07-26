@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 add_library(${PROJECT_NAME} INTERFACE)
 target_include_directories(${PROJECT_NAME} INTERFACE include)
+# there's a bit more below this
 
 if (${SST_EFFECTS_BUILD_TESTS})
     include(cmake/CPM.cmake)
@@ -37,11 +38,18 @@ if (${SST_EFFECTS_BUILD_TESTS})
                 )
     endif ()
 
+    if (NOT TARGET eurorack)
+        CPMAddPackage(NAME eurorack
+                GITHUB_REPOSITORY surge-synthesizer/eurorack
+                GIT_TAG surge
+        )
+    endif ()
+
     if (NOT TARGET simde)
         CPMAddPackage(NAME simde
                 GITHUB_REPOSITORY simd-everywhere/simde
                 VERSION 0.7.2
-                )
+        )
         add_library(simde INTERFACE)
         target_include_directories(simde INTERFACE ${simde_SOURCE_DIR})
     endif ()
@@ -67,3 +75,11 @@ if (${SST_EFFECTS_BUILD_TESTS})
     target_compile_definitions(${PROJECT_NAME}-test PRIVATE CATCH_CONFIG_DISABLE_EXCEPTIONS=1)
 
 endif ()
+
+
+if (TARGET eurorack)
+    target_link_libraries(${PROJECT_NAME} INTERFACE eurorack)
+    target_compile_definitions(${PROJECT_NAME} INTERFACE SST_EFFECTS_EURORACK=1)
+else()
+    message(STATUS "sst-effects built without eurorack library; Nimbus effect is no-op")
+endif()
