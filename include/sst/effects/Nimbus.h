@@ -167,7 +167,7 @@ template <typename FXConfig> struct Nimbus : core::EffectTemplateBase<FXConfig>
         case nmb_reverb:
             return pmd().asPercent().withName("Reverb").withDefault(0.f);
         case nmb_mix:
-            return pmd().asPercent().withName("Mix").withDefault(0.f);
+            return pmd().asPercent().withName("Mix").withDefault(0.5f);
         case nmb_num_params:
             break;
         }
