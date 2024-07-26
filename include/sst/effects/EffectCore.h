@@ -171,10 +171,7 @@ template <typename FXConfig> struct EffectTemplateBase : public FXConfig::BaseCl
         }
     }
 
-    inline float intValue(int idx) const
-    {
-        return FXConfig::intValueAt(asBase(), valueStorage, idx);
-    }
+    inline int intValue(int idx) const { return FXConfig::intValueAt(asBase(), valueStorage, idx); }
 
     inline float temposyncRatio(int idx) const
     {
