@@ -37,7 +37,7 @@
 
 #undef TEST
 #ifdef _MSC_VER
-#undefine __attribute__
+#undef __attribute__
 #endif
 
 namespace sst::effects::nimbus
