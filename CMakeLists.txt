@@ -40,7 +40,7 @@ if (${SST_EFFECTS_BUILD_TESTS})
 
     if (NOT TARGET eurorack)
         CPMAddPackage(NAME eurorack
-                GITHUB_REPOSITORY surge-synthesizer/mit -m feurorack
+                GITHUB_REPOSITORY surge-synthesizer/eurorack
                 GIT_TAG surge
         )
     endif ()
