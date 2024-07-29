@@ -31,7 +31,7 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
     static constexpr const char *effectName{"BitCrusher"};
 
     static constexpr int numFloatParams{5};
-    static constexpr int numIntParams{1};
+    static constexpr int numIntParams{2};
 
     enum FloatParams
     {
@@ -44,7 +44,8 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
 
     enum IntParams
     {
-        ipFilterSwitch
+        ipFilterSwitch,
+        ipFilterMode
     };
 
     BitCrusher() : core::VoiceEffectTemplateBase<VFXConfig>() {}
@@ -104,6 +105,12 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
         case ipFilterSwitch:
             return pmd().asBool().withName("Filter Engage");
             break;
+        case ipFilterMode:
+            return pmd()
+                .asInt()
+                .withRange(0, 2)
+                .withUnorderedMapFormatting({{0, "LP"}, {1, "HP"}, {2, "BP"}})
+                .withDefault(0);
         }
         return pmd().withName("oops");
     }
@@ -114,6 +121,19 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
                        float pitch)
     {
         bool filterSwitch = this->getIntParam(ipFilterSwitch);
+        int filtMode = this->getIntParam(ipFilterMode);
+        sst::filters::CytomicSVF::Mode mode{};
+        switch (filtMode)
+        {
+        case 1:
+            mode = sst::filters::CytomicSVF::HP;
+            break;
+        case 2:
+            mode = sst::filters::CytomicSVF::BP;
+            break;
+        default:
+            mode = sst::filters::CytomicSVF::LP;
+        }
         float sRate = this->getFloatParam(fpSamplerate);
         if (keytrackOn)
         {
@@ -133,8 +153,8 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
 
         if (priorFreq != filterFreq && filterSwitch == true)
         {
-            filter.template setCoeffForBlock<VFXConfig::blockSize>(
-                filters::CytomicSVF::LP, filterFreq, reso, this->getSampleRateInv(), 0.f);
+            filter.template setCoeffForBlock<VFXConfig::blockSize>(mode, filterFreq, reso,
+                                                                   this->getSampleRateInv(), 0.f);
         }
 
         int k;
