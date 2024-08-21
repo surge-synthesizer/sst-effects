@@ -163,7 +163,9 @@ void Nimbus<FXConfig>::processBlock(float *__restrict dataL, float *__restrict d
             parm->feedback = std::clamp(this->floatValue(nmb_feedback), 0.f, 1.f);
             parm->freeze = this->floatValue(nmb_freeze) > 0.5;
             parm->reverb = std::clamp(this->floatValue(nmb_reverb), 0.f, 1.f);
-            parm->dry_wet = 1.f;
+            // Supercell (and maybe original) has a bug with an interpolation
+            // read off end of mix line at exactly 1.0
+            parm->dry_wet = 0.99999f; // 1.f;
 
 #if EURORACK_CLOUDS_IS_SUPERPARASITES
             parm->capture = nimbusTrigger;
