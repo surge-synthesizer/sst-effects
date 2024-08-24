@@ -57,6 +57,21 @@ struct DelayLineSupport
         }
     }
 
+    template <size_t N> void clearLine()
+    {
+        auto res = std::get<N - shortestN>(linePointers);
+        if (res)
+        {
+            res->clear();
+        }
+    }
+
+    template <size_t N> bool hasLinePointer()
+    {
+        auto res = std::get<N - shortestN>(linePointers);
+        return res != nullptr;
+    }
+
     template <size_t N> LineN<N> *getLinePointer()
     {
         auto res = std::get<N - shortestN>(linePointers);
@@ -65,7 +80,7 @@ struct DelayLineSupport
     }
 
   protected:
-    uint8_t *lineBuffer;
+    uint8_t *lineBuffer{nullptr};
 
     std::tuple<LineN<12> *, LineN<13> *, LineN<14> *, LineN<15> *, LineN<16> *, LineN<17> *,
                LineN<18> *, LineN<19> *, LineN<20> *>

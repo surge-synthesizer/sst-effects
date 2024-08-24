@@ -132,12 +132,12 @@ template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig:
                                    std::declval<typename VFXConfig::BaseClass *>())),
                                float>::value,
                   "Implement getSampleRate");
-    float getSampleRate() { return VFXConfig::getSampleRate(asBase()); }
+    float getSampleRate() const { return VFXConfig::getSampleRate(asBase()); }
     static_assert(std::is_same<decltype(VFXConfig::getSampleRateInv(
                                    std::declval<typename VFXConfig::BaseClass *>())),
                                float>::value,
                   "Implement getSampleRateInv");
-    float getSampleRateInv() { return VFXConfig::getSampleRateInv(asBase()); }
+    float getSampleRateInv() const { return VFXConfig::getSampleRateInv(asBase()); }
 
     /*
      * We have to provide a memory pool
