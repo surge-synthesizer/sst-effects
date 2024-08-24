@@ -137,8 +137,20 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
             isShort = false;
             for (int i = 0; i < 2; ++i)
             {
-                lineSupport[i].template preReserveLines<longLineSize>(this);
-                lineSupport[i].template prepareLine<longLineSize>(this, sSincTable);
+                if (lineSupport[i].template hasLinePointer<shortLineSize>())
+                {
+                    // swapped short to long. Return
+                    lineSupport[i].template returnLines<shortLineSize>(this);
+                }
+                if (!lineSupport[i].template hasLinePointer<longLineSize>())
+                {
+                    lineSupport[i].template preReserveLines<longLineSize>(this);
+                    lineSupport[i].template prepareLine<longLineSize>(this, sSincTable);
+                }
+                else
+                {
+                    lineSupport[i].template clearLine<longLineSize>();
+                }
             }
         }
         else
@@ -146,8 +158,20 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
             isShort = true;
             for (int i = 0; i < 2; ++i)
             {
-                lineSupport[i].template preReserveLines<shortLineSize>(this);
-                lineSupport[i].template prepareLine<shortLineSize>(this, sSincTable);
+                if (lineSupport[i].template hasLinePointer<longLineSize>())
+                {
+                    // swapped long to short. Return
+                    lineSupport[i].template returnLines<longLineSize>(this);
+                }
+                if (!lineSupport[i].template hasLinePointer<shortLineSize>())
+                {
+                    lineSupport[i].template preReserveLines<shortLineSize>(this);
+                    lineSupport[i].template prepareLine<shortLineSize>(this, sSincTable);
+                }
+                else
+                {
+                    lineSupport[i].template clearLine<shortLineSize>();
+                }
             }
         }
 
@@ -336,8 +360,40 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
 
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
     bool checkParameterConsistency() const { return true; }
+    size_t tailLength() const
+    {
+        auto fbsum = this->getFloatParam(fpFeedback) + this->getFloatParam(fpCrossFeed);
+        if (fbsum > 1)
+        {
+            return -1;
+        }
+        auto tm = lipolDelay[0].target;
+        if (this->getIntParam(ipStereo))
+            tm = std::max(tm, lipolDelay[1].target);
 
-  protected:
+        // so fbsum ^ N = 1e-4
+        // n log fbsum = log 1e-4
+        // n = log 1e-4 / log fbsum
+        // so if you use log10 its -4 / log fbsum
+        //
+        // You get at least one hit so you add a time to N
+        // so (N+1) tm is the ringout.
+        // But that log_fbsum is expensive. So lets just store
+        // some static values for values 0.05,.... up to 1
+        static constexpr float fbVals[]{3.074487147360963,  4.0,
+                                        4.854906619166852,  5.7227062322935724,
+                                        6.643856189774724,  7.649957157572793,
+                                        8.773238967862678,  10.05176637892824,
+                                        11.534441578462017, 13.287712379549449,
+                                        15.406106280365744, 18.03030220777539,
+                                        21.380468045300727, 25.82278494325153,
+                                        32.01569111860437,  41.275404634064685,
+                                        56.672415948335924, 87.41738130713135,
+                                        179.5622699214194,  250};
+        auto ct = std::clamp((int)floor(fbsum * 20), 0, 19);
+        return tm * (fbVals[ct] + 1);
+    }
+
     std::array<details::DelayLineSupport, 2> lineSupport;
     bool isShort{true};
 
