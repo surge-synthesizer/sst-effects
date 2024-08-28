@@ -41,6 +41,7 @@
 #include "sst/voice-effects/filter/SurgeBiquads.h"
 #include "sst/voice-effects/filter/SSTFilters.h"
 #include "sst/voice-effects/filter/StaticPhaser.h"
+#include "sst/voice-effects/modulation/ShepardPhaser.h"
 #include "sst/voice-effects/modulation/Tremolo.h"
 #include "sst/voice-effects/modulation/Phaser.h"
 #include "sst/voice-effects/modulation/FMFilter.h"
@@ -163,6 +164,10 @@ TEST_CASE("Can Create Voice FX")
     SECTION("Static Phaser")
     {
         VTester<sst::voice_effects::filter::StaticPhaser<VTestConfig>>::TestVFX();
+    }
+    SECTION("Shepard Phaser")
+    {
+        VTester<sst::voice_effects::modulation::ShepardPhaser<VTestConfig>>::TestVFX();
     }
     SECTION("Tremolo") { VTester<sst::voice_effects::modulation::Tremolo<VTestConfig>>::TestVFX(); }
     SECTION("Phaser") { VTester<sst::voice_effects::modulation::Phaser<VTestConfig>>::TestVFX(); }
