@@ -25,7 +25,6 @@
 #include "../VoiceEffectCore.h"
 
 #include <iostream>
-#include <cmath>
 
 #include "sst/basic-blocks/mechanics/block-ops.h"
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
@@ -38,8 +37,6 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
 
     static constexpr int numFloatParams{4};
     static constexpr int numIntParams{2};
-
-    basic_blocks::dsp::RNG rng;
 
     enum FloatParams
     {

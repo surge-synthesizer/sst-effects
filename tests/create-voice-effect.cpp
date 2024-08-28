@@ -41,7 +41,7 @@
 #include "sst/voice-effects/filter/SurgeBiquads.h"
 #include "sst/voice-effects/filter/SSTFilters.h"
 #include "sst/voice-effects/filter/StaticPhaser.h"
-#include "sst/voice-effects/filter/ShepardPhaser.h"
+#include "sst/voice-effects/modulation/ShepardPhaser.h"
 #include "sst/voice-effects/modulation/Tremolo.h"
 #include "sst/voice-effects/modulation/Phaser.h"
 #include "sst/voice-effects/modulation/FMFilter.h"
