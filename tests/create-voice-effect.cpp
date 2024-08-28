@@ -167,7 +167,7 @@ TEST_CASE("Can Create Voice FX")
     }
     SECTION("Shepard Phaser")
     {
-        VTester<sst::voice_effects::filter::ShepardPhaser<VTestConfig>>::TestVFX();
+        VTester<sst::voice_effects::modulation::ShepardPhaser<VTestConfig>>::TestVFX();
     }
     SECTION("Tremolo") { VTester<sst::voice_effects::modulation::Tremolo<VTestConfig>>::TestVFX(); }
     SECTION("Phaser") { VTester<sst::voice_effects::modulation::Phaser<VTestConfig>>::TestVFX(); }
