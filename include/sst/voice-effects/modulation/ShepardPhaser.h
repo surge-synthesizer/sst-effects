@@ -65,7 +65,7 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
         case fpResonance:
             return pmd().asPercent().withDefault(1.0f).withName("Resonance");
         case fpRate:
-            return pmd().asLfoRate(-7, 0).withDefault(-3).withName("Rate");
+            return pmd().asLfoRate(-7, 9).withDefault(0).withName("Rate");
         case fpStartFreq:
             return pmd().asAudibleFrequency().withName("Start Freq").withDefault(-30);
         case fpEndFreq:
@@ -113,10 +113,10 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
     {
-        auto lfoRate = this->getFloatParam(fpRate);
         auto range = this->getFloatParam(fpEndFreq) - this->getFloatParam(fpStartFreq);
         auto res = std::clamp(this->getFloatParam(fpResonance) * .2f + .8f, 0.f, 1.0f);
         int peaks = this->getIntParam(ipPeaks);
+        auto lfoRate = this->getFloatParam(fpRate) - std::log2f(peaks);
 
         namespace mech = sst::basic_blocks::mechanics;
 
@@ -156,7 +156,6 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
             for (int k = 0; k < VFXConfig::blockSize; ++k)
             {
                 filters[i].processBlockStep(tmpL[k], tmpR[k]);
-                softClip(tmpL[k], tmpR[k]);
             }
 
             lipolLevel[i].set_target(iTri * iTri * iTri);
@@ -165,21 +164,6 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
             mech::scale_accumulate_from_to<VFXConfig::blockSize>(tmpL, tmpR, 0.3333f, dataoutL,
                                                                  dataoutR);
         }
-    }
-
-    void softClip(float &L, float &R)
-    {
-        L = std::clamp(L, -1.5f, 1.5f);
-        L = L - 4.0 / 27.0 * L * L * L;
-
-        R = std::clamp(R, -1.5f, 1.5f);
-        R = R - 4.0 / 27.0 * R * R * R;
-    }
-
-    void softClip(float &C)
-    {
-        C = std::clamp(C, -1.5f, 1.5f);
-        C = C - 4.0 / 27.0 * C * C * C;
     }
 
   protected:
