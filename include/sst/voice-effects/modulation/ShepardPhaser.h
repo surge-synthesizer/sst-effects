@@ -38,7 +38,7 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
 
     static constexpr int numFloatParams{4};
     static constexpr int numIntParams{2};
-    
+
     basic_blocks::dsp::RNG rng;
 
     enum FloatParams
@@ -112,14 +112,13 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
         }
         return res * .5 + .5;
     }
-    
-
 
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
     {
         auto stereo = this->getIntParam(ipStereo);
-        auto range = std::clamp(this->getFloatParam(fpEndFreq), -60.f, 70.f) - std::clamp(this->getFloatParam(fpStartFreq), -60.f, 70.f);
+        auto range = std::clamp(this->getFloatParam(fpEndFreq), -60.f, 70.f) -
+                     std::clamp(this->getFloatParam(fpStartFreq), -60.f, 70.f);
         auto res = std::clamp(this->getFloatParam(fpResonance) * .08f + .9f, 0.f, .98f);
         int peaks = this->getIntParam(ipPeaks);
         if (peaks != priorPeaks)
@@ -128,7 +127,7 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
             priorPeaks = peaks;
         }
         auto lfoRate = this->getFloatParam(fpRate) - logOfPeaks;
-        
+
         if (isFirst)
         {
             phasor.applyPhaseOffset(rng.unif01());
@@ -136,7 +135,7 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
         }
         phasor.process_block(lfoRate, 0.f, lfo_t::RAMP);
         auto phasorValue = phasor.lastTarget * .5f + .5f;
-        
+
         namespace mech = sst::basic_blocks::mechanics;
         mech::clear_block<VFXConfig::blockSize>(dataoutL);
         mech::clear_block<VFXConfig::blockSize>(dataoutR);
@@ -147,16 +146,18 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
             auto halfway = 0.5 / static_cast<double>(peaks);
             auto iPhaseL = std::fmod(phasorValue + offset, 1.0);
             auto iPhaseR = !stereo ? iPhaseL : std::fmod(phasorValue + offset + halfway, 1.0);
-            
+
             auto iTriL = triangle(iPhaseL);
             auto iTriR = triangle(iPhaseR);
-            
-            auto freqL =  440.f * this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpStartFreq) + (range * iPhaseL));
-            auto freqR = 440.f * this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpStartFreq) + (range * iPhaseR));
-            
+
+            auto freqL = 440.f * this->note_to_pitch_ignoring_tuning(
+                                     this->getFloatParam(fpStartFreq) + (range * iPhaseL));
+            auto freqR = 440.f * this->note_to_pitch_ignoring_tuning(
+                                     this->getFloatParam(fpStartFreq) + (range * iPhaseR));
+
             filters[i].template setCoeffForBlock<VFXConfig::blockSize>(
-                sst::filters::CytomicSVF::Mode::BP, freqL, freqR, res, res, this->getSampleRateInv(),
-                1.f, 1.f);
+                sst::filters::CytomicSVF::Mode::BP, freqL, freqR, res, res,
+                this->getSampleRateInv(), 1.f, 1.f);
 
             float tmpL alignas(16)[VFXConfig::blockSize];
             float tmpR alignas(16)[VFXConfig::blockSize];
@@ -167,7 +168,7 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
             {
                 filters[i].processBlockStep(tmpL[k], tmpR[k]);
             }
-            
+
             if (!stereo)
             {
                 lipolLevel[i].set_target(iTriL * iTriL * iTriL);
@@ -185,10 +186,11 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
                                                                  dataoutR);
         }
     }
-    
+
     void processMonoToMono(float *datainL, float *dataoutL, float pitch)
     {
-        auto range = std::clamp(this->getFloatParam(fpEndFreq), -60.f, 70.f) - std::clamp(this->getFloatParam(fpStartFreq), -60.f, 70.f);
+        auto range = std::clamp(this->getFloatParam(fpEndFreq), -60.f, 70.f) -
+                     std::clamp(this->getFloatParam(fpStartFreq), -60.f, 70.f);
         auto res = std::clamp(this->getFloatParam(fpResonance) * .08f + .9f, 0.f, .98f);
         int peaks = this->getIntParam(ipPeaks);
         if (peaks != priorPeaks)
@@ -197,7 +199,7 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
             priorPeaks = peaks;
         }
         auto lfoRate = this->getFloatParam(fpRate) - logOfPeaks;
-        
+
         if (isFirst)
         {
             phasor.applyPhaseOffset(rng.unif01());
@@ -205,10 +207,10 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
         }
         phasor.process_block(lfoRate, 0.f, lfo_t::RAMP);
         auto phasorValue = phasor.lastTarget * .5f + .5f;
-        
+
         namespace mech = sst::basic_blocks::mechanics;
         mech::clear_block<VFXConfig::blockSize>(dataoutL);
-        
+
         for (int i = 0; i < peaks; ++i)
         {
 
@@ -222,8 +224,7 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
             auto freqMod = this->getFloatParam(fpStartFreq) + (range * iPhase);
             auto freq = 440.f * this->note_to_pitch_ignoring_tuning(freqMod);
             filters[i].template setCoeffForBlock<VFXConfig::blockSize>(
-                sst::filters::CytomicSVF::Mode::BP, freq, res, this->getSampleRateInv(),
-                1.f);
+                sst::filters::CytomicSVF::Mode::BP, freq, res, this->getSampleRateInv(), 1.f);
 
             float tmp alignas(16)[VFXConfig::blockSize];
             mech::copy_from_to<VFXConfig::blockSize>(datainL, tmp);
@@ -239,12 +240,12 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
             mech::scale_accumulate_from_to<VFXConfig::blockSize>(tmp, 0.5f, dataoutL);
         }
     }
-    
+
     void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
     {
         processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
     }
-    
+
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
 
   protected:
