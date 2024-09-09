@@ -33,6 +33,7 @@
 #include "sst/voice-effects/generator/GenCorrelatedNoise.h"
 #include "sst/voice-effects/eq/EqNBandParametric.h"
 #include "sst/voice-effects/eq/MorphEQ.h"
+#include "sst/voice-effects/eq/TiltEQ.h"
 #include "sst/voice-effects/eq/EqGraphic6Band.h"
 #include "sst/voice-effects/delay/Widener.h"
 #include "sst/voice-effects/delay/ShortDelay.h"
@@ -124,6 +125,7 @@ TEST_CASE("Can Create Voice FX")
         VTester<sst::voice_effects::eq::EqNBandParametric<VTestConfig, 3>>::TestVFX();
     }
     SECTION("MorphEQ") { VTester<sst::voice_effects::eq::MorphEQ<VTestConfig>>::TestVFX(); }
+    SECTION("TiltEQ") { VTester<sst::voice_effects::eq::TiltEQ<VTestConfig>>::TestVFX(); }
     SECTION("GraphicEQ")
     {
         VTester<sst::voice_effects::eq::EqGraphic6Band<VTestConfig>>::TestVFX();
