@@ -37,23 +37,21 @@ template <typename VFXConfig> struct TiltEQ : core::VoiceEffectTemplateBase<VFXC
 
     static constexpr int numFloatParams{2};
     static constexpr int numIntParams{0};
-    
+
     enum FloatParams
     {
         fpFreq,
         fpTilt,
     };
 
-    TiltEQ() : core::VoiceEffectTemplateBase<VFXConfig>()
-    {
-    }
+    TiltEQ() : core::VoiceEffectTemplateBase<VFXConfig>() {}
 
     ~TiltEQ() {}
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
-        
+
         switch (idx)
         {
         case fpFreq:
@@ -71,7 +69,7 @@ template <typename VFXConfig> struct TiltEQ : core::VoiceEffectTemplateBase<VFXC
 
     void initVoiceEffect() {}
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
-    
+
     void setCoeffs()
     {
         float freq = 440 * this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpFreq));
@@ -79,18 +77,21 @@ template <typename VFXConfig> struct TiltEQ : core::VoiceEffectTemplateBase<VFXC
         float posGain = this->dbToLinear(slope);
         float negGain = this->dbToLinear(-1 * slope);
         float res = .07f;
-        
+
         if (slope == priorSlope && freq == priorFreq)
         {
             for (int i = 0; i < 2; i++)
             {
-                    filters[i].template retainCoeffForBlock<VFXConfig::blockSize>();
+                filters[i].template retainCoeffForBlock<VFXConfig::blockSize>();
             }
         }
         else
         {
-            filters[0].template setCoeffForBlock<VFXConfig::blockSize>(filters::CytomicSVF::Mode::LOW_SHELF, freq, res, this->getSampleRateInv(), negGain);
-            filters[1].template setCoeffForBlock<VFXConfig::blockSize>(filters::CytomicSVF::Mode::HIGH_SHELF, freq, res, this->getSampleRateInv(), posGain);
+            filters[0].template setCoeffForBlock<VFXConfig::blockSize>(
+                filters::CytomicSVF::Mode::LOW_SHELF, freq, res, this->getSampleRateInv(), negGain);
+            filters[1].template setCoeffForBlock<VFXConfig::blockSize>(
+                filters::CytomicSVF::Mode::HIGH_SHELF, freq, res, this->getSampleRateInv(),
+                posGain);
             priorSlope = slope;
         }
     }
@@ -99,8 +100,10 @@ template <typename VFXConfig> struct TiltEQ : core::VoiceEffectTemplateBase<VFXC
                        float pitch)
     {
         setCoeffs();
-        filters[0].template processBlock<VFXConfig::blockSize>(datainL, datainR, dataoutL, dataoutR);
-        filters[1].template processBlock<VFXConfig::blockSize>(dataoutL, dataoutR, dataoutL, dataoutR);
+        filters[0].template processBlock<VFXConfig::blockSize>(datainL, datainR, dataoutL,
+                                                               dataoutR);
+        filters[1].template processBlock<VFXConfig::blockSize>(dataoutL, dataoutR, dataoutL,
+                                                               dataoutR);
     }
 
     void processMonoToMono(float *datainL, float *dataoutL, float pitch)
@@ -109,7 +112,7 @@ template <typename VFXConfig> struct TiltEQ : core::VoiceEffectTemplateBase<VFXC
         filters[0].template processBlock<VFXConfig::blockSize>(datainL, dataoutL);
         filters[1].template processBlock<VFXConfig::blockSize>(dataoutL, dataoutL);
     }
-    
+
     /*
     float getFrequencyGraph(float f)
     {
