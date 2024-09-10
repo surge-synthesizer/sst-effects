@@ -39,6 +39,7 @@ namespace sst::voice_effects::core
 // Todo: as we port consider this FXConfig::BaseClass being a bit more configurable.
 template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig::BaseClass
 {
+    using config_t = VFXConfig;
     static_assert(std::is_integral<decltype(VFXConfig::blockSize)>::value);
     static_assert(!(VFXConfig::blockSize & (VFXConfig::blockSize - 1))); // 2^n
     static_assert(VFXConfig::blockSize >= 4);                            // > simd register length
@@ -161,6 +162,7 @@ template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig:
                   "void returnBlock(base *, uint8_t *, size_t) not defined");
 
     void preReservePool(size_t s) { VFXConfig::preReservePool(asBase(), s); }
+
     uint8_t *checkoutBlock(size_t s) { return VFXConfig::checkoutBlock(asBase(), s); }
     void returnBlock(uint8_t *d, size_t s) { VFXConfig::returnBlock(asBase(), d, s); }
 
@@ -194,14 +196,16 @@ template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig:
         }                                                                                          \
         else                                                                                       \
         {                                                                                          \
-            return DVAL;                                                                           \
+            DVAL;                                                                                  \
         }                                                                                          \
     };
 
-    HASMEM(oversamplingRatio, constexpr int16_t getOversamplingRatio(), 1, );
-    HASMEM(getTempoPointer, double *getBaseTempoPointer(), &defaultTempo, (asBase()));
-    HASMEM(isTemposync, bool getIsTemposync(), false, (asBase()));
-    HASMEM(isDeactivated, bool getIsDeactivated(int index), false, (asBase(), index));
+    HASMEM(oversamplingRatio, constexpr int16_t getOversamplingRatio(), return 1, );
+    HASMEM(getTempoPointer, double *getBaseTempoPointer(), return &defaultTempo, (asBase()));
+    HASMEM(isTemposync, bool getIsTemposync(), return false, (asBase()));
+    HASMEM(isDeactivated, bool getIsDeactivated(int index), return false, (asBase(), index));
+    HASMEM(preReserveSingleInstancePool, void preReserveSingleInstancePool(size_t s),
+           throw std::logic_error("this effect requires single instance pools"), (asBase(), s));
 
 #undef HASMEM
 
@@ -220,6 +224,8 @@ template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig:
             temposyncratioinv = 1.0 / temposyncratio;
         }
     }
+
+    float getTempoSyncRatio() { return temposyncratio; }
 
   private:
     double defaultTempo{120.0};

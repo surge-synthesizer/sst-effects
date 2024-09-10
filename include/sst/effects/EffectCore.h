@@ -265,6 +265,14 @@ template <typename FXConfig> struct EffectTemplateBase : public FXConfig::BaseCl
             return res.asPercentBipolar().withRange(-2.f, 2.f).withDefault(1.f);
     }
 
+    int getDefaultWidth() const
+    {
+        if constexpr (!useLinearWidth())
+            return 0.f;
+        else
+            return 1.f;
+    }
+
     template <typename Smoother> void setWidthTarget(Smoother &width, int idx, float scale = 1.f)
     {
         if constexpr (!useLinearWidth())
