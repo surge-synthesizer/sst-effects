@@ -48,6 +48,8 @@
 #include "sst/voice-effects/modulation/FMFilter.h"
 #include "sst/voice-effects/generator/TiltNoise.h"
 #include "sst/voice-effects/modulation/NoiseAM.h"
+#include "sst/voice-effects/utilities/StereoFieldManipulator.h"
+#include "sst/voice-effects/utilities/VolumeAndPan.h"
 
 struct VTestConfig
 {
@@ -182,4 +184,12 @@ TEST_CASE("Can Create Voice FX")
         VTester<sst::voice_effects::generator::TiltNoise<VTestConfig>>::TestVFX();
     }
     SECTION("Phaser") { VTester<sst::voice_effects::modulation::NoiseAM<VTestConfig>>::TestVFX(); }
+    SECTION("VolumeAndPan")
+    {
+        VTester<sst::voice_effects::utilities::VolumeAndPan<VTestConfig>>::TestVFX();
+    }
+    SECTION("StereoFieldManipulator")
+    {
+        VTester<sst::voice_effects::utilities::StereoFieldManipulator<VTestConfig>>::TestVFX();
+    }
 }

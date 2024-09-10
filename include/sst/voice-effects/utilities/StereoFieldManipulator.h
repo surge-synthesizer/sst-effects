@@ -128,11 +128,6 @@ struct StereoFieldManipulator : core::VoiceEffectTemplateBase<VFXConfig>
             dataoutR[i] = sR;
         }
     }
-
-    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
-    {
-        processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
-    }
 };
 } // namespace sst::voice_effects::utilities
 #endif // SCXT_STEREOFIELDMANIP_H
