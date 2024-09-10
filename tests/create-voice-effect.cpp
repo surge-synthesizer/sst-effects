@@ -197,7 +197,7 @@ TEST_CASE("Can Create Voice FX")
     SECTION("StereoFieldManipulator")
     {
         VTester<sst::voice_effects::utilities::StereoFieldManipulator<VTestConfig>>::TestVFX();
-
+    }
     SECTION("Lifted Reverb 1")
     {
         VTester<sst::voice_effects::liftbus::LiftedReverb1<VTestConfig>>::TestVFX();
