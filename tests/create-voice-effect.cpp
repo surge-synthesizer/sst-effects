@@ -51,6 +51,11 @@
 #include "sst/voice-effects/utilities/StereoFieldManipulator.h"
 #include "sst/voice-effects/utilities/VolumeAndPan.h"
 
+#include "sst/voice-effects/lifted_bus_effects/LiftedReverb1.h"
+#include "sst/voice-effects/lifted_bus_effects/LiftedReverb2.h"
+#include "sst/voice-effects/lifted_bus_effects/LiftedDelay.h"
+#include "sst/voice-effects/lifted_bus_effects/LiftedFlanger.h"
+
 struct VTestConfig
 {
     struct BaseClass
@@ -71,6 +76,7 @@ struct VTestConfig
     static float getSampleRateInv(const BaseClass *) { return 1.0 / 48000.f; }
 
     static void preReservePool(BaseClass *, size_t) {}
+    static void preReserveSingleInstancePool(BaseClass *, size_t) {}
     static uint8_t *checkoutBlock(BaseClass *, size_t) { return nullptr; }
     static void returnBlock(BaseClass *, uint8_t *, size_t) {}
 };
@@ -191,5 +197,21 @@ TEST_CASE("Can Create Voice FX")
     SECTION("StereoFieldManipulator")
     {
         VTester<sst::voice_effects::utilities::StereoFieldManipulator<VTestConfig>>::TestVFX();
+
+    SECTION("Lifted Reverb 1")
+    {
+        VTester<sst::voice_effects::liftbus::LiftedReverb1<VTestConfig>>::TestVFX();
+    }
+    SECTION("Lifted Reverb 2")
+    {
+        VTester<sst::voice_effects::liftbus::LiftedReverb2<VTestConfig>>::TestVFX();
+    }
+    SECTION("Lifted Delay")
+    {
+        VTester<sst::voice_effects::liftbus::LiftedDelay<VTestConfig>>::TestVFX();
+    }
+    SECTION("Lifted Flanger")
+    {
+        VTester<sst::voice_effects::liftbus::LiftedFlanger<VTestConfig>>::TestVFX();
     }
 }
