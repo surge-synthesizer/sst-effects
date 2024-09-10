@@ -48,6 +48,8 @@
 #include "sst/voice-effects/modulation/FMFilter.h"
 #include "sst/voice-effects/generator/TiltNoise.h"
 #include "sst/voice-effects/modulation/NoiseAM.h"
+#include "sst/voice-effects/utilities/StereoFieldManipulator.h"
+#include "sst/voice-effects/utilities/VolumeAndPan.h"
 
 #include "sst/voice-effects/lifted_bus_effects/LiftedReverb1.h"
 #include "sst/voice-effects/lifted_bus_effects/LiftedReverb2.h"
@@ -188,7 +190,14 @@ TEST_CASE("Can Create Voice FX")
         VTester<sst::voice_effects::generator::TiltNoise<VTestConfig>>::TestVFX();
     }
     SECTION("Phaser") { VTester<sst::voice_effects::modulation::NoiseAM<VTestConfig>>::TestVFX(); }
-
+    SECTION("VolumeAndPan")
+    {
+        VTester<sst::voice_effects::utilities::VolumeAndPan<VTestConfig>>::TestVFX();
+    }
+    SECTION("StereoFieldManipulator")
+    {
+        VTester<sst::voice_effects::utilities::StereoFieldManipulator<VTestConfig>>::TestVFX();
+    }
     SECTION("Lifted Reverb 1")
     {
         VTester<sst::voice_effects::liftbus::LiftedReverb1<VTestConfig>>::TestVFX();
