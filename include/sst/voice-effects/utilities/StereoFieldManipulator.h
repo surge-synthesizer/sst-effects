@@ -57,9 +57,14 @@ struct StereoFieldManipulator : core::VoiceEffectTemplateBase<VFXConfig>
         switch (idx)
         {
         case fpRotation:
-            return pmd().asFloat().withRange(-90.f, 90.f).withDefault(0.f).withName("Rotation");
+            return pmd().asFloat().withRange(-90.f, 90.f).withDefault(0.f).withName("Rotation (º)");
         case fpWidth:
-            return pmd().asPercent().withDefault(1.f).withRange(0.f, 2.f).withName("Width");
+            return pmd().asPercent().withDefault(1.f).withRange(0.f, 2.f).withName("Width (%)");
+        case fpCenter:
+            return pmd().asPercent().withDefault(0.f).withRange(-1.f, 1.f).withName("Center (%)");
+        case fpLeftRight:
+            return pmd().asPercent().withDefault(0.f).withRange(-1.f, 1.f).withName(
+                "Left/Right (%)");
         }
         return pmd().asFloat().withName("Error");
     }
@@ -73,7 +78,12 @@ struct StereoFieldManipulator : core::VoiceEffectTemplateBase<VFXConfig>
     {
         auto rotRadians = this->getFloatParam(fpRotation) * 0.017453292; // degrees * PI/180
         auto width = this->getFloatParam(fpWidth) / 2.f;
-        std::cout << rotRadians << std::endl;
+        auto center = std::min(this->getFloatParam(fpCenter) + 1, 1.f);
+        auto side = 1 - this->getFloatParam(fpCenter);
+        auto left = -std::min(this->getFloatParam(fpLeftRight), 0.f);
+        auto left1 = -std::max(this->getFloatParam(fpLeftRight) - 1, -1.f);
+        auto right = std::max(this->getFloatParam(fpLeftRight), 0.f);
+        auto right1 = std::min(1 + this->getFloatParam(fpLeftRight), 1.f);
 
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
@@ -107,6 +117,12 @@ struct StereoFieldManipulator : core::VoiceEffectTemplateBase<VFXConfig>
             auto radius = sqrt(sL * sL + sR * sR);
             sL = sin(angle) * radius;
             sR = cos(angle) * radius;
+
+            // 3 Way Balancer + Enhancer
+            auto mono = (sL + sR) / 2 * center;
+            auto stereo = (sL - sR) * side;
+            sL = (mono + (stereo * left1 - stereo * right) * width) / std::max(width, 1.f);
+            sR = (mono + (-stereo * right1 + stereo * left) * width) / std::max(width, 1.f);
 
             dataoutL[i] = sL;
             dataoutR[i] = sR;
