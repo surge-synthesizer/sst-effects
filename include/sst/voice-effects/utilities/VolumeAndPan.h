@@ -27,6 +27,7 @@
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/PanLaws.h"
+#include "sst/basic-blocks/mechanics/block-ops.h"
 
 namespace sst::voice_effects::utilities
 {
@@ -84,27 +85,25 @@ template <typename VFXConfig> struct VolumeAndPan : core::VoiceEffectTemplateBas
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
     {
-        auto outputVolume = this->dbToLinear(this->getFloatParam(fpVolume));
         auto pan = (this->getFloatParam(fpPan) + 1) / 2;
-
         basic_blocks::dsp::pan_laws::panmatrix_t pmat{1, 1, 0, 0};
-
         basic_blocks::dsp::pan_laws::stereoEqualPower(pan, pmat);
 
-        for (int i = 0; i < VFXConfig::blockSize; i++)
-        {
-            auto inL = datainL[i];
-            auto inR = datainR[i];
+        leftLerp.set_target(pmat[0]);
+        rightLerp.set_target(pmat[1]);
 
-            dataoutL[i] = inL * pmat[0] * outputVolume;
-            dataoutR[i] = inR * pmat[1] * outputVolume;
-        }
+        sst::basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
+        sst::basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(datainR, dataoutR);
+
+        leftLerp.multiply_block(dataoutL);
+        rightLerp.multiply_block(dataoutR);
+
+        volLerp.set_target(this->dbToLinear(this->getFloatParam(fpVolume)));
+        volLerp.multiply_2_blocks(dataoutL, dataoutR);
     }
 
-    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
-    {
-        processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
-    }
+  protected:
+    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> volLerp, leftLerp, rightLerp;
 };
 } // namespace sst::voice_effects::utilities
 #endif // SCXT_VOLUMEANDPAN_H

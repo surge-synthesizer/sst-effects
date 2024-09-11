@@ -131,14 +131,14 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
 
     void initVoiceEffect()
     {
-        lipolFb.set_target_instant(
+        feedbackLerp.set_target_instant(
             std::sqrt(std::clamp(this->getFloatParam(fpFeedback), 0.f, 1.f)));
     }
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     using lfo_t = sst::basic_blocks::modulators::SimpleLFO<Phaser, VFXConfig::blockSize>;
-    lfo_t actualLFO{this};
+    lfo_t LFO{this};
     typename lfo_t::Shape lfoShape = lfo_t::Shape::SINE;
 
     void shapeCheck()
@@ -177,25 +177,39 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
         auto lfoRate = this->getFloatParam(fpRate);
         auto lfoDepth = this->getFloatParam(fpDepth);
 
+        shapeCheck();
+
         if (!phaseSet)
         {
-            auto phase = rng.unif01();
-            actualLFO.applyPhaseOffset(phase);
+            if (lfoShape == lfo_t::SINE || lfoShape == lfo_t::TRI)
+            {
+                auto phase = rng.unif01();
+                LFO.applyPhaseOffset(phase);
+            }
+            else if (lfoShape == lfo_t::PULSE)
+            {
+
+                LFO.applyPhaseOffset(rng.boolean() ? 0.f : .5f);
+            }
+            else
+            {
+
+                LFO.applyPhaseOffset(0.f);
+            }
             phaseSet = true;
         }
-        shapeCheck();
-        actualLFO.process_block(lfoRate, 0.f, lfoShape);
+        LFO.process_block(lfoRate, 0.f, lfoShape);
 
-        float lfoValue = actualLFO.lastTarget * lfoDepth;
+        float lfoValue = LFO.lastTarget * lfoDepth;
 
         calc_coeffs(pitch, lfoValue);
 
         sst::basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
         sst::basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(datainR, dataoutR);
 
-        lipolFb.set_target(std::sqrt(std::clamp(this->getFloatParam(fpFeedback), 0.f, 1.f)));
+        feedbackLerp.set_target(std::sqrt(std::clamp(this->getFloatParam(fpFeedback), 0.f, 1.f)));
         float fb alignas(16)[VFXConfig::blockSize];
-        lipolFb.store_block(fb);
+        feedbackLerp.store_block(fb);
 
         for (int k = 0; k < VFXConfig::blockSize; ++k)
         {
@@ -222,26 +236,39 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
         auto lfoRate = this->getFloatParam(fpRate);
         auto lfoDepth = this->getFloatParam(fpDepth);
 
+        shapeCheck();
+
         if (!phaseSet)
         {
-            auto phase = rng.unif01();
-            actualLFO.applyPhaseOffset(phase);
+            if (lfoShape == lfo_t::SINE || lfoShape == lfo_t::TRI)
+            {
+                auto phase = rng.unif01();
+                LFO.applyPhaseOffset(phase);
+            }
+            else if (lfoShape == lfo_t::PULSE)
+            {
+
+                LFO.applyPhaseOffset(rng.boolean() ? 0.f : .5f);
+            }
+            else
+            {
+
+                LFO.applyPhaseOffset(0.f);
+            }
             phaseSet = true;
         }
+        LFO.process_block(lfoRate, 0.f, lfoShape);
 
-        shapeCheck();
-        actualLFO.process_block(lfoRate, 0.f, lfoShape);
-
-        float lfoValue = actualLFO.lastTarget * lfoDepth;
+        float lfoValue = LFO.lastTarget * lfoDepth;
 
         this->calc_coeffs(pitch, lfoValue);
 
         sst::basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(dataIn, dataOut);
 
-        this->lipolFb.set_target(
+        this->feedbackLerp.set_target(
             std::sqrt(std::clamp(this->getFloatParam(this->fpFeedback), 0.f, 0.97f)));
         float fb alignas(16)[VFXConfig::blockSize];
-        this->lipolFb.store_block(fb);
+        this->feedbackLerp.store_block(fb);
 
         for (int k = 0; k < VFXConfig::blockSize; ++k)
         {
@@ -317,7 +344,7 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
     std::array<int, numIntParams> mLastIParam{};
     std::array<sst::filters::CytomicSVF, 4> filters;
     float fbAmt[2]{0.f, 0.f};
-    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> lipolFb;
+    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> feedbackLerp;
 };
 } // namespace sst::voice_effects::modulation
 #endif // SCXT_PHASER_H

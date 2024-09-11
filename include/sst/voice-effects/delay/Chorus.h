@@ -163,19 +163,19 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
             }
         }
 
-        lipolDelay[0].set_target_instant(
+        timeLerp[0].set_target_instant(
             std::clamp(this->getFloatParam(fpTime), 0.f, maxMiliseconds) * this->getSampleRate() /
             1000.f);
-        lipolDelay[1].set_target_instant(
+        timeLerp[1].set_target_instant(
             std::clamp(this->getFloatParam(fpTime), 0.f, maxMiliseconds) * this->getSampleRate() /
             1000.f);
 
-        lipolFb.set_target_instant(std::clamp(this->getFloatParam(fpFeedback), 0.f, 1.f));
+        feedbackLerp.set_target_instant(std::clamp(this->getFloatParam(fpFeedback), 0.f, 1.f));
     }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     using lfo_t = sst::basic_blocks::modulators::SimpleLFO<Chorus, VFXConfig::blockSize>;
-    lfo_t actualLFO{this};
+    lfo_t LFO{this};
     typename lfo_t::Shape lfoShape = lfo_t::Shape::SINE;
 
     void shapeCheck()
@@ -209,8 +209,8 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
     bool phaseSet = false;
 
     template <typename T>
-    void processImpl(const std::array<T *, 2> &lines, float *datainL, float *datainR,
-                     float *dataoutL, float *dataoutR, float pitch)
+    void stereoImpl(const std::array<T *, 2> &lines, float *datainL, float *datainR,
+                    float *dataoutL, float *dataoutR)
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
@@ -218,39 +218,53 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
         bool stereo = this->getIntParam(ipStereo);
         auto lfoRate = this->getFloatParam(fpRate);
         auto lfoDepth = this->getFloatParam(fpDepth);
+        shapeCheck();
+
         if (!phaseSet)
         {
-            auto phase = rng.unif01();
-            actualLFO.applyPhaseOffset(phase);
+            if (lfoShape == lfo_t::SINE || lfoShape == lfo_t::TRI)
+            {
+                auto phase = rng.unif01();
+                LFO.applyPhaseOffset(phase);
+            }
+            else if (lfoShape == lfo_t::PULSE)
+            {
+
+                LFO.applyPhaseOffset(rng.boolean() ? 0.f : .5f);
+            }
+            else
+            {
+
+                LFO.applyPhaseOffset(0.f);
+            }
             phaseSet = true;
         }
-        shapeCheck();
-        actualLFO.process_block(lfoRate, 0.f, lfoShape);
+        LFO.process_block(lfoRate, 0.f, lfoShape);
 
         auto baseTime = this->getFloatParam(fpTime);
 
-        float lfoValueL = actualLFO.lastTarget * baseTime * lfoDepth;
-        float lfoValueR = actualLFO.lastTarget * baseTime * lfoDepth * (stereo ? -1 : 1);
+        float lfoValueL = LFO.lastTarget * baseTime * lfoDepth;
+        float lfoValueR = LFO.lastTarget * baseTime * lfoDepth * (stereo ? -1 : 1);
 
         mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
         mech::copy_from_to<VFXConfig::blockSize>(datainR, dataoutR);
         float FIRipol = static_cast<float>(SincTable::FIRipol_N);
 
-        lipolDelay[0].set_target(std::max((std::clamp(baseTime + (lfoValueL), 0.f, maxMiliseconds) *
-                                           this->getSampleRate() / 1000.f),
-                                          FIRipol));
-        lipolDelay[1].set_target(std::max((std::clamp(baseTime + (lfoValueR), 0.f, maxMiliseconds) *
-                                           this->getSampleRate() / 1000.f),
-                                          FIRipol));
+        timeLerp[0].set_target(std::max((std::clamp(baseTime + (lfoValueL), 0.f, maxMiliseconds) *
+                                         this->getSampleRate() / 1000.f),
+                                        FIRipol));
+        timeLerp[1].set_target(std::max((std::clamp(baseTime + (lfoValueR), 0.f, maxMiliseconds) *
+                                         this->getSampleRate() / 1000.f),
+                                        FIRipol));
 
-        lipolFb.set_target(std::clamp(this->getFloatParam(fpFeedback), 0.f, 1.f));
+        feedbackLerp.set_target(std::clamp(this->getFloatParam(fpFeedback), 0.f, 1.f));
 
         float ld alignas(16)[2][VFXConfig::blockSize];
-        lipolDelay[0].store_block(ld[0]);
-        lipolDelay[1].store_block(ld[1]);
+        timeLerp[0].store_block(ld[0]);
+        timeLerp[1].store_block(ld[1]);
 
         float fb alignas(16)[VFXConfig::blockSize];
-        lipolFb.store_block(fb);
+        feedbackLerp.store_block(fb);
 
         for (int i = 0; i < VFXConfig::blockSize; ++i)
         {
@@ -275,22 +289,106 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
         }
     }
 
+    template <typename T> void monoImpl(T *line, float *datainL, float *dataoutL)
+    {
+        namespace mech = sst::basic_blocks::mechanics;
+        namespace sdsp = sst::basic_blocks::dsp;
+
+        auto lfoRate = this->getFloatParam(fpRate);
+        auto lfoDepth = this->getFloatParam(fpDepth);
+        shapeCheck();
+
+        if (!phaseSet)
+        {
+            if (lfoShape == lfo_t::SINE || lfoShape == lfo_t::TRI)
+            {
+                auto phase = rng.unif01();
+                LFO.applyPhaseOffset(phase);
+            }
+            else if (lfoShape == lfo_t::PULSE)
+            {
+
+                LFO.applyPhaseOffset(rng.boolean() ? 0.f : .5f);
+            }
+            else
+            {
+
+                LFO.applyPhaseOffset(0.f);
+            }
+            phaseSet = true;
+        }
+        LFO.process_block(lfoRate, 0.f, lfoShape);
+
+        auto baseTime = this->getFloatParam(fpTime);
+
+        float lfoValue = LFO.lastTarget * baseTime * lfoDepth;
+
+        mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
+        float FIRipol = static_cast<float>(SincTable::FIRipol_N);
+
+        timeLerp[0].set_target(std::max((std::clamp(baseTime + (lfoValue), 0.f, maxMiliseconds) *
+                                         this->getSampleRate() / 1000.f),
+                                        FIRipol));
+
+        feedbackLerp.set_target(std::clamp(this->getFloatParam(fpFeedback), 0.f, 1.f));
+
+        float ld alignas(16)[VFXConfig::blockSize];
+        timeLerp[0].store_block(ld);
+
+        float fb alignas(16)[VFXConfig::blockSize];
+        feedbackLerp.store_block(fb);
+
+        for (int i = 0; i < VFXConfig::blockSize; ++i)
+        {
+            auto output = line->read(ld[i]);
+
+            dataoutL[i] = output;
+
+            auto feed = fb[i] * dataoutL[i];
+
+            // soft clip for now
+            feed = std::clamp(feed, -1.5f, 1.5f);
+            feed = feed - 4.0 / 27.0 * feed * feed * feed;
+
+            line->write(datainL[i] + feed);
+        }
+    }
+
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
     {
         if (isShort)
         {
-            processImpl(std::array{lineSupport[0].template getLinePointer<shortLineSize>(),
-                                   lineSupport[1].template getLinePointer<shortLineSize>()},
-                        datainL, datainR, dataoutL, dataoutR, pitch);
+            stereoImpl(std::array{lineSupport[0].template getLinePointer<shortLineSize>(),
+                                  lineSupport[1].template getLinePointer<shortLineSize>()},
+                       datainL, datainR, dataoutL, dataoutR);
         }
         else
         {
-            processImpl(std::array{lineSupport[0].template getLinePointer<longLineSize>(),
-                                   lineSupport[1].template getLinePointer<longLineSize>()},
-                        datainL, datainR, dataoutL, dataoutR, pitch);
+            stereoImpl(std::array{lineSupport[0].template getLinePointer<longLineSize>(),
+                                  lineSupport[1].template getLinePointer<longLineSize>()},
+                       datainL, datainR, dataoutL, dataoutR);
         }
     }
+
+    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
+    {
+        processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
+    }
+
+    void processMonoToMono(float *datainL, float *dataoutL, float pitch)
+    {
+        if (isShort)
+        {
+            monoImpl(lineSupport[0].template getLinePointer<shortLineSize>(), datainL, dataoutL);
+        }
+        else
+        {
+            monoImpl(lineSupport[0].template getLinePointer<longLineSize>(), datainL, dataoutL);
+        }
+    }
+
+    bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
 
   protected:
     std::array<details::DelayLineSupport, 2> lineSupport;
@@ -298,8 +396,7 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
 
     std::array<float, numFloatParams> mLastParam{};
 
-    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> lipolFb, lipolCross,
-        lipolDelay[2];
+    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> feedbackLerp, timeLerp[2];
 };
 
 } // namespace sst::voice_effects::delay

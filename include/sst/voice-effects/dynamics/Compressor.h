@@ -50,14 +50,13 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
         fpAttack,
         fpRelease,
         fpMakeUp,
-        fpSideChainHP,
-        fpSideChainLP
+        fpSCTiltAmt,
+        fpSCTiltFreq,
     };
 
     enum IntParams
     {
         ipDetector
-        //        ipKnee,
     };
 
     Compressor() : core::VoiceEffectTemplateBase<VFXConfig>()
@@ -93,7 +92,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
                 .asFloat()
                 .withRange(1.f, 12.f)
                 .withDefault(2.f)
-                .withLinearScaleFormatting("one over")
+                .withLinearScaleFormatting(": 1")
                 .withDecimalPlaces(2)
                 .withName("Ratio");
         case fpAttack:
@@ -111,44 +110,25 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
                 .withLinearScaleFormatting("ms", 1000.f)
                 .withName("Release");
         case fpMakeUp:
+            return pmd().asDecibelWithRange(0, 24).withName("Makeup Gain");
+        case fpSCTiltAmt:
             return pmd()
                 .asFloat()
-                .withRange(1.f, 4.f)
-                .withDefault(1.f)
-                .withLinearScaleFormatting("x")
-                .withName("Makeup Gain");
-        case fpSideChainHP:
+                .withRange(-18, 18)
+                .withDefault(0)
+                .withLinearScaleFormatting("db")
+                .withName("SC Tilt");
+        case fpSCTiltFreq:
             if (keytrackOn)
             {
                 return pmd()
                     .asFloat()
                     .withRange(-48.f, 48.f)
-                    .withName("SC HP Offset")
+                    .withName("Tilt Freq")
                     .withDefault(0)
                     .withLinearScaleFormatting("semitones");
             }
-            return pmd()
-                .asFloat()
-                .withRange(-96.f, 0.f)
-                .withDefault(-96.f)
-                .withSemitoneZeroAt400Formatting()
-                .withName("Sidechain HP");
-        case fpSideChainLP:
-            if (keytrackOn)
-            {
-                return pmd()
-                    .asFloat()
-                    .withRange(0.f, 96.f)
-                    .withName("SC LP Offset")
-                    .withDefault(72)
-                    .withLinearScaleFormatting("semitones");
-            }
-            return pmd()
-                .asFloat()
-                .withRange(0.f, 72.f)
-                .withDefault(72.f)
-                .withSemitoneZeroAt400Formatting()
-                .withName("Sidechain LP");
+            return pmd().asAudibleFrequency().withName("Tilt Freq");
         }
         return pmd().asFloat().withName("Error");
     }
@@ -238,8 +218,9 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
     {
-        auto gain = this->getFloatParam(fpMakeUp);
-        //        bool knee = this->getIntParam(ipKnee);
+        auto makeup = decibelsToAmplitude(this->getFloatParam(fpMakeUp));
+        gainLerp.set_target(makeup);
+
         bool RMS = this->getIntParam(ipDetector);
         auto threshold_db = this->getFloatParam(fpThreshold);
         auto ratio_recip = 1 / this->getFloatParam(fpRatio);
@@ -255,8 +236,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
             first = false;
         }
 
-        setCoeffsHighpass(pitch);
-        setCoeffsLowpass(pitch);
+        setTiltCoeffs(pitch);
 
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
@@ -285,15 +265,17 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
             outputL *= reductionFactor;
             outputR *= reductionFactor;
 
-            dataoutL[i] = outputL * gain;
-            dataoutR[i] = outputR * gain;
+            dataoutL[i] = outputL;
+            dataoutR[i] = outputR;
         }
+        gainLerp.multiply_2_blocks(dataoutL, dataoutR);
     }
 
     void processMonoToMono(float *datain, float *dataout, float pitch)
     {
-        auto gain = this->getFloatParam(fpMakeUp);
-        //        bool knee = this->getIntParam(ipKnee);
+        auto makeup = decibelsToAmplitude(this->getFloatParam(fpMakeUp));
+        gainLerp.set_target(makeup);
+
         bool RMS = this->getIntParam(ipDetector);
         auto threshold_db = this->getFloatParam(fpThreshold);
         auto ratio_recip = 1 / this->getFloatParam(fpRatio);
@@ -308,8 +290,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
             first = false;
         }
 
-        setCoeffsHighpass(pitch);
-        setCoeffsLowpass(pitch);
+        setTiltCoeffs(pitch);
 
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
@@ -337,43 +318,40 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
 
             output *= reductionFactor;
 
-            dataout[i] = output * gain;
+            dataout[i] = output;
         }
+        gainLerp.multiply_block(dataout);
     }
 
-    void setCoeffsHighpass(float pitch)
+    void setTiltCoeffs(float pitch)
     {
-        auto hpParam = this->getFloatParam(fpSideChainHP);
-        auto hpFreq =
-            440.f * this->note_to_pitch_ignoring_tuning((keytrackOn) ? pitch + hpParam : hpParam);
+        auto freqParam = this->getFloatParam(fpSCTiltFreq);
+        if (keytrackOn)
+        {
+            freqParam += pitch;
+        }
+        float freq = 440 * this->note_to_pitch_ignoring_tuning(freqParam);
+        float slope = this->getFloatParam(fpSCTiltAmt) / 2;
+        float posGain = this->dbToLinear(slope);
+        float negGain = this->dbToLinear(-1 * slope);
+        float res = .07f;
 
-        if (hpFreq != hpFreqPrior)
+        if (slope == priorSlope && freq == priorFreq)
+        {
+            for (int i = 0; i < 2; i++)
+            {
+                filters[i].template retainCoeffForBlock<VFXConfig::blockSize>();
+            }
+        }
+        else
         {
             filters[0].template setCoeffForBlock<VFXConfig::blockSize>(
-                sst::filters::CytomicSVF::HP, hpFreq, 0.5f, VFXConfig::getSampleRateInv(this), 0.f);
-            hpFreqPrior = hpFreq;
-        }
-        else
-        {
-            filters[0].template retainCoeffForBlock<VFXConfig::blockSize>();
-        }
-    }
-
-    void setCoeffsLowpass(float pitch)
-    {
-        auto lpParam = this->getFloatParam(fpSideChainLP);
-        auto lpFreq =
-            440.f * this->note_to_pitch_ignoring_tuning((keytrackOn) ? pitch + lpParam : lpParam);
-
-        if (lpFreq != lpFreqPrior)
-        {
+                filters::CytomicSVF::Mode::LOW_SHELF, freq, res, this->getSampleRateInv(), negGain);
             filters[1].template setCoeffForBlock<VFXConfig::blockSize>(
-                sst::filters::CytomicSVF::LP, lpFreq, 0.5f, VFXConfig::getSampleRateInv(this), 0.f);
-            lpFreqPrior = lpFreq;
-        }
-        else
-        {
-            filters[1].template retainCoeffForBlock<VFXConfig::blockSize>();
+                filters::CytomicSVF::Mode::HIGH_SHELF, freq, res, this->getSampleRateInv(),
+                posGain);
+            priorSlope = slope;
+            priorFreq = freq;
         }
     }
 
@@ -393,9 +371,11 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
     float lastEnv = -1.f;
     sst::basic_blocks::dsp::RunningAverage RA;
 
-    float hpFreqPrior = -1.f;
-    float lpFreqPrior = -1.f;
+    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, false> gainLerp;
+
     std::array<sst::filters::CytomicSVF, 2> filters;
+    float priorSlope = -123456.f;
+    float priorFreq = -123456.f;
 };
 } // namespace sst::voice_effects::dynamics
 #endif // SCXT_COMPRESSOR_H

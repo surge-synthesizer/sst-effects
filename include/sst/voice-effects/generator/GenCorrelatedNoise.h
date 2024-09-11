@@ -83,8 +83,12 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
         case FloatParams::fpLevel:
             return pmd().asCubicDecibelAttenuation().withDefault(0.5f).withName("Level");
         case FloatParams::fpStereoWidth:
-            return pmd().asFloat().withRange(0.f, 2.f).withDefault(1.f).withName(
-                !stereo ? std::string() : "Stereo Width");
+            return pmd()
+                .asFloat()
+                .withRange(0.f, 2.f)
+                .withDefault(1.f)
+                .withLinearScaleFormatting("%", 100)
+                .withName(!stereo ? std::string() : "Stereo Width");
         default:
             break;
         }
@@ -142,7 +146,10 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
             auto runRight = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
                 mPrior[1][0], mPrior[1][1], mColorLerp.v, rng.unifPM1());
 
-            midSideAdjust(widthParam, runLeft, runRight, dataoutL[k], dataoutR[k]);
+            if (isStereo)
+            {
+                midSideAdjust(widthParam, runLeft, runRight, dataoutL[k], dataoutR[k]);
+            }
 
             for (auto kk = 1; kk < this->getOversamplingRatio(); ++kk)
             {
