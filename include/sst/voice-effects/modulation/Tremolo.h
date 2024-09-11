@@ -512,8 +512,8 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
     std::array<sst::filters::CytomicSVF, 2> filters;
     float priorCrossover = -1234.5678f;
     bool phaseSet = false;
-    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> volLerp;
-    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> lfoLerp[2];
+    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, false> volLerp;
+    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, false> lfoLerp[2];
 };
 } // namespace sst::voice_effects::modulation
 #endif // SCXT_TREMOLO_H

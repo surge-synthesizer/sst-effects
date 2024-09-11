@@ -102,7 +102,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
             return pmd()
                 .asFloat()
                 .withRange(0.f, 1.f)
-                .withDefault(1.f)
+                .withDefault(dual ? .85f : 1.f)
                 .withLinearScaleFormatting("%", 100.f)
                 .withDecimalPlaces(2)
                 .withName(std::string("Level") + (dual ? " One" : ""));
@@ -110,7 +110,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
             return pmd()
                 .asFloat()
                 .withRange(0.f, 1.f)
-                .withDefault(1.f)
+                .withDefault(.85f)
                 .withLinearScaleFormatting("%", 100.f)
                 .withDecimalPlaces(2)
                 .withName(!dual ? std::string() : "Level Two");
@@ -146,7 +146,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
                 .withCustomMinDisplay("L")
                 .withCustomMaxDisplay("R")
                 .withCustomDefaultDisplay("C")
-                .withDefault(-1.f)
+                .withDefault(dual ? -1.f : 0.f)
                 .withName(!stereo ? std::string() : (std::string("Pan") + (dual ? " One" : "")));
         case fpPanTwo:
             return pmd()
@@ -250,67 +250,86 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
-        mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
-        mech::copy_from_to<VFXConfig::blockSize>(datainR, dataoutR);
 
-        auto panParamOne = std::clamp((this->getFloatParam(fpPanOne) + 1) / 2, 0.f, 1.f);
-        auto panParamTwo = std::clamp((this->getFloatParam(fpPanTwo) + 1) / 2, 0.f, 1.f);
+        auto levelParamOne = std::clamp(this->getFloatParam(fpLevelOne), 0.f, 1.f);
+        auto levelParamTwo = std::clamp(this->getFloatParam(fpLevelTwo), 0.f, 1.f);
+        levelLerpOne.set_target(levelParamOne);
+        levelLerpTwo.set_target(levelParamTwo);
 
+        auto panParamOne = std::clamp((this->getFloatParam(fpPanOne) * .5f + .5f), 0.f, 1.f);
+        auto panParamTwo = std::clamp((this->getFloatParam(fpPanTwo) * .5f + .5f), 0.f, 1.f);
         if (this->getIntParam(ipStereo) == false)
         {
             panParamOne = 0.5f;
             panParamTwo = 0.5f;
         }
+        panLerpOne.set_target(panParamOne);
+        panLerpTwo.set_target(panParamTwo);
 
-        auto ptOne = this->getFloatParam(fpOffsetOne);
-        auto ptTwo = this->getFloatParam(fpOffsetTwo);
+        auto pitchParamOne = this->getFloatParam(fpOffsetOne);
+        auto pitchParamTwo = this->getFloatParam(fpOffsetTwo);
         if (keytrackOn)
         {
-            ptOne += pitch;
-            ptTwo += pitch;
+            pitchParamOne += pitch;
+            pitchParamTwo += pitch;
         }
-        ptOne += pitchAdjustmentForStiffness();
-        ptTwo += pitchAdjustmentForStiffness();
-        setupFilters(ptOne);
-        setupFilters(ptTwo);
+        pitchParamOne += pitchAdjustmentForStiffness();
+        pitchParamTwo += pitchAdjustmentForStiffness();
+        setupFilters(pitchParamOne);
+        setupFilters(pitchParamTwo);
+        pitchLerpOne.set_target(this->getSampleRate() /
+                                (440 * this->note_to_pitch_ignoring_tuning(pitchParamOne)));
+        pitchLerpTwo.set_target(this->getSampleRate() /
+                                (440 * this->note_to_pitch_ignoring_tuning(pitchParamTwo)));
 
-        lipolPitchOne.set_target(this->getSampleRate() /
-                                 (440 * this->note_to_pitch_ignoring_tuning(ptOne)));
-        lipolPitchTwo.set_target(this->getSampleRate() /
-                                 (440 * this->note_to_pitch_ignoring_tuning(ptTwo)));
+        auto decayParam = std::clamp(this->getFloatParam(fpDecay), 0.f, 1.f) * 0.12 + 0.88;
+        decayParam = std::min(sqrt(decayParam), 0.99999);
+        decayLerp.set_target(decayParam);
 
-        auto dcv = std::clamp(this->getFloatParam(fpDecay), 0.f, 1.f) * 0.12 + 0.88;
-        dcv = std::min(sqrt(dcv), 0.99999);
-        lipolDecay.set_target(dcv);
         if (firstPitch)
         {
-            lipolPitchOne.instantize();
-            lipolPitchTwo.instantize();
-            lipolDecay.instantize();
+            pitchLerpOne.instantize();
+            pitchLerpTwo.instantize();
+            decayLerp.instantize();
+            panLerpOne.instantize();
+            panLerpTwo.instantize();
             firstPitch = false;
         }
-        float dtOne alignas(16)[VFXConfig::blockSize];
-        float dtTwo alignas(16)[VFXConfig::blockSize];
-        float dc alignas(16)[VFXConfig::blockSize];
-        lipolPitchOne.store_block(dtOne);
-        lipolPitchTwo.store_block(dtTwo);
-        lipolDecay.store_block(dc);
+
+        float levelOne alignas(16)[VFXConfig::blockSize];
+        float levelTwo alignas(16)[VFXConfig::blockSize];
+        float panOne alignas(16)[VFXConfig::blockSize];
+        float panTwo alignas(16)[VFXConfig::blockSize];
+        float frequencyOne alignas(16)[VFXConfig::blockSize];
+        float frequencyTwo alignas(16)[VFXConfig::blockSize];
+        float feedback alignas(16)[VFXConfig::blockSize];
+
+        levelLerpOne.store_block(levelOne);
+        levelLerpTwo.store_block(levelTwo);
+        panLerpOne.store_block(panOne);
+        panLerpTwo.store_block(panTwo);
+        pitchLerpOne.store_block(frequencyOne);
+        pitchLerpTwo.store_block(frequencyTwo);
+        decayLerp.store_block(feedback);
 
         float tone = this->getFloatParam(fpStiffness);
 
+        mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
+        mech::copy_from_to<VFXConfig::blockSize>(datainR, dataoutR);
+
         for (int i = 0; i < VFXConfig::blockSize; ++i)
         {
-            auto fromLineOne = lines[0]->read(dtOne[i]);
-            auto fromLineTwo = lines[1]->read(dtTwo[i]);
+            auto fromLineOne = lines[0]->read(frequencyOne[i]);
+            auto fromLineTwo = lines[1]->read(frequencyTwo[i]);
 
             float toLineOne = 0.f;
             float toLineTwo = 0.f;
 
-            balancedMonoSum(panParamOne, datainL[i], datainR[i], toLineOne);
-            balancedMonoSum(panParamTwo, datainL[i], datainR[i], toLineTwo);
+            balancedMonoSum(panOne[i], datainL[i], datainR[i], toLineOne);
+            balancedMonoSum(panTwo[i], datainL[i], datainR[i], toLineTwo);
 
-            toLineOne = toLineOne + dc[i] * fromLineOne;
-            toLineTwo = toLineTwo + dc[i] * fromLineTwo;
+            toLineOne = toLineOne + feedback[i] * fromLineOne;
+            toLineTwo = toLineTwo + feedback[i] * fromLineTwo;
 
             if (tone < 0)
             {
@@ -327,19 +346,16 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
             float leftOutOne = 0.f, rightOutOne = 0.f;
             float leftOutTwo = 0.f, rightOutTwo = 0.f;
 
-            auto levelOne = std::clamp(this->getFloatParam(fpLevelOne), 0.f, 1.f);
-            auto levelTwo = std::clamp(this->getFloatParam(fpLevelTwo), 0.f, 1.f);
+            panLineToOutput(panOne[i], toLineOne, leftOutOne, rightOutOne);
+            panLineToOutput(panTwo[i], toLineTwo, leftOutTwo, rightOutTwo);
 
-            panLineToOutput(panParamOne, toLineOne, leftOutOne, rightOutOne);
-            panLineToOutput(panParamTwo, toLineTwo, leftOutTwo, rightOutTwo);
+            leftOutOne *= levelOne[i];
+            rightOutOne *= levelOne[i];
+            leftOutTwo *= levelTwo[i];
+            rightOutTwo *= levelTwo[i];
 
-            leftOutOne *= levelOne;
-            rightOutOne *= levelOne;
-            leftOutTwo *= levelTwo;
-            rightOutTwo *= levelTwo;
-
-            dataoutL[i] = (leftOutOne + leftOutTwo) / 2;
-            dataoutR[i] = (rightOutOne + rightOutTwo) / 2;
+            dataoutL[i] = leftOutOne + leftOutTwo;
+            dataoutR[i] = rightOutOne + rightOutTwo;
         }
     }
 
@@ -349,52 +365,63 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
-        mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
-        mech::copy_from_to<VFXConfig::blockSize>(datainR, dataoutR);
 
-        auto panParam = std::clamp((this->getFloatParam(fpPanOne) + 1) / 2, 0.f, 1.f);
+        auto levelParam = std::clamp(this->getFloatParam(fpLevelOne), 0.f, 1.f);
+        levelLerpOne.set_target(levelParam);
 
+        auto panParam = std::clamp((this->getFloatParam(fpPanOne) * .5f + .5f), 0.f, 1.f);
         if (this->getIntParam(ipStereo) == false)
         {
             panParam = 0.5f;
         }
+        panLerpOne.set_target(panParam);
 
-        auto pt = this->getFloatParam(fpOffsetOne);
+        auto pitchParam = this->getFloatParam(fpOffsetOne);
         if (keytrackOn)
         {
-            pt += pitch;
+            pitchParam += pitch;
         }
-        pt += pitchAdjustmentForStiffness();
-        setupFilters(pt);
+        pitchParam += pitchAdjustmentForStiffness();
+        setupFilters(pitchParam);
+        pitchLerpOne.set_target(this->getSampleRate() /
+                                (440 * this->note_to_pitch_ignoring_tuning(pitchParam)));
 
-        lipolPitch.set_target(this->getSampleRate() /
-                              (440 * this->note_to_pitch_ignoring_tuning(pt)));
+        auto decayParam = std::clamp(this->getFloatParam(fpDecay), 0.f, 1.f) * 0.12 + 0.88;
+        decayParam = std::min(sqrt(decayParam), 0.99999);
+        decayLerp.set_target(decayParam);
 
-        auto dcv = std::clamp(this->getFloatParam(fpDecay), 0.f, 1.f) * 0.12 + 0.88;
-        dcv = std::min(sqrt(dcv), 0.99999);
-        lipolDecay.set_target(dcv);
         if (firstPitch)
         {
-            lipolPitch.instantize();
-            lipolDecay.instantize();
+            pitchLerpOne.instantize();
+            decayLerp.instantize();
+            panLerpOne.instantize();
             firstPitch = false;
         }
-        float dt alignas(16)[VFXConfig::blockSize];
-        float dc alignas(16)[VFXConfig::blockSize];
-        lipolPitch.store_block(dt);
-        lipolDecay.store_block(dc);
+
+        float level alignas(16)[VFXConfig::blockSize];
+        float pan alignas(16)[VFXConfig::blockSize];
+        float frequency alignas(16)[VFXConfig::blockSize];
+        float feedback alignas(16)[VFXConfig::blockSize];
+
+        levelLerpOne.store_block(level);
+        panLerpOne.store_block(pan);
+        pitchLerpOne.store_block(frequency);
+        decayLerp.store_block(feedback);
 
         float tone = this->getFloatParam(fpStiffness);
 
+        mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
+        mech::copy_from_to<VFXConfig::blockSize>(datainR, dataoutR);
+
         for (int i = 0; i < VFXConfig::blockSize; ++i)
         {
-            auto fromLine = line->read(dt[i]);
+            auto fromLine = line->read(frequency[i]);
 
             float toLine = datainL[i];
 
-            balancedMonoSum(panParam, datainL[i], datainR[i], toLine);
+            balancedMonoSum(pan[i], datainL[i], datainR[i], toLine);
 
-            toLine = toLine + dc[i] * fromLine;
+            toLine = toLine + feedback[i] * fromLine;
 
             float dummyR = 0.f;
 
@@ -409,14 +436,12 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
 
             line->write(toLine);
 
-            auto level = std::clamp(this->getFloatParam(fpLevelOne), 0.f, 1.f);
-
             float leftOut = 0.f, rightOut = 0.f;
 
-            panLineToOutput(panParam, toLine, leftOut, rightOut);
+            panLineToOutput(pan[i], toLine, leftOut, rightOut);
 
-            dataoutL[i] = leftOut * level;
-            dataoutR[i] = rightOut * level;
+            dataoutL[i] = leftOut * level[i];
+            dataoutR[i] = rightOut * level[i];
         }
     }
 
@@ -426,54 +451,66 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
-        mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
 
-        auto ptOne = this->getFloatParam(fpOffsetOne);
-        auto ptTwo = this->getFloatParam(fpOffsetTwo);
+        auto levelParamOne = std::clamp(this->getFloatParam(fpLevelOne), 0.f, 1.f);
+        auto levelParamTwo = std::clamp(this->getFloatParam(fpLevelTwo), 0.f, 1.f);
+        levelLerpOne.set_target(levelParamOne);
+        levelLerpTwo.set_target(levelParamTwo);
+
+        auto pitchParamOne = this->getFloatParam(fpOffsetOne);
+        auto pitchParamTwo = this->getFloatParam(fpOffsetTwo);
         if (keytrackOn)
         {
-            ptOne += pitch;
-            ptTwo += pitch;
+            pitchParamOne += pitch;
+            pitchParamTwo += pitch;
         }
-        ptOne += pitchAdjustmentForStiffness();
-        ptTwo += pitchAdjustmentForStiffness();
-        setupFilters(ptOne);
-        setupFilters(ptTwo);
+        pitchParamOne += pitchAdjustmentForStiffness();
+        pitchParamTwo += pitchAdjustmentForStiffness();
+        setupFilters(pitchParamOne);
+        setupFilters(pitchParamTwo);
 
-        lipolPitchOne.set_target(this->getSampleRate() /
-                                 (440 * this->note_to_pitch_ignoring_tuning(ptOne)));
-        lipolPitchTwo.set_target(this->getSampleRate() /
-                                 (440 * this->note_to_pitch_ignoring_tuning(ptTwo)));
+        pitchLerpOne.set_target(this->getSampleRate() /
+                                (440 * this->note_to_pitch_ignoring_tuning(pitchParamOne)));
+        pitchLerpTwo.set_target(this->getSampleRate() /
+                                (440 * this->note_to_pitch_ignoring_tuning(pitchParamTwo)));
 
-        auto dcv = std::clamp(this->getFloatParam(fpDecay), 0.f, 1.f) * 0.12 + 0.88;
-        dcv = std::min(sqrt(dcv), 0.99999);
-        lipolDecay.set_target(dcv);
+        auto decayParam = std::clamp(this->getFloatParam(fpDecay), 0.f, 1.f) * 0.12 + 0.88;
+        decayParam = std::min(sqrt(decayParam), 0.99999);
+        decayLerp.set_target(decayParam);
         if (firstPitch)
         {
-            lipolPitchOne.instantize();
-            lipolPitchTwo.instantize();
-            lipolDecay.instantize();
+            pitchLerpOne.instantize();
+            pitchLerpTwo.instantize();
+            decayLerp.instantize();
             firstPitch = false;
         }
-        float dtOne alignas(16)[VFXConfig::blockSize];
-        float dtTwo alignas(16)[VFXConfig::blockSize];
-        float dc alignas(16)[VFXConfig::blockSize];
-        lipolPitchOne.store_block(dtOne);
-        lipolPitchTwo.store_block(dtTwo);
-        lipolDecay.store_block(dc);
+
+        float levelOne alignas(16)[VFXConfig::blockSize];
+        float levelTwo alignas(16)[VFXConfig::blockSize];
+        float frequencyOne alignas(16)[VFXConfig::blockSize];
+        float frequencyTwo alignas(16)[VFXConfig::blockSize];
+        float feedback alignas(16)[VFXConfig::blockSize];
+
+        levelLerpOne.store_block(levelOne);
+        levelLerpTwo.store_block(levelTwo);
+        pitchLerpOne.store_block(frequencyOne);
+        pitchLerpTwo.store_block(frequencyTwo);
+        decayLerp.store_block(feedback);
 
         float tone = this->getFloatParam(fpStiffness);
 
+        mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
+
         for (int i = 0; i < VFXConfig::blockSize; ++i)
         {
-            auto fromLineOne = lines[0]->read(dtOne[i]);
-            auto fromLineTwo = lines[1]->read(dtTwo[i]);
+            auto fromLineOne = lines[0]->read(frequencyOne[i]);
+            auto fromLineTwo = lines[1]->read(frequencyTwo[i]);
 
             float toLineOne = 0.f;
             float toLineTwo = 0.f;
 
-            toLineOne = datainL[i] + dc[i] * fromLineOne;
-            toLineTwo = datainL[i] + dc[i] * fromLineTwo;
+            toLineOne = datainL[i] + feedback[i] * fromLineOne;
+            toLineTwo = datainL[i] + feedback[i] * fromLineTwo;
 
             if (tone < 0)
             {
@@ -484,13 +521,10 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
                 hp.process_sample(toLineOne, toLineTwo, toLineOne, toLineTwo);
             }
 
-            auto levelOne = std::clamp(this->getFloatParam(fpLevelOne), 0.f, 1.f);
-            auto levelTwo = std::clamp(this->getFloatParam(fpLevelTwo), 0.f, 1.f);
-
             lines[0]->write(toLineOne);
             lines[1]->write(toLineTwo);
 
-            dataoutL[i] = ((toLineOne * levelOne + toLineTwo * levelTwo) / 2);
+            dataoutL[i] = toLineOne * levelOne[i] + toLineTwo * levelTwo[i];
         }
     }
 
@@ -499,42 +533,50 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
-        mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
 
-        auto pt = this->getFloatParam(fpOffsetOne);
+        auto levelParam = std::clamp(this->getFloatParam(fpLevelOne), 0.f, 1.f);
+        levelLerpOne.set_target(levelParam);
+
+        auto pitchParam = this->getFloatParam(fpOffsetOne);
         if (keytrackOn)
         {
-            pt += pitch;
+            pitchParam += pitch;
         }
-        pt += pitchAdjustmentForStiffness();
-        setupFilters(pt);
+        pitchParam += pitchAdjustmentForStiffness();
+        setupFilters(pitchParam);
 
-        lipolPitch.set_target(this->getSampleRate() /
-                              (440 * this->note_to_pitch_ignoring_tuning(pt)));
+        pitchLerpOne.set_target(this->getSampleRate() /
+                                (440 * this->note_to_pitch_ignoring_tuning(pitchParam)));
 
-        auto dcv = std::clamp(this->getFloatParam(fpDecay), 0.f, 1.f) * 0.12 + 0.88;
-        dcv = std::min(sqrt(dcv), 0.99999);
-        lipolDecay.set_target(dcv);
+        auto decayParam = std::clamp(this->getFloatParam(fpDecay), 0.f, 1.f) * 0.12 + 0.88;
+        decayParam = std::min(sqrt(decayParam), 0.99999);
+        decayLerp.set_target(decayParam);
         if (firstPitch)
         {
-            lipolPitch.instantize();
-            lipolDecay.instantize();
+            pitchLerpOne.instantize();
+            decayLerp.instantize();
             firstPitch = false;
         }
-        float dt alignas(16)[VFXConfig::blockSize];
-        float dc alignas(16)[VFXConfig::blockSize];
-        lipolPitch.store_block(dt);
-        lipolDecay.store_block(dc);
+
+        float level alignas(16)[VFXConfig::blockSize];
+        float frequency alignas(16)[VFXConfig::blockSize];
+        float feedback alignas(16)[VFXConfig::blockSize];
+
+        levelLerpOne.store_block(level);
+        pitchLerpOne.store_block(frequency);
+        decayLerp.store_block(feedback);
 
         float tone = this->getFloatParam(fpStiffness);
 
+        mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
+
         for (int i = 0; i < VFXConfig::blockSize; ++i)
         {
-            auto fromLine = line->read(dt[i]);
+            auto fromLine = line->read(frequency[i]);
 
             float toLine = datainL[i];
 
-            toLine = toLine + dc[i] * fromLine;
+            toLine = toLine + feedback[i] * fromLine;
 
             float dummyR = 0.f;
 
@@ -549,9 +591,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
 
             line->write(toLine);
 
-            auto level = std::clamp(this->getFloatParam(fpLevelOne), 0.f, 1.f);
-
-            dataoutL[i] = toLine * level;
+            dataoutL[i] = toLine * level[i];
         }
     }
 
@@ -711,8 +751,8 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
 
     std::array<float, numFloatParams> mLastParam{};
 
-    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> lipolPitch, lipolPitchOne,
-        lipolPitchTwo, lipolDecay;
+    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> levelLerpOne, levelLerpTwo,
+        panLerpOne, panLerpTwo, pitchLerpOne, pitchLerpTwo, decayLerp;
 
     typename core::VoiceEffectTemplateBase<VFXConfig>::BiquadFilterType lp, hp;
 };

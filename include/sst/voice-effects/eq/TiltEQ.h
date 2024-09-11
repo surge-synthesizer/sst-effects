@@ -93,6 +93,7 @@ template <typename VFXConfig> struct TiltEQ : core::VoiceEffectTemplateBase<VFXC
                 filters::CytomicSVF::Mode::HIGH_SHELF, freq, res, this->getSampleRateInv(),
                 posGain);
             priorSlope = slope;
+            priorFreq = freq;
         }
     }
 
