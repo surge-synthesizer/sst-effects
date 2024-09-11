@@ -18,8 +18,8 @@
  * https://github.com/surge-synthesizer/sst-effects
  */
 
-#ifndef INCLUDE_SST_VOICE_EFFECTS_UTILITIES_STEREOFIELDMANIP_H
-#define INCLUDE_SST_VOICE_EFFECTS_UTILITIES_STEREOFIELDMANIP_H
+#ifndef INCLUDE_SST_VOICE_EFFECTS_UTILITIES_STEREOTOOL_H
+#define INCLUDE_SST_VOICE_EFFECTS_UTILITIES_STEREOTOOL_H
 
 #include "../VoiceEffectCore.h"
 
@@ -30,10 +30,9 @@
 
 namespace sst::voice_effects::utilities
 {
-template <typename VFXConfig>
-struct StereoFieldManipulator : core::VoiceEffectTemplateBase<VFXConfig>
+template <typename VFXConfig> struct StereoTool : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Stereo Field Manipulator"};
+    static constexpr const char *effectName{"Stereo Tool"};
 
     static constexpr int numFloatParams{4};
     static constexpr int numIntParams{0};
@@ -42,13 +41,13 @@ struct StereoFieldManipulator : core::VoiceEffectTemplateBase<VFXConfig>
     {
         fpRotation,
         fpWidth,
-        fpCenter,
+        fpMidSide,
         fpLeftRight
     };
 
-    StereoFieldManipulator() : core::VoiceEffectTemplateBase<VFXConfig>() {}
+    StereoTool() : core::VoiceEffectTemplateBase<VFXConfig>() {}
 
-    ~StereoFieldManipulator() {}
+    ~StereoTool() {}
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
@@ -57,14 +56,18 @@ struct StereoFieldManipulator : core::VoiceEffectTemplateBase<VFXConfig>
         switch (idx)
         {
         case fpRotation:
-            return pmd().asFloat().withRange(-90.f, 90.f).withDefault(0.f).withName("Rotation (º)");
+            return pmd()
+                .asFloat()
+                .withRange(-90.f, 90.f)
+                .withDefault(0.f)
+                .withName("Rotation")
+                .withLinearScaleFormatting("º");
         case fpWidth:
-            return pmd().asPercent().withDefault(1.f).withRange(0.f, 2.f).withName("Width (%)");
-        case fpCenter:
-            return pmd().asPercent().withDefault(0.f).withRange(-1.f, 1.f).withName("Center (%)");
+            return pmd().asPercent().withDefault(1.f).withRange(0.f, 2.f).withName("Width");
+        case fpMidSide:
+            return pmd().asPercent().withDefault(0.f).withRange(-1.f, 1.f).withName("Mid|Side");
         case fpLeftRight:
-            return pmd().asPercent().withDefault(0.f).withRange(-1.f, 1.f).withName(
-                "Left/Right (%)");
+            return pmd().asPercent().withDefault(0.f).withRange(-1.f, 1.f).withName("Left|Right");
         }
         return pmd().asFloat().withName("Error");
     }
@@ -78,8 +81,8 @@ struct StereoFieldManipulator : core::VoiceEffectTemplateBase<VFXConfig>
     {
         auto rotRadians = this->getFloatParam(fpRotation) * 0.017453292; // degrees * PI/180
         auto width = this->getFloatParam(fpWidth) / 2.f;
-        auto center = std::min(this->getFloatParam(fpCenter) + 1, 1.f);
-        auto side = 1 - this->getFloatParam(fpCenter);
+        auto side = std::min(this->getFloatParam(fpMidSide) + 1, 1.f);
+        auto center = 1 - this->getFloatParam(fpMidSide);
         auto left = -std::min(this->getFloatParam(fpLeftRight), 0.f);
         auto left1 = -std::max(this->getFloatParam(fpLeftRight) - 1, -1.f);
         auto right = std::max(this->getFloatParam(fpLeftRight), 0.f);
@@ -130,4 +133,4 @@ struct StereoFieldManipulator : core::VoiceEffectTemplateBase<VFXConfig>
     }
 };
 } // namespace sst::voice_effects::utilities
-#endif // SCXT_STEREOFIELDMANIP_H
+#endif // SCXT_STEREOTOOL_H
