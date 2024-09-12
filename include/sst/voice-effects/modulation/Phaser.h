@@ -340,8 +340,6 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
 
   protected:
     bool keytrackOn{false};
-    std::array<float, numFloatParams> mLastParam{};
-    std::array<int, numIntParams> mLastIParam{};
     std::array<sst::filters::CytomicSVF, 4> filters;
     float fbAmt[2]{0.f, 0.f};
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> feedbackLerp;

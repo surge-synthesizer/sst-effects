@@ -237,8 +237,6 @@ template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFX
     bool getKeytrack() const { return keytrackOn; }
 
   protected:
-    std::array<float, numFloatParams> mLastParam{};
-    std::array<int, numIntParams> mLastIParam{};
     bool first = true;
     bool keytrackOn = false;
     sst::basic_blocks::dsp::SlewLimiter speedLimiter;
