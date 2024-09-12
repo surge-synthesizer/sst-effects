@@ -50,6 +50,7 @@
 #include "sst/voice-effects/modulation/NoiseAM.h"
 #include "sst/voice-effects/utilities/StereoTool.h"
 #include "sst/voice-effects/utilities/VolumeAndPan.h"
+#include "sst/voice-effects/utilities/GainMatrix.h"
 
 #include "sst/voice-effects/lifted_bus_effects/LiftedReverb1.h"
 #include "sst/voice-effects/lifted_bus_effects/LiftedReverb2.h"
@@ -198,6 +199,7 @@ TEST_CASE("Can Create Voice FX")
     {
         VTester<sst::voice_effects::utilities::StereoTool<VTestConfig>>::TestVFX();
     }
+    SECTION("GainMatrix") { VTester<sst::voice_effects::utilities::GainMatrix<VTestConfig>>::TestVFX(); }
     SECTION("Lifted Reverb 1")
     {
         VTester<sst::voice_effects::liftbus::LiftedReverb1<VTestConfig>>::TestVFX();
