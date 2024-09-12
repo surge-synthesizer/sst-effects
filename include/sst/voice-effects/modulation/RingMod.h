@@ -51,11 +51,7 @@ template <typename VFXConfig> struct RingMod : core::VoiceEffectTemplateBase<VFX
         ipDenom
     };
 
-    RingMod() : core::VoiceEffectTemplateBase<VFXConfig>()
-    {
-        std::fill(mLastIParam.begin(), mLastIParam.end(), -1);
-        std::fill(mLastParam.begin(), mLastParam.end(), -188888.f);
-    }
+    RingMod() : core::VoiceEffectTemplateBase<VFXConfig>() {}
 
     ~RingMod() {}
 
@@ -159,8 +155,6 @@ template <typename VFXConfig> struct RingMod : core::VoiceEffectTemplateBase<VFX
 
   protected:
     bool keytrackOn{true};
-    std::array<float, numFloatParams> mLastParam{};
-    std::array<int, numIntParams> mLastIParam{};
     sst::basic_blocks::dsp::QuadratureOscillator<float> qosc;
     int priorNum = -1;
     int priorDenom = -1;

@@ -164,7 +164,11 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
         return pmd().withName("error");
     }
 
-    void initVoiceEffect() {}
+    void initVoiceEffect()
+    {
+        cySvf[0].init();
+        cySvf[1].init();
+    }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     void calc_coeffs(float pitch = 0.f)
@@ -191,20 +195,12 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
 
         if (diff || idiff)
         {
-            if (idiff)
-            {
-                cySvf[0].init();
-                if (iparam[2])
-                {
-                    cySvf[1].init();
-                }
-            }
             auto mode = (sst::filters::CytomicSVF::Mode)(iparam[0]);
 
             auto res = std::clamp(param[2], 0.f, 1.f);
             if (iparam[2] == true)
             {
-                res *= .885f; // I just checked on a specrum analyzer.
+                res *= .885f; // I just checked peak heights on a spectrum analyzer.
             }
 
             auto shelf = this->dbToLinear(param[3]);

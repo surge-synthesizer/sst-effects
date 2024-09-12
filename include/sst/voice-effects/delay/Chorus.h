@@ -71,10 +71,7 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
         ipStereo,
     };
 
-    Chorus(const SincTable &st) : sSincTable(st), core::VoiceEffectTemplateBase<VFXConfig>()
-    {
-        std::fill(mLastParam.begin(), mLastParam.end(), -188888.f);
-    }
+    Chorus(const SincTable &st) : sSincTable(st), core::VoiceEffectTemplateBase<VFXConfig>() {}
 
     ~Chorus()
     {
@@ -393,8 +390,6 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
   protected:
     std::array<details::DelayLineSupport, 2> lineSupport;
     bool isShort{true};
-
-    std::array<float, numFloatParams> mLastParam{};
 
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> feedbackLerp, timeLerp[2];
 };

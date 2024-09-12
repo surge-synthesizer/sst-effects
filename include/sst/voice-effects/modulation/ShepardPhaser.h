@@ -92,7 +92,18 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
         return pmd().asInt().withName("Error");
     }
 
-    void initVoiceEffect() {}
+    void initVoiceEffect()
+    {
+        for (int i = 0; i < 24; ++i)
+        {
+            filters[i].init();
+            if (i < 12)
+            {
+                priorLevelL[i] = -12345.f;
+                priorLevelR[i] = -12345.f;
+            }
+        }
+    }
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
@@ -124,6 +135,7 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
         if (peaks != priorPeaks)
         {
             logOfPeaks = std::log2f(peaks);
+            gainScale = 1 / logOfPeaks;
             priorPeaks = peaks;
         }
         auto lfoRate = this->getFloatParam(fpRate) - logOfPeaks;
@@ -140,50 +152,107 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
         mech::clear_block<VFXConfig::blockSize>(dataoutL);
         mech::clear_block<VFXConfig::blockSize>(dataoutR);
 
-        for (int i = 0; i < peaks; ++i)
+        if (stereo)
         {
-            auto offset = static_cast<double>(i) / static_cast<double>(peaks);
-            auto halfway = 0.5 / static_cast<double>(peaks);
-            auto iPhaseL = std::fmod(phasorValue + offset, 1.0);
-            auto iPhaseR = !stereo ? iPhaseL : std::fmod(phasorValue + offset + halfway, 1.0);
-
-            auto iTriL = triangle(iPhaseL);
-            auto iTriR = triangle(iPhaseR);
-
-            auto freqL = 440.f * this->note_to_pitch_ignoring_tuning(
-                                     this->getFloatParam(fpStartFreq) + (range * iPhaseL));
-            auto freqR = 440.f * this->note_to_pitch_ignoring_tuning(
-                                     this->getFloatParam(fpStartFreq) + (range * iPhaseR));
-
-            filters[i].template setCoeffForBlock<VFXConfig::blockSize>(
-                sst::filters::CytomicSVF::Mode::BP, freqL, freqR, res, res,
-                this->getSampleRateInv(), 1.f, 1.f);
-
-            float tmpL alignas(16)[VFXConfig::blockSize];
-            float tmpR alignas(16)[VFXConfig::blockSize];
-            mech::copy_from_to<VFXConfig::blockSize>(datainL, tmpL);
-            mech::copy_from_to<VFXConfig::blockSize>(datainR, tmpR);
-
-            for (int k = 0; k < VFXConfig::blockSize; ++k)
+            for (int i = 0; i < peaks; ++i)
             {
-                filters[i].processBlockStep(tmpL[k], tmpR[k]);
-            }
+                auto offset = static_cast<double>(i) / static_cast<double>(peaks);
+                auto halfway = 0.5 / static_cast<double>(peaks);
 
-            if (!stereo)
-            {
-                lipolLevel[i].set_target(iTriL * iTriL * iTriL);
-                lipolLevel[i].multiply_2_blocks(tmpL, tmpR);
-            }
-            else
-            {
-                lipolLevel[i].set_target(iTriL * iTriL * iTriL);
-                lipolLevel[i].multiply_block(tmpL);
-                lipolLevel[i + 12].set_target(iTriR * iTriR * iTriR);
-                lipolLevel[i + 12].multiply_block(tmpR);
-            }
+                // ramp for frequency
+                auto iPhaseL = std::fmod(phasorValue + offset, 1.0);
+                auto iPhaseR = std::fmod(phasorValue + offset + halfway, 1.0);
 
-            mech::scale_accumulate_from_to<VFXConfig::blockSize>(tmpL, tmpR, 0.5f, dataoutL,
-                                                                 dataoutR);
+                // triangle for amplitude
+                auto iTriL = triangle(iPhaseL);
+                auto iTriR = triangle(iPhaseR);
+                iTriL = iTriL * iTriL * iTriL;
+                iTriR = iTriR * iTriR * iTriR;
+                if (priorLevelL[i] < 0) // true on first block
+                {
+                    priorLevelL[i] = iTriL; // start from the first value
+                }
+                if (priorLevelR[i] < 0) // same for the right side
+                {
+                    priorLevelR[i] = iTriR;
+                }
+                // set the smoothers to start on the prior value
+                levelLerpL.set_target_instant(priorLevelL[i]);
+                levelLerpR.set_target_instant(priorLevelR[i]);
+                // and aim for the current value
+                levelLerpL.set_target(iTriL);
+                levelLerpR.set_target(iTriR);
+                // and save the index's value to start from on the next block
+                priorLevelL[i] = iTriL;
+                priorLevelR[i] = iTriR;
+                // A float per filter is a lot less memory than a lipol_sse per filter
+
+                auto freqL = 440.f * this->note_to_pitch_ignoring_tuning(
+                                         this->getFloatParam(fpStartFreq) + (range * iPhaseL));
+                auto freqR = 440.f * this->note_to_pitch_ignoring_tuning(
+                                         this->getFloatParam(fpStartFreq) + (range * iPhaseR));
+
+                filters[i].template setCoeffForBlock<VFXConfig::blockSize>(
+                    sst::filters::CytomicSVF::Mode::BP, freqL, freqR, res, res,
+                    this->getSampleRateInv(), 1.f, 1.f);
+
+                float tmpL alignas(16)[VFXConfig::blockSize];
+                float tmpR alignas(16)[VFXConfig::blockSize];
+                mech::copy_from_to<VFXConfig::blockSize>(datainL, tmpL);
+                mech::copy_from_to<VFXConfig::blockSize>(datainR, tmpR);
+
+                for (int k = 0; k < VFXConfig::blockSize; ++k)
+                {
+                    filters[i].processBlockStep(tmpL[k], tmpR[k]);
+                }
+
+                levelLerpL.multiply_block(tmpL);
+                levelLerpR.multiply_block(tmpR);
+
+                mech::scale_accumulate_from_to<VFXConfig::blockSize>(tmpL, tmpR, gainScale,
+                                                                     dataoutL, dataoutR);
+            }
+        }
+        else
+        {
+            for (int i = 0; i < peaks; ++i)
+            {
+                auto offset = static_cast<double>(i) / static_cast<double>(peaks);
+                auto halfway = 0.5 / static_cast<double>(peaks);
+                auto iPhase = std::fmod(phasorValue + offset, 1.0);
+
+                auto iTri = triangle(iPhase);
+                iTri = iTri * iTri * iTri;
+                if (priorLevelL[i] < 0)
+                {
+                    priorLevelL[i] = iTri;
+                }
+                levelLerpL.set_target_instant(priorLevelL[i]);
+                levelLerpL.set_target(iTri);
+                priorLevelL[i] = iTri;
+
+                auto freq = 440.f * this->note_to_pitch_ignoring_tuning(
+                                        this->getFloatParam(fpStartFreq) + (range * iPhase));
+
+                filters[i].template setCoeffForBlock<VFXConfig::blockSize>(
+                    sst::filters::CytomicSVF::Mode::BP, freq, freq, res, res,
+                    this->getSampleRateInv(), 1.f, 1.f);
+
+                float tmpL alignas(16)[VFXConfig::blockSize];
+                float tmpR alignas(16)[VFXConfig::blockSize];
+                mech::copy_from_to<VFXConfig::blockSize>(datainL, tmpL);
+                mech::copy_from_to<VFXConfig::blockSize>(datainR, tmpR);
+
+                for (int k = 0; k < VFXConfig::blockSize; ++k)
+                {
+                    filters[i].processBlockStep(tmpL[k], tmpR[k]);
+                }
+
+                levelLerpL.multiply_2_blocks(tmpL, tmpR);
+
+                mech::scale_accumulate_from_to<VFXConfig::blockSize>(tmpL, tmpR, gainScale,
+                                                                     dataoutL, dataoutR);
+            }
         }
     }
 
@@ -196,6 +265,7 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
         if (peaks != priorPeaks)
         {
             logOfPeaks = std::log2f(peaks);
+            gainScale = 1 / logOfPeaks;
             priorPeaks = peaks;
         }
         auto lfoRate = this->getFloatParam(fpRate) - logOfPeaks;
@@ -213,13 +283,23 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
 
         for (int i = 0; i < peaks; ++i)
         {
+            auto offset = static_cast<double>(i) / static_cast<double>(peaks);
+            auto iPhase = std::fmod(phasorValue + offset, 1.0);
 
-            float iPhase = phasorValue + (i / static_cast<float>(peaks));
-            if (iPhase > 1)
-            {
-                iPhase -= 1;
-            }
             float iTri = triangle(iPhase);
+            iTri = iTri * iTri * iTri;
+
+            if (isFirst)
+            {
+                priorLevelL[i] = iTri;
+                if (i == peaks - 1)
+                {
+                    isFirst = false;
+                }
+            }
+            levelLerpL.set_target_instant(priorLevelL[i]);
+            levelLerpL.set_target(iTri);
+            priorLevelL[i] = iTri;
 
             auto freqMod = this->getFloatParam(fpStartFreq) + (range * iPhase);
             auto freq = 440.f * this->note_to_pitch_ignoring_tuning(freqMod);
@@ -234,10 +314,9 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
                 filters[i].processBlockStep(tmp[k]);
             }
 
-            lipolLevel[i].set_target(iTri * iTri * iTri);
-            lipolLevel[i].multiply_block(tmp);
+            levelLerpL.multiply_block(tmp);
 
-            mech::scale_accumulate_from_to<VFXConfig::blockSize>(tmp, 0.5f, dataoutL);
+            mech::scale_accumulate_from_to<VFXConfig::blockSize>(tmp, gainScale, dataoutL);
         }
     }
 
@@ -249,14 +328,16 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
 
   protected:
-    std::array<float, numFloatParams> mLastParam{};
-    std::array<int, numIntParams> mLastIParam{};
-
     std::array<sst::filters::CytomicSVF, 12> filters;
 
-    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> lipolLevel[24];
-    float logOfPeaks{0.f};
+    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> levelLerpL, levelLerpR;
+    float priorLevelL[12];
+    float priorLevelR[12];
+
     int priorPeaks{0};
+    float logOfPeaks{0.f};
+    float gainScale{1.f};
+
     bool isFirst{true};
 };
 } // namespace sst::voice_effects::modulation
