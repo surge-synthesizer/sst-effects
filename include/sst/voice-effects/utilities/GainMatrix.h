@@ -79,20 +79,35 @@ template <typename VFXConfig> struct GainMatrix : core::VoiceEffectTemplateBase<
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
     {
+
+        llLerp.set_target(this->getFloatParam(fpLeftToLeft));
+        float ll alignas(16)[VFXConfig::blockSize];
+        llLerp.store_block(ll);
+
+        rlLerp.set_target(this->getFloatParam(fpRightToLeft));
+        float rl alignas(16)[VFXConfig::blockSize];
+        rlLerp.store_block(rl);
+
+        rrLerp.set_target(this->getFloatParam(fpRightToRight));
+        float rr alignas(16)[VFXConfig::blockSize];
+        rrLerp.store_block(rr);
+
+        lrLerp.set_target(this->getFloatParam(fpLeftToRight));
+        float lr alignas(16)[VFXConfig::blockSize];
+        lrLerp.store_block(lr);
+
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
             auto sL = datainL[i];
             auto sR = datainR[i];
 
-            dataoutL[i] =
-                sL * this->getFloatParam(fpLeftToLeft) + sR * this->getFloatParam(fpRightToLeft);
-            dataoutR[i] =
-                sR * this->getFloatParam(fpRightToRight) + sL * this->getFloatParam(fpLeftToRight);
+            dataoutL[i] = sL * ll[i] + sR * rl[i];
+            dataoutR[i] = sR * rr[i] + sL * lr[i];
         }
     }
 
   protected:
-    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> volLerp, leftLerp, rightLerp;
+    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> llLerp, rlLerp, rrLerp, lrLerp;
 };
 } // namespace sst::voice_effects::utilities
 #endif // SCXT_GAINMATRIX_H

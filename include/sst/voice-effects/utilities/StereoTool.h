@@ -79,17 +79,34 @@ template <typename VFXConfig> struct StereoTool : core::VoiceEffectTemplateBase<
     void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
                        float pitch)
     {
-        auto rotRadians = this->getFloatParam(fpRotation) * 0.017453292; // degrees * PI/180
-        auto width = this->getFloatParam(fpWidth) / 2.f;
-        auto side = std::min(this->getFloatParam(fpMidSide) + 1, 1.f);
-        auto center = 1 - this->getFloatParam(fpMidSide);
-        auto left = -std::min(this->getFloatParam(fpLeftRight), 0.f);
-        auto left1 = -std::max(this->getFloatParam(fpLeftRight) - 1, -1.f);
-        auto right = std::max(this->getFloatParam(fpLeftRight), 0.f);
-        auto right1 = std::min(1 + this->getFloatParam(fpLeftRight), 1.f);
+
+        rotLerp.set_target(this->getFloatParam(fpRotation));
+        float rot alignas(16)[VFXConfig::blockSize];
+        rotLerp.store_block(rot);
+
+        widthLerp.set_target(this->getFloatParam(fpWidth));
+        float w alignas(16)[VFXConfig::blockSize];
+        widthLerp.store_block(w);
+
+        msLerp.set_target(this->getFloatParam(fpMidSide));
+        float ms alignas(16)[VFXConfig::blockSize];
+        msLerp.store_block(ms);
+
+        lrLerp.set_target(this->getFloatParam(fpLeftRight));
+        float lr alignas(16)[VFXConfig::blockSize];
+        lrLerp.store_block(lr);
 
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
+            auto rotRadians = rot[i] * 0.017453292; // degrees * PI/180
+            auto width = w[i] / 2.f;
+            auto side = std::min(ms[i] + 1, 1.f);
+            auto center = 1 - ms[i];
+            auto left = -std::min(lr[i], 0.f);
+            auto left1 = -std::max(lr[i] - 1, -1.f);
+            auto right = std::max(lr[i], 0.f);
+            auto right1 = std::min(1 + lr[i], 1.f);
+
             auto sL = datainL[i];
             auto sR = datainR[i];
 
@@ -131,6 +148,10 @@ template <typename VFXConfig> struct StereoTool : core::VoiceEffectTemplateBase<
             dataoutR[i] = sR;
         }
     }
+
+  protected:
+    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> rotLerp, widthLerp, msLerp,
+        lrLerp;
 };
 } // namespace sst::voice_effects::utilities
 #endif // SCXT_STEREOTOOL_H
