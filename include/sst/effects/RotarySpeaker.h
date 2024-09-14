@@ -64,7 +64,6 @@ template <typename FXConfig> struct RotarySpeaker : core::EffectTemplateBase<FXC
         : core::EffectTemplateBase<FXConfig>(s, e, p)
     {
     }
-    ~RotarySpeaker();
     void initialize();
     void processBlock(float *__restrict L, float *__restrict R);
 
@@ -73,6 +72,7 @@ template <typename FXConfig> struct RotarySpeaker : core::EffectTemplateBase<FXC
     void onSampleRateChanged() { initialize(); }
 
     void setvars(bool init);
+    void processOnlyControl();
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
@@ -154,19 +154,18 @@ template <typename FXConfig> inline void RotarySpeaker<FXConfig>::setvars(bool i
     }
 }
 
-/*
-void RotarySpeakerEffect::process_only_control()
+template <typename FXConfig> inline void RotarySpeaker<FXConfig>::processOnlyControl()
 {
-    float frate = this->floatValue(rot_horn_rate) *
-                  (fxdata->p[rot_horn_rate].temposync ? storage->temposyncratio : 1.f);
+    double frate = this->envelopeRateLinear(-this->floatValue(rot_horn_rate)) *
+                   this->temposyncRatio(rot_horn_rate);
 
-    lfo.set_rate(2 * M_PI * powf(2, frate) * storage->dsamplerate_inv * FXConfig::blockSize);
-    lf_lfo.set_rate(*pd_float[rot_rotor_rate] * 2 * M_PI * powf(2, frate) *
-                    storage->dsamplerate_inv * FXConfig::blockSize);
+    lfo.set_rate(2 * M_PI * powf(2, frate) * 1 / this->sampleRate() * FXConfig::blockSize);
+    lf_lfo.set_rate(this->floatValue(rot_rotor_rate) * 2 * M_PI * powf(2, frate) * 1 /
+                    this->sampleRate() * FXConfig::blockSize);
 
     lfo.process();
     lf_lfo.process();
-}*/
+}
 
 template <typename FXConfig>
 inline void RotarySpeaker<FXConfig>::processBlock(float *__restrict dataL, float *__restrict dataR)
@@ -388,7 +387,7 @@ inline void RotarySpeaker<FXConfig>::processBlock(float *__restrict dataL, float
     // scale width
     this->applyWidth(wbL, wbR, width);
 
-    mix.fade_2_blocks_inplace(dataL, wbL, dataR, wbR, FXConfig::blockSizeQuad);
+    mix.fade_2_blocks_inplace(dataL, wbL, dataR, wbR, FXConfig::blockSize >> 2);
 
     wpos += FXConfig::blockSize;
     wpos = wpos & (max_delay_length - 1);
