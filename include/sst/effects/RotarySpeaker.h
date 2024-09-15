@@ -189,7 +189,7 @@ inline void RotarySpeaker<FXConfig>::processBlock(float *__restrict dataL, float
 
     lfo.set_rate(2 * M_PI * powf(2, frate) * 1 / this->sampleRate() * FXConfig::blockSize);
     lf_lfo.set_rate(this->floatValue(rot_rotor_rate) * 2 * M_PI * powf(2, frate) * 1 /
-                    this->sampleRate() * FXConfig::blockSize);
+                    this->sampleRate());
 
     float precalc0 = (-2 - (float)lfo.i);
     float precalc1 = (-1 - (float)lfo.r);
