@@ -61,8 +61,10 @@ template <typename FXConfig> struct RotarySpeaker : core::EffectTemplateBase<FXC
 
     RotarySpeaker(typename FXConfig::GlobalStorage *s, typename FXConfig::EffectStorage *e,
                   typename FXConfig::ValueStorage *p)
-        : core::EffectTemplateBase<FXConfig>(s, e, p)
+        : core::EffectTemplateBase<FXConfig>(s, e, p), xover(s), lowbass(s)
     {
+        mix.set_blocksize(FXConfig::blockSize);
+        width.set_blocksize(BLOCK_SIZE);
     }
     void initialize();
     void processBlock(float *__restrict L, float *__restrict R);
@@ -83,21 +85,24 @@ template <typename FXConfig> struct RotarySpeaker : core::EffectTemplateBase<FXC
         switch ((rotary_params)idx)
         {
         case rot_horn_rate:
-            return result.temposyncable();
+            return result.asLfoRate(-7, 9).withName("Horn Rate");
         case rot_doppler:
-            return result;
+            return result.asPercent().withName("Doppler");
         case rot_tremolo:
-            return result;
+            return result.asPercent().withName("Tremolo");
         case rot_rotor_rate:
-            return result;
+            return result.asPercent().withRange(0, 2).withName("Rotor Rate");
         case rot_drive:
-            return result;
+            return result.deactivatable().asPercent().withDefault(0).withName("Drive");
         case rot_waveshape:
-            return result;
+        {
+            return result.withLinearScaleFormatting("").asInt().withRange(0, 8 - 1).withName(
+                "Model");
+        }
         case rot_width:
-            return result;
+            return result.asDecibelWithRange(-24, 24).withName("Width");
         case rot_mix:
-            return result;
+            return result.asPercent().withName("Mix");
         case rot_num_params:
             return result;
         }
@@ -156,6 +161,7 @@ template <typename FXConfig> inline void RotarySpeaker<FXConfig>::setvars(bool i
 
 template <typename FXConfig> inline void RotarySpeaker<FXConfig>::processOnlyControl()
 {
+    std::cout << "control" << std::endl;
     double frate = this->envelopeRateLinear(-this->floatValue(rot_horn_rate)) *
                    this->temposyncRatio(rot_horn_rate);
 
@@ -183,7 +189,7 @@ inline void RotarySpeaker<FXConfig>::processBlock(float *__restrict dataL, float
 
     lfo.set_rate(2 * M_PI * powf(2, frate) * 1 / this->sampleRate() * FXConfig::blockSize);
     lf_lfo.set_rate(this->floatValue(rot_rotor_rate) * 2 * M_PI * powf(2, frate) * 1 /
-                    this->sampleRate());
+                    this->sampleRate() * FXConfig::blockSize);
 
     float precalc0 = (-2 - (float)lfo.i);
     float precalc1 = (-1 - (float)lfo.r);
