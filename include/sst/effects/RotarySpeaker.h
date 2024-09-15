@@ -53,6 +53,15 @@ template <typename FXConfig> struct RotarySpeaker : core::EffectTemplateBase<FXC
         rot_num_params,
     };
 
+    static constexpr int n_waveShapers = 8;
+    static constexpr std::array<sst::waveshapers::WaveshaperType, n_waveShapers> waveShapers = {
+        sst::waveshapers::WaveshaperType::wst_soft, sst::waveshapers::WaveshaperType::wst_hard,
+        sst::waveshapers::WaveshaperType::wst_asym, sst::waveshapers::WaveshaperType::wst_sine,
+        sst::waveshapers::WaveshaperType::wst_digital, // If you adjust this list above here, you
+                                                       // break 1.9 patch compat
+        sst::waveshapers::WaveshaperType::wst_ojd, sst::waveshapers::WaveshaperType::wst_fwrectify,
+        sst::waveshapers::WaveshaperType::wst_fuzzsoft};
+
     static constexpr int numParams{rot_num_params};
     static constexpr const char *effectName{"rotaryspeaker"};
 
@@ -64,13 +73,13 @@ template <typename FXConfig> struct RotarySpeaker : core::EffectTemplateBase<FXC
         : core::EffectTemplateBase<FXConfig>(s, e, p), xover(s), lowbass(s)
     {
         mix.set_blocksize(FXConfig::blockSize);
-        width.set_blocksize(BLOCK_SIZE);
+        width.set_blocksize(FXConfig::blockSize);
     }
     void initialize();
     void processBlock(float *__restrict L, float *__restrict R);
 
     void suspendProcessing() { initialize(); }
-    int getRingoutDecay() const { return -1; }
+    int getRingoutDecay() const { return 1000; }
     void onSampleRateChanged() { initialize(); }
 
     void setvars(bool init);
@@ -96,8 +105,16 @@ template <typename FXConfig> struct RotarySpeaker : core::EffectTemplateBase<FXC
             return result.deactivatable().asPercent().withDefault(0).withName("Drive");
         case rot_waveshape:
         {
-            return result.withLinearScaleFormatting("").asInt().withRange(0, 8 - 1).withName(
-                "Model");
+            std::unordered_map<int, std::string> names;
+            for (int i = 0; i < n_waveShapers; ++i)
+            {
+                names[i] = sst::waveshapers::wst_names[(int)waveShapers[i]];
+            }
+            return result.withType(pmd::INT)
+                .withName("Model")
+                .withDefault(0)
+                .withRange(0, n_waveShapers - 1)
+                .withUnorderedMapFormatting(names);
         }
         case rot_width:
             return result.asDecibelWithRange(-24, 24).withName("Width");
@@ -162,8 +179,7 @@ template <typename FXConfig> inline void RotarySpeaker<FXConfig>::setvars(bool i
 template <typename FXConfig> inline void RotarySpeaker<FXConfig>::processOnlyControl()
 {
     std::cout << "control" << std::endl;
-    double frate = this->envelopeRateLinear(-this->floatValue(rot_horn_rate)) *
-                   this->temposyncRatio(rot_horn_rate);
+    double frate = this->floatValue(rot_horn_rate) * this->temposyncRatio(rot_horn_rate);
 
     lfo.set_rate(2 * M_PI * powf(2, frate) * 1 / this->sampleRate() * FXConfig::blockSize);
     lf_lfo.set_rate(this->floatValue(rot_rotor_rate) * 2 * M_PI * powf(2, frate) * 1 /
@@ -178,8 +194,7 @@ inline void RotarySpeaker<FXConfig>::processBlock(float *__restrict dataL, float
 {
     setvars(false);
 
-    double frate = this->envelopeRateLinear(-this->floatValue(rot_horn_rate)) *
-                   this->temposyncRatio(rot_horn_rate);
+    double frate = this->floatValue(rot_horn_rate) * this->temposyncRatio(rot_horn_rate);
     /*
      ** lf_lfo.process drives the sub-frequency and processes inside the iteration over samples>
      ** lfo.process drives the speaker and processes outside the iteration
@@ -226,12 +241,15 @@ inline void RotarySpeaker<FXConfig>::processBlock(float *__restrict dataL, float
 
     int wsi = this->floatValue(rot_waveshape);
 
-    if (wsi < 0 || wsi >= n_fxws)
+    if (wsi != 0)
+        std::cout << wsi << std::endl;
+
+    if (wsi < 0 || wsi >= n_waveShapers)
     {
         wsi = 0;
     }
 
-    auto ws = FXWaveShapers[wsi];
+    auto ws = waveShapers[wsi];
 
     /*
     ** This is a set of completely empirical scaling settings to offset gain being too crazy
