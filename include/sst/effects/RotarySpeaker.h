@@ -117,7 +117,7 @@ template <typename FXConfig> struct RotarySpeaker : core::EffectTemplateBase<FXC
                 .withUnorderedMapFormatting(names);
         }
         case rot_width:
-            return this->getWidthParam();;
+            return this->getWidthParam();
         case rot_mix:
             return result.asPercent().withDefault(0.33f).withName("Mix");
         case rot_num_params:
