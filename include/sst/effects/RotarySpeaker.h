@@ -371,11 +371,12 @@ inline void RotarySpeaker<FXConfig>::processBlock(float *__restrict dataL, float
         int rpL = (wpos - i_dtimeL + k);
         int rpR = (wpos - i_dtimeR + k);
 
+        assert(sincTable.FIRipol_M - 1 > 0);
         int sincL = sincTable.FIRipol_N *
-                    limit_range((int)(sincTable.FIRipol_M * (float(i_dtimeL + 1) - dL.v)), 0,
+                    std::clamp((int)(sincTable.FIRipol_M * (float(i_dtimeL + 1) - dL.v)), 0,
                                 sincTable.FIRipol_M - 1);
         int sincR = sincTable.FIRipol_N *
-                    limit_range((int)(sincTable.FIRipol_M * (float(i_dtimeR + 1) - dR.v)), 0,
+                    std::clamp((int)(sincTable.FIRipol_M * (float(i_dtimeR + 1) - dR.v)), 0,
                                 sincTable.FIRipol_M - 1);
 
         // get delay output
