@@ -107,5 +107,8 @@ TEST_CASE("Can Run Types with Concrete Config")
         Tester<sst::effects::treemonster::TreeMonster<sfx::core::ConcreteConfig>>::TestFX();
     }
     SECTION("Nimbus") { Tester<sst::effects::nimbus::Nimbus<sfx::core::ConcreteConfig>>::TestFX(); }
-    SECTION("RotarySpeaker") { Tester<sst::effects::rotaryspeaker::RotarySpeaker<sfx::core::ConcreteConfig>>::TestFX(); }
+    SECTION("RotarySpeaker")
+    {
+        Tester<sst::effects::rotaryspeaker::RotarySpeaker<sfx::core::ConcreteConfig>>::TestFX();
+    }
 }
