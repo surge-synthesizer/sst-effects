@@ -140,7 +140,7 @@ template <typename FXConfig> struct RotarySpeaker : core::EffectTemplateBase<FXC
     using quadr_osc = sst::basic_blocks::dsp::SurgeQuadrOsc<float>;
     quadr_osc lfo;
     quadr_osc lf_lfo;
-    lipol<float> dL, dR, hornamp[2];
+    sst::basic_blocks::dsp::lipol<float, FXConfig::blockSize, true> dL, dR, hornamp[2];
     sst::basic_blocks::dsp::SurgeLag<float, true> drive;
     bool first_run;
     sst::basic_blocks::tables::SurgeSincTableProvider sincTable;
