@@ -65,7 +65,8 @@ template <typename FXConfig> struct RotarySpeaker : core::EffectTemplateBase<FXC
     static constexpr int numParams{rot_num_params};
     static constexpr const char *effectName{"rotaryspeaker"};
 
-    lipol_ps_blocksz width alignas(16), mix alignas(16);
+    typename core::EffectTemplateBase<FXConfig>::lipol_ps_blocksz width alignas(16), mix
+        alignas(16);
     sst::waveshapers::QuadWaveshaperState wsState alignas(16);
 
     RotarySpeaker(typename FXConfig::GlobalStorage *s, typename FXConfig::EffectStorage *e,
@@ -83,7 +84,7 @@ template <typename FXConfig> struct RotarySpeaker : core::EffectTemplateBase<FXC
     void onSampleRateChanged() { initialize(); }
 
     void setvars(bool init);
-    void processOnlyControl();
+    void processControlOnly();
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
@@ -127,7 +128,8 @@ template <typename FXConfig> struct RotarySpeaker : core::EffectTemplateBase<FXC
     };
 
   protected:
-    float buffer[max_delay_length];
+    static constexpr int maxDelayLength{1 << 18};
+    float buffer[maxDelayLength];
     int wpos;
     // filter *lp[2],*hp[2];
     // biquadunit rotor_lpL,rotor_lpR;
@@ -146,7 +148,7 @@ template <typename FXConfig> struct RotarySpeaker : core::EffectTemplateBase<FXC
 
 template <typename FXConfig> inline void RotarySpeaker<FXConfig>::initialize()
 {
-    memset(buffer, 0, max_delay_length * sizeof(float));
+    memset(buffer, 0, maxDelayLength * sizeof(float));
 
     wpos = 0;
 
@@ -176,9 +178,8 @@ template <typename FXConfig> inline void RotarySpeaker<FXConfig>::setvars(bool i
     }
 }
 
-template <typename FXConfig> inline void RotarySpeaker<FXConfig>::processOnlyControl()
+template <typename FXConfig> inline void RotarySpeaker<FXConfig>::processControlOnly()
 {
-    std::cout << "control" << std::endl;
     double frate = this->floatValue(rot_horn_rate) * this->temposyncRatio(rot_horn_rate);
 
     lfo.set_rate(2 * M_PI * powf(2, frate) * 1 / this->sampleRate() * FXConfig::blockSize);
@@ -239,10 +240,7 @@ inline void RotarySpeaker<FXConfig>::processBlock(float *__restrict dataL, float
 
     drive.newValue(this->floatValue(rot_drive));
 
-    int wsi = this->floatValue(rot_waveshape);
-
-    if (wsi != 0)
-        std::cout << wsi << std::endl;
+    auto wsi = this->intValue(rot_waveshape);
 
     if (wsi < 0 || wsi >= n_waveShapers)
     {
@@ -360,33 +358,35 @@ inline void RotarySpeaker<FXConfig>::processBlock(float *__restrict dataL, float
     for (k = 0; k < FXConfig::blockSize; k++)
     {
         // feed delay input
-        int wp = (wpos + k) & (max_delay_length - 1);
+        int wp = (wpos + k) & (maxDelayLength - 1);
         lower_sub[k] = lower[k];
         upper[k] -= lower[k];
         buffer[wp] = upper[k];
 
         int i_dtimeL = std::max<int>(FXConfig::blockSize,
-                                     std::min((int)dL.v, max_delay_length - FIRipol_N - 1));
+                                     std::min((int)dL.v, maxDelayLength - sincTable.FIRipol_N - 1));
         int i_dtimeR = std::max<int>(FXConfig::blockSize,
-                                     std::min((int)dR.v, max_delay_length - FIRipol_N - 1));
+                                     std::min((int)dR.v, maxDelayLength - sincTable.FIRipol_N - 1));
 
         int rpL = (wpos - i_dtimeL + k);
         int rpR = (wpos - i_dtimeR + k);
 
-        int sincL = FIRipol_N *
-                    limit_range((int)(FIRipol_M * (float(i_dtimeL + 1) - dL.v)), 0, FIRipol_M - 1);
-        int sincR = FIRipol_N *
-                    limit_range((int)(FIRipol_M * (float(i_dtimeR + 1) - dR.v)), 0, FIRipol_M - 1);
+        int sincL = sincTable.FIRipol_N *
+                    limit_range((int)(sincTable.FIRipol_M * (float(i_dtimeL + 1) - dL.v)), 0,
+                                sincTable.FIRipol_M - 1);
+        int sincR = sincTable.FIRipol_N *
+                    limit_range((int)(sincTable.FIRipol_M * (float(i_dtimeR + 1) - dR.v)), 0,
+                                sincTable.FIRipol_M - 1);
 
         // get delay output
         tbufferL[k] = 0;
         tbufferR[k] = 0;
-        for (int i = 0; i < FIRipol_N; i++)
+        for (int i = 0; i < sincTable.FIRipol_N; i++)
         {
-            tbufferL[k] += buffer[(rpL - i) & (max_delay_length - 1)] *
-                           sincTable.sinctable1X[sincL + FIRipol_N - i];
-            tbufferR[k] += buffer[(rpR - i) & (max_delay_length - 1)] *
-                           sincTable.sinctable1X[sincR + FIRipol_N - i];
+            tbufferL[k] += buffer[(rpL - i) & (maxDelayLength - 1)] *
+                           sincTable.sinctable1X[sincL + sincTable.FIRipol_N - i];
+            tbufferR[k] += buffer[(rpR - i) & (maxDelayLength - 1)] *
+                           sincTable.sinctable1X[sincR + sincTable.FIRipol_N - i];
         }
         dL.process();
         dR.process();
@@ -414,7 +414,7 @@ inline void RotarySpeaker<FXConfig>::processBlock(float *__restrict dataL, float
     mix.fade_2_blocks_inplace(dataL, wbL, dataR, wbR, FXConfig::blockSize >> 2);
 
     wpos += FXConfig::blockSize;
-    wpos = wpos & (max_delay_length - 1);
+    wpos = wpos & (maxDelayLength - 1);
 }
 } // namespace sst::effects::rotaryspeaker
 #endif // INCLUDE_SST_EFFECTS_ROTARYSPEAKER_H
