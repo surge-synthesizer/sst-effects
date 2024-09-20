@@ -24,18 +24,19 @@
 #include <cstring>
 #include <cmath>
 #include <utility>
+#include <iostream>
 
 #include "EffectCore.h"
 #include "sst/basic-blocks/params/ParamMetadata.h"
 
 #include "sst/basic-blocks/dsp/Lag.h"
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
-#include "sst/basic-blocks/dsp/Clippers.h"
 
 #include "sst/basic-blocks/mechanics/simd-ops.h"
 #include "sst/basic-blocks/mechanics/block-ops.h"
 
 #include "sst/basic-blocks/tables/SincTableProvider.h"
+#include "sst/basic-blocks/dsp/SSESincDelayLine.h"
 
 #include "sst/filters/CytomicSVF.h"
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
@@ -55,11 +56,12 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
         fld_offset,
         fld_feedback,
         fld_warp_rate,
-        fld_warp_depth,
+        fld_warp_depth_1,
+        fld_warp_depth_2,
         fld_cutoff,
         fld_resonance,
         fld_playrate,
-        fld_playdir,
+        fld_test,
 
         fld_num_params,
     };
@@ -93,10 +95,9 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
 
         case fld_time:
             return pmd()
-                .asFloat()
-                .withRange(20.f, 8000.f)
-                .withDefault(300.f)
-                .withLinearScaleFormatting("ms", 1)
+                .asEnvelopeTime()
+                .withRange(-5.64386f, 3.f) // 20ms to 8s
+                .withDefault(-1.73697f) // 300ms
                 .withName("Time");
 
         case fld_offset:
@@ -104,268 +105,219 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
                 .asFloat()
                 .withRange(-10.f, 10.f)
                 .withDefault(0.f)
-                .withLinearScaleFormatting("ms", 1.f)
+                .withLinearScaleFormatting("ms", 2.f)
                 .withName("L/R Offset");
 
         case fld_feedback:
             return pmd().asPercent().withDefault(.5f).withName("Feedback");
 
         case fld_warp_rate:
-            return pmd().asLfoRate().withName("Rate");
+            return pmd().asLfoRate(-3, 4).withName("Warp Rate");
 
-        case fld_warp_depth:
+        case fld_warp_depth_1:
             return pmd()
-                .asFloat()
-                .withRange(0.f, 4.f)
-                .withDefault(0.f)
-                .withLinearScaleFormatting("%", 1.f)
-                .withName("Depth");
+                .asPercent()
+                .withName("Pitch Warp");
+                
+        case fld_warp_depth_2:
+            return pmd()
+                .asPercent()
+                .withName("Filter Warp");
 
         case fld_cutoff:
-            return pmd().asAudibleFrequency().withDefault(0.f).withName("Cutoff");
+            return pmd().asAudibleFrequency().withDefault(20.f).withName("Cutoff");
 
         case fld_resonance:
-            return pmd().asPercent().withName("Resonance").withDefault(.7f);
+            return pmd().asPercent().withName("Resonance").withDefault(.5f);
 
         case fld_playrate:
             return pmd()
-                .asInt()
-                .withRange(0, 3)
+                .asFloat()
+                .withRange(-4, 4)
                 .withName("Playrate")
-                .withDefault(1)
-                .withUnorderedMapFormatting({{0, "0.5"}, {1, "1"}, {2, "1.5"}, {3, "2"}});
-        case fld_playdir:
+                .withDefault(1);
+        case fld_test:
             return pmd()
-                .asBool()
-                .withName("Direction")
-                .withDefault(true)
-                .withUnorderedMapFormatting({{false, "Reverse"}, {true, "Forwards"}});
+                .asFloat()
+                .withRange(-1, 1)
+                .withName("test")
+                .withDefault(0);
         }
         return {};
     }
+    
     int samplerate = this->sampleRate();
-    float envelope_rate_linear_nowrap(float f)
+    const float sampleRateInv = 1 / this->sampleRate();
+    inline float envelope_rate_linear_nowrap(float f)
     {
-        return 1.f * FXConfig::blockSize / samplerate * std::pow(-2, f);
+        return this->envelopeRateLinear(f);
     }
-
+    
+    
   protected:
-    inline float amp_to_linear(float x)
-    {
-        x = std::max(0.f, x);
-
-        return x * x * x;
-    }
-    void setvars(bool b);
-
-    /*
-     * we use our own sinctable here. Since these effects
-     * are rarely constructed and not used at a voice level it
-     * is ok.
-     */
-    sst::basic_blocks::tables::SurgeSincTableProvider sincTable;
-
-    // TODO - we've wanted a sample rate adjustable max for a while.
-    // Still don't have it here.
-    static constexpr int max_delay_length{1 << 16};
-    sst::basic_blocks::dsp::lipol_sse<FXConfig::blockSize, true> timeLerpL, timeLerpR;
-    typename core::EffectTemplateBase<FXConfig>::lipol_ps_blocksz feedback, mix;
-    float buffer alignas(
-        16)[2][max_delay_length + sst::basic_blocks::tables::SurgeSincTableProvider::FIRipol_N];
-
-    sst::filters::CytomicSVF filter;
-
+    static constexpr int max_delay_length{1 << 19};
+    
+    const sst::basic_blocks::tables::SurgeSincTableProvider sincTable;
+    using line_t = sst::basic_blocks::dsp::SSESincDelayLine<max_delay_length>;
+    line_t delayLineL{sincTable};
+    line_t delayLineR{sincTable};
+    
+    float min_delay_length = static_cast<float>(sincTable.FIRipol_N);
+    
     using lfo_t = sst::basic_blocks::modulators::SimpleLFO<FloatyDelay, FXConfig::blockSize>;
     lfo_t sineLFO{this, rng};
     lfo_t noiseLFO{this, rng};
     typename lfo_t::Shape sine = lfo_t::Shape::SINE;
     typename lfo_t::Shape noise = lfo_t::Shape::SMOOTH_NOISE;
-
-    bool inithadtempo;
-    float envf;
-    int wpos;
-    float sampleRateInv = 1 / this->sampleRate();
-
-    float playbackRate{1.f};
-    static constexpr int osw = 128; // overlap window
+    
+    sst::filters::CytomicSVF filter;
+    sst::filters::CytomicSVF DCfilter;
+    
+    sst::basic_blocks::dsp::lipol_sse<FXConfig::blockSize, false> timeLerp, offsLerp, rateLerp, feedbackLerp, mixLerp;
+    
     // int ringout_time;
+
+    inline float rateToSeconds(float f)
+    {
+        return std::pow(2, f);
+    }
+                                                                 
+    inline void softClip(float &L, float &R)
+    {
+        L = std::clamp(L, -1.5f, 1.5f);
+        L = L - 4.0 / 27.0 * L * L * L;
+        
+        R = std::clamp(R, -1.5f, 1.5f);
+        R = R - 4.0 / 27.0 * R * R * R;
+    }
+    
+    float readHeadMove{0};
+    // overlap smoothing window of about 2ms in double speed
+    int osw = 64;
+    
+    int counter{0};
+    
+    bool test{false};
+    float prior{-1};
 };
 
 template <typename FXConfig> inline void FloatyDelay<FXConfig>::initialize()
 {
-    memset(buffer[0], 0, (max_delay_length + this->sincTable.FIRipol_N) * sizeof(float));
-    memset(buffer[1], 0, (max_delay_length + this->sincTable.FIRipol_N) * sizeof(float));
-    wpos = 0;
     // ringout_time = 100000;
-    envf = 0.f;
     filter.init();
-    // See issue #1444 and the fix for this stuff
-    inithadtempo = (this->temposyncInitialized());
-    setvars(true);
-    inithadtempo = (this->temposyncInitialized());
-}
-
-template <typename FXConfig> inline void FloatyDelay<FXConfig>::setvars(bool init)
-{
-    if (!inithadtempo && this->temposyncInitialized())
-    {
-        init = true;
-        inithadtempo = true;
-    }
-    if (init)
-    {
-        timeLerpL.instantize();
-        timeLerpR.instantize();
-        feedback.instantize();
-        mix.instantize();
-    }
-
-    auto fbp = this->floatValue(fld_feedback);
-    float fb = amp_to_linear(std::fabs(fbp));
-    feedback.set_target_smoothed(fb);
-
-    auto wr = this->floatValue(fld_warp_rate);
-    auto wd = this->floatValue(fld_warp_depth) * (this->floatValue(fld_time) * .25);
-
-    sineLFO.process_block(wr, 0.f, sine);
-    noiseLFO.process_block(wr * 2.f, 0.f, noise);
-    auto mod = wd * (sineLFO.lastTarget + noiseLFO.lastTarget * 0.1f);
-
-    auto tL = this->floatValue(fld_time) - this->floatValue(fld_offset);
-    auto tR = this->floatValue(fld_time) + this->floatValue(fld_offset);
-
-    tL *= mod;
-    tR *= mod;
-
-    tL = std::clamp(tL, 10.f, 8000.f);
-    tR = std::clamp(tR, 10.f, 8000.f);
-
-    timeLerpL.set_target(tL * sampleRateInv);
-    timeLerpR.set_target(tR * sampleRateInv);
-
-    switch (this->intValue(fld_playrate))
-    {
-    case (0):
-        playbackRate = 0.5f;
-        break;
-    case (1):
-        playbackRate = 1.f;
-        break;
-    case (2):
-        playbackRate = 1.5f;
-        break;
-    case (3):
-        playbackRate = 2.f;
-        break;
-    default:
-        playbackRate = 1.f;
-        break;
-    }
-
-    filter.template setCoeffForBlock<FXConfig::blockSize>(
-        sst::filters::CytomicSVF::LP, this->floatValue(fld_cutoff), this->floatValue(fld_resonance),
-        1 / this->sampleRate(), 0.f);
-
-    mix.set_target_smoothed(this->floatValue(fld_mix));
+    DCfilter.init();
+    DCfilter.template setCoeffForBlock<FXConfig::blockSize>(sst::filters::CytomicSVF::HP, 30.f, .5f, sampleRateInv, 0.f);
+    timeLerp.instantize();
+    offsLerp.instantize();
+    rateLerp.instantize();
+    feedbackLerp.instantize();
+    mixLerp.instantize();
+    delayLineL.clear();
+    delayLineR.clear();
+    sineLFO.attack(sine);
+    noiseLFO.attack(noise);
 }
 
 template <typename FXConfig>
 inline void FloatyDelay<FXConfig>::processBlock(float *dataL, float *dataR)
-
 {
-    setvars(false);
+//    if (prior != this->floatValue(fld_test))
+//    {
+//        test = true;
+//        prior = this->floatValue(fld_test);
+//    }
+    float wr = this->floatValue(fld_warp_rate);
+    float wd1 = this->floatValue(fld_warp_depth_1);
+    float wd2 = this->floatValue(fld_warp_depth_2);
+    sineLFO.process_block(wr, 0.f, sine);
+    noiseLFO.process_block(wr + 1, 0.f, noise);
+    float mod = (sineLFO.lastTarget * 0.66f + noiseLFO.lastTarget * 0.33f);
+    
+    auto freqL = 440 * this->noteToPitchIgnoringTuning(this->floatValue(fld_cutoff) + mod * wd2 * 12.f);
+    auto freqR = 440 * this->noteToPitchIgnoringTuning(this->floatValue(fld_cutoff) - mod * wd2 * 12.f);
+    auto res =  this->floatValue(fld_resonance);
+    filter.template setCoeffForBlock<FXConfig::blockSize>(sst::filters::CytomicSVF::LP, freqL, freqR, res, res, sampleRateInv, 0.f, 0.f);
+    DCfilter.template retainCoeffForBlock<FXConfig::blockSize>();
+  
+    float baseTime = std::clamp(rateToSeconds(this->floatValue(fld_time)),.002f, 8.f) * this->sampleRate();
+    
+    mod *= wd1;
+    mod *= .01225f * (baseTime - .002f) + .002f;
+    
+    timeLerp.set_target(baseTime + mod);
+    float time alignas(16)[FXConfig::blockSize];
+    timeLerp.store_block(time);
 
-    int k;
-    // wb = write-buffer
-    float tbufferL alignas(16)[FXConfig::blockSize], wbL alignas(16)[FXConfig::blockSize];
-    float tbufferR alignas(16)[FXConfig::blockSize], wbR alignas(16)[FXConfig::blockSize];
+    offsLerp.set_target(std::clamp(this->floatValue(fld_offset), -10.f, 10.f) * .001 * this->sampleRate());
+    float offset alignas(16)[FXConfig::blockSize];
+    offsLerp.store_block(offset);
+    
+    rateLerp.set_target(this->floatValue(fld_playrate));
+    float playrate alignas(16)[FXConfig::blockSize];
+    rateLerp.store_block(playrate);
+    
+    float fb = this->floatValue(fld_feedback);
+    feedbackLerp.set_target(fb);
+    float feedback alignas(16)[FXConfig::blockSize];
+    feedbackLerp.store_block(feedback);
+    
 
-    float timeL alignas(16)[FXConfig::blockSize];
-    float timeR alignas(16)[FXConfig::blockSize];
-    timeLerpL.store_block(timeL);
-    timeLerpR.store_block(timeR);
+    
+    float dBufferL alignas(16)[FXConfig::blockSize];
+    float dBufferR alignas(16)[FXConfig::blockSize];
 
-    for (k = 0; k < FXConfig::blockSize; k++)
+    for (int i = 0; i < FXConfig::blockSize; i++)
     {
-        int i_dtimeL =
-            std::max((int)FXConfig::blockSize,
-                     std::min((int)timeL[k], (int)(max_delay_length - sincTable.FIRipol_N - 1)));
-        int i_dtimeR =
-            std::max((int)FXConfig::blockSize,
-                     std::min((int)timeR[k], (int)(max_delay_length - sincTable.FIRipol_N - 1)));
-        // Read position
-        int rpL = (int)((wpos - i_dtimeL + k) - sincTable.FIRipol_N) & (max_delay_length - 1);
-        int rpR = (int)((wpos - i_dtimeR + k) - sincTable.FIRipol_N) & (max_delay_length - 1);
+        if (readHeadMove >= baseTime * playrate[i])
+        {
+            readHeadMove = 0;
+        }
+        
+        float increment = std::fabsf(playrate[i]) - 1;
+        
+        auto readPos = time[i] * playrate[i];
+        readPos -= (playrate[i] >= 0) ? readHeadMove : readPos - readHeadMove;
+        
+        readHeadMove += increment;
+        
+        auto readPosL = readPos + offset[i];
+        auto readPosR = readPos - offset[i];
 
-        // ols = overlap smoothing, osw = overlap smooting window
+        auto fromLineL = delayLineL.read(std::max(readPosL, min_delay_length));
+        auto fromLineR = delayLineR.read(std::max(readPosR, min_delay_length));
+        
+        DCfilter.processBlockStep(fromLineL, fromLineR);
+
+        
+        dBufferL[i] = fromLineL;
+        dBufferR[i] = fromLineR;
+        
+        auto toLineL = feedback[i] * dBufferL[i] + dataL[i];
+        auto toLineR = feedback[i] * dBufferR[i] + dataR[i];
+        
+        filter.processBlockStep(toLineL, toLineR);
+        softClip(toLineL, toLineR);
+        
+        // overlap smoothing
         // In repeat and/or non-1 playrate, read and write will approach each other,
         // turn the delay output down gradually in a little window around the approach.
-        // float olsL = (std::abs(rpL - wpos) > osw) ? 1 : std::abs(rpL - wpos) / osw;
-        // float olsR = (std::abs(rpR - wpos) > osw) ? 1 : std::abs(rpL - wpos) / osw;
+        // float ol = std::abs(RP - wp);
+        // float ols = (ol > osw) ? 1 : ol / osw;
 
-        int sincL = sincTable.FIRipol_N *
-                    std::clamp((int)(sincTable.FIRipol_M * (float(i_dtimeL + 1) - timeL[k])), 0,
-                               sincTable.FIRipol_M - 1);
-        int sincR = sincTable.FIRipol_N *
-                    std::clamp((int)(sincTable.FIRipol_M * (float(i_dtimeR + 1) - timeR[k])), 0,
-                               sincTable.FIRipol_M - 1);
-
-        //
-        __m128 L, R;
-        L = _mm_mul_ps(_mm_load_ps(&sincTable.sinctable1X[sincL]), _mm_loadu_ps(&buffer[0][rpL]));
-        L = _mm_add_ps(L, _mm_mul_ps(_mm_load_ps(&sincTable.sinctable1X[sincL + 4]),
-                                     _mm_loadu_ps(&buffer[0][rpL + 4])));
-        L = _mm_add_ps(L, _mm_mul_ps(_mm_load_ps(&sincTable.sinctable1X[sincL + 8]),
-                                     _mm_loadu_ps(&buffer[0][rpL + 8])));
-        L = sst::basic_blocks::mechanics::sum_ps_to_ss(L);
-        R = _mm_mul_ps(_mm_load_ps(&sincTable.sinctable1X[sincR]), _mm_loadu_ps(&buffer[1][rpR]));
-        R = _mm_add_ps(R, _mm_mul_ps(_mm_load_ps(&sincTable.sinctable1X[sincR + 4]),
-                                     _mm_loadu_ps(&buffer[1][rpR + 4])));
-        R = _mm_add_ps(R, _mm_mul_ps(_mm_load_ps(&sincTable.sinctable1X[sincR + 8]),
-                                     _mm_loadu_ps(&buffer[1][rpR + 8])));
-        R = sst::basic_blocks::mechanics::sum_ps_to_ss(R);
-
-        _mm_store_ss(&tbufferL[k], L);
-        _mm_store_ss(&tbufferR[k], R);
-
-        // * olsL etc
+        delayLineL.write(toLineL);
+        delayLineR.write(toLineR);
+        
+//        if (test)
+//        {
+//            std::cout << "dataL = " << dataL[i] << std::endl;
+//            std::cout << "dataR = " << dataR[i] << std::endl;
+//            test = false;
+//        }
     }
 
-    filter.template processBlock<FXConfig::blockSize>(tbufferL, tbufferR, tbufferL, tbufferR);
-
-    sdsp::tanh7_block<FXConfig::blockSize>(tbufferL);
-    sdsp::tanh7_block<FXConfig::blockSize>(tbufferR);
-
-    feedback.MAC_2_blocks_to(tbufferL, tbufferR, wbL, wbR, this->blockSize_quad);
-
-    if (wpos + FXConfig::blockSize >= max_delay_length)
-    {
-        for (k = 0; k < FXConfig::blockSize; k++)
-        {
-            buffer[0][(wpos + k) & (max_delay_length - 1)] = wbL[k];
-            buffer[1][(wpos + k) & (max_delay_length - 1)] = wbR[k];
-        }
-    }
-    else
-    {
-        mech::copy_from_to<FXConfig::blockSize>(wbL, &buffer[0][wpos]);
-        mech::copy_from_to<FXConfig::blockSize>(wbR, &buffer[1][wpos]);
-    }
-
-    if (wpos == 0)
-    {
-        // copy buffer so FIR-core doesn't have to wrap
-        for (k = 0; k < sincTable.FIRipol_N; k++)
-        {
-            buffer[0][k + max_delay_length] = buffer[0][k];
-            buffer[1][k + max_delay_length] = buffer[1][k];
-        }
-    }
-
-    mix.fade_2_blocks_inplace(dataL, tbufferL, dataR, tbufferR, this->blockSize_quad);
-
-    wpos += FXConfig::blockSize;
-    wpos = wpos & (max_delay_length - 1);
+    
+    mixLerp.set_target(this->floatValue(fld_mix));
+    mixLerp.fade_2_blocks_inplace(dataL, dBufferL, dataR, dBufferR, this->blockSize_quad);
 }
 } // namespace sst::effects::floatydelay
 #endif // FLOATYDELAY_H
