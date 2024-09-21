@@ -147,8 +147,8 @@ template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFX
         R = R - 4.0 / 27.0 * R * R * R;
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         auto sens = 1 + -1 * this->getFloatParam(fpSens);
         sens *= sens;

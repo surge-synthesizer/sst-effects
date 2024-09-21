@@ -144,8 +144,8 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
         rightOut = midIn - sideIn;
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         bool stereo = this->getIntParam(ipStereo);
 
@@ -193,7 +193,7 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
         levelLerp.multiply_2_blocks(dataoutL, dataoutR);
     }
 
-    void processMonoToMono(float *datain, float *dataout, float pitch)
+    void processMonoToMono(const float *const datain, float *dataout, float pitch)
     {
         float level = this->getFloatParam(fpLevel);
         level = level * level * level;
@@ -223,7 +223,8 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
         levelLerp.multiply_block(dataout);
     }
 
-    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
+    void processMonoToStereo(const float *const datainL, float *dataoutL, float *dataoutR,
+                             float pitch)
     {
         processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
     }

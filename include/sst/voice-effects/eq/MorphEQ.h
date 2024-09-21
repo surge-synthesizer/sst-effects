@@ -292,8 +292,8 @@ template <typename VFXConfig> struct MorphEQ : core::VoiceEffectTemplateBase<VFX
     }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         calc_coeffs();
         gain.multiply_2_blocks_to(datainL, datainR, dataoutL, dataoutR);
@@ -311,7 +311,7 @@ template <typename VFXConfig> struct MorphEQ : core::VoiceEffectTemplateBase<VFX
         }
     }
 
-    void processMonoToMono(float *datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         calc_coeffs();
 

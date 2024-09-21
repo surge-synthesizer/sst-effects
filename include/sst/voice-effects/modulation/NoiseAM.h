@@ -192,8 +192,8 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
         }
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         bool stereo = this->getIntParam(ipStereo);
         float threshold = this->getFloatParam(fpThreshold);
@@ -270,7 +270,7 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
         }
     }
 
-    void processMonoToMono(float *datain, float *dataout, float pitch)
+    void processMonoToMono(const float *const datain, float *dataout, float pitch)
     {
         float threshold = this->getFloatParam(fpThreshold);
         auto depth = this->getFloatParam(fpDepth);
@@ -317,7 +317,8 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
         }
     }
 
-    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
+    void processMonoToStereo(const float *const datainL, float *dataoutL, float *dataoutR,
+                             float pitch)
     {
         processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
     }

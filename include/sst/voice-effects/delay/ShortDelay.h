@@ -191,8 +191,8 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     template <typename T>
-    void stereoImpl(const std::array<T *, 2> &lines, float *datainL, float *datainR,
-                    float *dataoutL, float *dataoutR)
+    void stereoImpl(const std::array<T *, 2> &lines, const float *const datainL,
+                    const float *const datainR, float *dataoutL, float *dataoutR)
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
@@ -264,7 +264,7 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
         }
     }
 
-    template <typename T> void monoImpl(T *line, float *datainL, float *dataoutL)
+    template <typename T> void monoImpl(T *line, const float *const datainL, float *dataoutL)
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
@@ -313,8 +313,8 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
         }
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         if (isShort)
         {
@@ -330,7 +330,8 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
         }
     }
 
-    void processMonoToStereo(float *datain, float *dataoutL, float *dataoutR, float pitch)
+    void processMonoToStereo(const float *const datain, float *dataoutL, float *dataoutR,
+                             float pitch)
     {
         if (isShort)
         {
@@ -346,7 +347,7 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
         }
     }
 
-    void processMonoToMono(float *datain, float *dataout, float pitch)
+    void processMonoToMono(const float *const datain, float *dataout, float pitch)
     {
         if (isShort)
         {

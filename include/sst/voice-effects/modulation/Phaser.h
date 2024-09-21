@@ -171,8 +171,8 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
 
     bool phaseSet = false;
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         auto lfoRate = this->getFloatParam(fpRate);
         auto lfoDepth = this->getFloatParam(fpDepth);
@@ -226,12 +226,13 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
         }
     }
 
-    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
+    void processMonoToStereo(const float *const datainL, float *dataoutL, float *dataoutR,
+                             float pitch)
     {
         processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
     }
 
-    void processMonoToMono(float *dataIn, float *dataOut, float pitch)
+    void processMonoToMono(const float *const dataIn, float *dataOut, float pitch)
     {
         auto lfoRate = this->getFloatParam(fpRate);
         auto lfoDepth = this->getFloatParam(fpDepth);

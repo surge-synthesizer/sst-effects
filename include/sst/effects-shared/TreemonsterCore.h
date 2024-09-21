@@ -71,7 +71,8 @@ struct TreemonsterCore : public BaseClass
         mix.set_blocksize(FXConfig::blockSize);
     }
 
-    void processWithoutMixOrWith(float *dataL, float *dataR, float *wetL, float *wetR);
+    void processWithoutMixOrWith(const float *const dataL, const float *const dataR, float *wetL,
+                                 float *wetR);
 
     void processWithMixAndWidth(float *dataL, float *dataR)
     {
@@ -168,9 +169,8 @@ inline void TreemonsterCore<BaseClass, BiquadType, addHPLP>::setvars(bool init)
     }
 }
 template <typename BaseClass, typename BiquadType, bool addHPLP>
-void TreemonsterCore<BaseClass, BiquadType, addHPLP>::processWithoutMixOrWith(float *dataL,
-                                                                              float *dataR,
-                                                                              float *L, float *R)
+void TreemonsterCore<BaseClass, BiquadType, addHPLP>::processWithoutMixOrWith(
+    const float *const dataL, const float *const dataR, float *L, float *R)
 {
     static constexpr double MIDI_0_FREQ = 8.17579891564371; // or 440.0 * pow( 2.0, - (69.0/12.0 ) )
 

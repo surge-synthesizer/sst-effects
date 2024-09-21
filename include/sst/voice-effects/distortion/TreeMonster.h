@@ -91,8 +91,8 @@ template <typename VFXConfig> struct TreeMonster : core::VoiceEffectTemplateBase
     void initVoiceEffect() { coreProc.initialize(); }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         coreProc.processWithoutMixOrWith(datainL, datainR, dataoutL, dataoutR);
     }

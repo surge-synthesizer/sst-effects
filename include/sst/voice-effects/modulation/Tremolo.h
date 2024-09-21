@@ -185,8 +185,8 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
      without the filters or the stereo or both.
     */
 
-    void harmonicStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                        float pitch)
+    void harmonicStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                        float *dataoutR, float pitch)
     {
         // Bring in the various params.
         auto lfoRate = this->getFloatParam(fpRate);
@@ -304,8 +304,8 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
      so I separated it. Now the branches are in the process functions further down instead.
      */
 
-    void standardStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                        float pitch)
+    void standardStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                        float *dataoutR, float pitch)
     {
         auto lfoRate = this->getFloatParam(fpRate);
         auto lfoDepth = this->getFloatParam(fpDepth);
@@ -349,7 +349,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         lfoLerp[1].multiply_block(dataoutR);
     }
 
-    void harmonicMono(float *datain, float *dataout, float pitch)
+    void harmonicMono(const float *const datain, float *dataout, float pitch)
     {
         auto lfoRate = this->getFloatParam(fpRate);
         auto lfoDepth = this->getFloatParam(fpDepth);
@@ -414,7 +414,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         sst::basic_blocks::mechanics::add_block<VFXConfig::blockSize>(LP, HP, dataout);
     }
 
-    void standardMono(float *datain, float *dataout, float pitch)
+    void standardMono(const float *const datain, float *dataout, float pitch)
     {
         auto lfoRate = this->getFloatParam(fpRate);
         auto lfoDepth = this->getFloatParam(fpDepth);
@@ -451,8 +451,8 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
      When starting a voice, the host will call one of the following functions.
      This first one gets called if incoming audio is Stereo...
     */
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         if (this->getIntParam(ipHarmonic) == true)
         {
@@ -468,7 +468,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
     }
 
     // ...this second one if incoming audio is Mono...
-    void processMonoToMono(float *datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         if (this->getIntParam(ipHarmonic) == true)
         {
@@ -483,7 +483,8 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
     }
 
     // ...and this last one if the input is Mono, but the user asked for stereo modulation.
-    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
+    void processMonoToStereo(const float *const datainL, float *dataoutL, float *dataoutR,
+                             float pitch)
     {
         // which in turn simply copies the mono audio and calls the stereo one with the copies.
         processStereo(datainL, datainL, dataoutL, dataoutR, pitch);

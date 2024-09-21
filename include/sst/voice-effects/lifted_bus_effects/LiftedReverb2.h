@@ -65,8 +65,8 @@ template <typename VFXConfig> struct LiftedReverb2 : core::VoiceEffectTemplateBa
         helper.valuesForFX[reverb2_t::rev2_width] = helper.busFX->getDefaultWidth();
         helper.valuesForFX[reverb2_t::rev2_mix] = 1.f;
     }
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         setupValues();
         mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);

@@ -240,8 +240,8 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
         }
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         calc_coeffs(pitch);
         cySvf[0].template processBlock<VFXConfig::blockSize>(datainL, datainR, dataoutL, dataoutR);
@@ -252,7 +252,7 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
         }
     }
 
-    void processMonoToMono(float *datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         calc_coeffs(pitch);
         cySvf[0].template processBlock<VFXConfig::blockSize>(datainL, dataoutL);
@@ -262,7 +262,8 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
         }
     }
 
-    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
+    void processMonoToStereo(const float *const datainL, float *dataoutL, float *dataoutR,
+                             float pitch)
     {
         calc_coeffs(pitch);
         cySvf[0].template processBlock<VFXConfig::blockSize>(datainL, datainL, dataoutL, dataoutR);

@@ -82,8 +82,8 @@ template <typename VFXConfig> struct VolumeAndPan : core::VoiceEffectTemplateBas
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         auto pan = (this->getFloatParam(fpPan) + 1) / 2;
         basic_blocks::dsp::pan_laws::panmatrix_t pmat{1, 1, 0, 0};

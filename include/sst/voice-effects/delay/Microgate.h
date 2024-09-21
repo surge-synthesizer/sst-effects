@@ -97,8 +97,8 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         namespace mech = sst::basic_blocks::mechanics;
 

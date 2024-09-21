@@ -76,8 +76,8 @@ template <typename VFXConfig> struct StereoTool : core::VoiceEffectTemplateBase<
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
 
         rotLerp.set_target(this->getFloatParam(fpRotation));
