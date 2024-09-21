@@ -99,12 +99,12 @@ struct EqNBandParametric : core::VoiceEffectTemplateBase<VFXConfig>
     void initVoiceEffect() {}
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         calc_coeffs();
-        float *inL = datainL;
-        float *inR = datainR;
+        auto *inL = datainL;
+        auto *inR = datainR;
         for (int i = 0; i < NBands; ++i)
         {
             mParametric[i].process_block_to(inL, inR, dataoutL, dataoutR);
@@ -113,10 +113,10 @@ struct EqNBandParametric : core::VoiceEffectTemplateBase<VFXConfig>
         }
     }
 
-    void processMonoToMono(float *datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         calc_coeffs();
-        float *inL = datainL;
+        auto *inL = datainL;
         for (int i = 0; i < NBands; ++i)
         {
             mParametric[i].process_block_to(inL, dataoutL);

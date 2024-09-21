@@ -153,8 +153,8 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
     }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         namespace mech = sst::basic_blocks::mechanics;
 
@@ -182,12 +182,13 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
         }
     }
 
-    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
+    void processMonoToStereo(const float *const datainL, float *dataoutL, float *dataoutR,
+                             float pitch)
     {
         processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
     }
 
-    void processMonoToMono(float *dataIn, float *dataOut, float pitch)
+    void processMonoToMono(const float *const dataIn, float *dataOut, float pitch)
     {
         namespace mech = sst::basic_blocks::mechanics;
 

@@ -118,8 +118,8 @@ template <typename VFXConfig> struct Widener : core::VoiceEffectTemplateBase<VFX
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     template <typename Line>
-    void processOntoLine(Line *line, float *datainL, float *datainR, float *dataoutL,
-                         float *dataoutR, float pitch)
+    void processOntoLine(Line *line, const float *const datainL, const float *const datainR,
+                         float *dataoutL, float *dataoutR, float pitch)
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
@@ -154,8 +154,8 @@ template <typename VFXConfig> struct Widener : core::VoiceEffectTemplateBase<VFX
         sdsp::decodeMS<VFXConfig::blockSize>(mid, side, dataoutL, dataoutR);
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         if (isShort)
         {

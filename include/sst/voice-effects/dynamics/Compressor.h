@@ -215,8 +215,8 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
         return z;
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         auto makeup = decibelsToAmplitude(this->getFloatParam(fpMakeUp));
         gainLerp.set_target(makeup);
@@ -271,7 +271,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
         gainLerp.multiply_2_blocks(dataoutL, dataoutR);
     }
 
-    void processMonoToMono(float *datain, float *dataout, float pitch)
+    void processMonoToMono(const float *const datain, float *dataout, float pitch)
     {
         auto makeup = decibelsToAmplitude(this->getFloatParam(fpMakeUp));
         gainLerp.set_target(makeup);

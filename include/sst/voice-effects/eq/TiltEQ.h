@@ -97,8 +97,8 @@ template <typename VFXConfig> struct TiltEQ : core::VoiceEffectTemplateBase<VFXC
         }
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         setCoeffs();
         filters[0].template processBlock<VFXConfig::blockSize>(datainL, datainR, dataoutL,
@@ -107,7 +107,7 @@ template <typename VFXConfig> struct TiltEQ : core::VoiceEffectTemplateBase<VFXC
                                                                dataoutR);
     }
 
-    void processMonoToMono(float *datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         setCoeffs();
         filters[0].template processBlock<VFXConfig::blockSize>(datainL, dataoutL);

@@ -245,8 +245,8 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
     }
 
     template <typename T>
-    void stereoDualString(const std::array<T *, 2> &lines, float *datainL, float *datainR,
-                          float *dataoutL, float *dataoutR, float pitch)
+    void stereoDualString(const std::array<T *, 2> &lines, const float *const datainL,
+                          const float *const datainR, float *dataoutL, float *dataoutR, float pitch)
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
@@ -360,8 +360,8 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
     }
 
     template <typename T>
-    void stereoSingleString(T *line, float *datainL, float *datainR, float *dataoutL,
-                            float *dataoutR, float pitch)
+    void stereoSingleString(T *line, const float *const datainL, const float *const datainR,
+                            float *dataoutL, float *dataoutR, float pitch)
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
@@ -446,8 +446,8 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
     }
 
     template <typename T>
-    void monoDualString(const std::array<T *, 2> &lines, float *datainL, float *dataoutL,
-                        float pitch)
+    void monoDualString(const std::array<T *, 2> &lines, const float *const datainL,
+                        float *dataoutL, float pitch)
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
@@ -529,7 +529,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
     }
 
     template <typename T>
-    void monoSingleString(T *line, float *datainL, float *dataoutL, float pitch)
+    void monoSingleString(T *line, const float *const datainL, float *dataoutL, float pitch)
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
@@ -660,8 +660,8 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
         return 0;
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         if (this->getIntParam(ipDualString == true))
         {
@@ -694,12 +694,13 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
         }
     }
 
-    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
+    void processMonoToStereo(const float *const datainL, float *dataoutL, float *dataoutR,
+                             float pitch)
     {
         processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
     }
 
-    void processMonoToMono(float *datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         if (this->getIntParam(ipDualString == true))
         {

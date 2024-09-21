@@ -93,8 +93,8 @@ template <typename VFXConfig> struct FreqShiftMod : core::VoiceEffectTemplateBas
     }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         auto rate = this->getFloatParam((int)FreqShiftModFloatParams::coarse) +
                     this->getFloatParam((int)FreqShiftModFloatParams::fine);

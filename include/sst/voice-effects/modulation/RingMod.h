@@ -111,8 +111,8 @@ template <typename VFXConfig> struct RingMod : core::VoiceEffectTemplateBase<VFX
         return 12 * std::log2(ratio);
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         namespace mech = sst::basic_blocks::mechanics;
 
@@ -130,7 +130,7 @@ template <typename VFXConfig> struct RingMod : core::VoiceEffectTemplateBase<VFX
         }
     }
 
-    void processMonoToMono(float *datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         namespace mech = sst::basic_blocks::mechanics;
         auto pt = this->getFloatParam(fpCarrierFrequency) + (keytrackOn ? pitch : 0);

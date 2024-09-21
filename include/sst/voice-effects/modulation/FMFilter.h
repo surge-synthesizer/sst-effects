@@ -169,8 +169,8 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
         }
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         if (isFirst)
         {
@@ -240,7 +240,7 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
         }
     }
 
-    void processMonoToMono(float *datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         if (isFirst)
         {
@@ -299,7 +299,8 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
         }
     }
 
-    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
+    void processMonoToStereo(const float *const datainL, float *dataoutL, float *dataoutR,
+                             float pitch)
     {
         processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
     }
