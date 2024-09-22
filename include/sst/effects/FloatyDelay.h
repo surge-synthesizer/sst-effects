@@ -61,7 +61,6 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
         fld_cutoff,
         fld_resonance,
         fld_playrate,
-        fld_test,
 
         fld_num_params,
     };
@@ -136,12 +135,6 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
                 .withRange(-4, 4)
                 .withName("Playrate")
                 .withDefault(1);
-        case fld_test:
-            return pmd()
-                .asFloat()
-                .withRange(-1, 1)
-                .withName("test")
-                .withDefault(0);
         }
         return {};
     }
@@ -192,13 +185,6 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
     }
     
     float readHeadMove{0};
-    // overlap smoothing window of about 2ms in double speed
-    int osw = 64;
-    
-    int counter{0};
-    
-    bool test{false};
-    float prior{-1};
 };
 
 template <typename FXConfig> inline void FloatyDelay<FXConfig>::initialize()
@@ -233,8 +219,10 @@ inline void FloatyDelay<FXConfig>::processBlock(float *dataL, float *dataR)
     noiseLFO.process_block(wr + 1, 0.f, noise);
     float mod = (sineLFO.lastTarget * 0.66f + noiseLFO.lastTarget * 0.33f);
     
-    auto freqL = 440 * this->noteToPitchIgnoringTuning(this->floatValue(fld_cutoff) + mod * wd2 * 12.f);
-    auto freqR = 440 * this->noteToPitchIgnoringTuning(this->floatValue(fld_cutoff) - mod * wd2 * 12.f);
+    auto freqL = 440 * this->noteToPitchIgnoringTuning(this->floatValue(fld_cutoff) + mod * wd2 * 36.f);
+    auto freqR = 440 * this->noteToPitchIgnoringTuning(this->floatValue(fld_cutoff) - mod * wd2 * 36.f);
+    freqL = std::clamp(freqL, 20.f, 20000.f);
+    freqR = std::clamp(freqR, 20.f, 20000.f);
     auto res =  this->floatValue(fld_resonance);
     filter.template setCoeffForBlock<FXConfig::blockSize>(sst::filters::CytomicSVF::LP, freqL, freqR, res, res, sampleRateInv, 0.f, 0.f);
     DCfilter.template retainCoeffForBlock<FXConfig::blockSize>();
@@ -261,33 +249,81 @@ inline void FloatyDelay<FXConfig>::processBlock(float *dataL, float *dataR)
     float feedback alignas(16)[FXConfig::blockSize];
     feedbackLerp.store_block(feedback);
     
-
-    
     float dBufferL alignas(16)[FXConfig::blockSize];
     float dBufferR alignas(16)[FXConfig::blockSize];
-
+    
+    float smooth{1.f};
+    float smoothWindow = 256.f;
+    
     for (int i = 0; i < FXConfig::blockSize; i++)
     {
-        if (readHeadMove >= baseTime * playrate[i])
+        /* Playrate/dir control
+         When we call read(x), x = the read head position relative to the write head.
+         Keep a running counter (readHeadMove) which we subtract from x and increment each sample
+         so the read head moves at a different speed from the write.
+         */
+        
+        // useful
+        auto absrate = std::fabs(playrate[i]);
+        auto absRHM = std::fabs(readHeadMove);
+        auto adjustedTime = time[i] * absrate;
+        
+        if (absRHM >= adjustedTime)
         {
+            // Wrap the counter back to 0 when we reach our target delay time.
             readHeadMove = 0;
         }
+
+        // The increment determines the speed.
+        // Write head advance 1 each sample, hence the -1 in fwd and +1 in rev.
+        float increment = (playrate[i] >= 0) ? absrate - 1 : absrate + 1;
         
-        float increment = std::fabsf(playrate[i]) - 1;
-        
-        auto readPos = time[i] * playrate[i];
+        auto readPos = adjustedTime;
+        // fwd: Start all the way back and run towards write
+        // rev: Start at write and run towards the back
         readPos -= (playrate[i] >= 0) ? readHeadMove : readPos - readHeadMove;
-        
+        // Update the counter
         readHeadMove += increment;
         
-        auto readPosL = readPos + offset[i];
-        auto readPosR = readPos - offset[i];
-
-        auto fromLineL = delayLineL.read(std::max(readPosL, min_delay_length));
-        auto fromLineR = delayLineR.read(std::max(readPosR, min_delay_length));
+        // Add in the stereo offset, clamp at min_delay lest bad things happen
+        auto readPosL = std::max(readPos + offset[i], min_delay_length);
+        auto readPosR = std::max(readPos - offset[i], min_delay_length);
+        
+        /*
+         Smoothing stragegy
+         In any playrate except 1, turn the read head signal down around each clicky jump
+         // TODO: Try a 2-head strategy.
+         */
+        if (playrate[i] == 1)
+        {
+            smooth = 1.f; // no smoothing needed
+            
+            if (readHeadMove > 1) // but delay time will be wrong
+            {
+                readHeadMove -= 1; // so wind the head back to zero
+            }
+            else if (readHeadMove < 1)
+            {
+                readHeadMove += 1;
+            }
+            // -1...1 is close enough anyway
+        }
+        else
+        {
+            if (playrate[i] < 0)
+            {
+                smoothWindow = 512.f; // longer window in reverse
+            }
+            // this looks a little cursed but hey, it works
+            auto s = std::min(std::min(smoothWindow, absRHM),
+                              std::min(smoothWindow, adjustedTime - absRHM));
+            smooth = s / smoothWindow;
+        }
+        
+        auto fromLineL = delayLineL.read(readPosL) * smooth;
+        auto fromLineR = delayLineR.read(readPosR) * smooth;
         
         DCfilter.processBlockStep(fromLineL, fromLineR);
-
         
         dBufferL[i] = fromLineL;
         dBufferR[i] = fromLineR;
@@ -297,24 +333,10 @@ inline void FloatyDelay<FXConfig>::processBlock(float *dataL, float *dataR)
         
         filter.processBlockStep(toLineL, toLineR);
         softClip(toLineL, toLineR);
-        
-        // overlap smoothing
-        // In repeat and/or non-1 playrate, read and write will approach each other,
-        // turn the delay output down gradually in a little window around the approach.
-        // float ol = std::abs(RP - wp);
-        // float ols = (ol > osw) ? 1 : ol / osw;
 
         delayLineL.write(toLineL);
         delayLineR.write(toLineR);
-        
-//        if (test)
-//        {
-//            std::cout << "dataL = " << dataL[i] << std::endl;
-//            std::cout << "dataR = " << dataR[i] << std::endl;
-//            test = false;
-//        }
     }
-
     
     mixLerp.set_target(this->floatValue(fld_mix));
     mixLerp.fade_2_blocks_inplace(dataL, dBufferL, dataR, dBufferR, this->blockSize_quad);
