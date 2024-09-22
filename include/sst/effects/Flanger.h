@@ -201,6 +201,14 @@ template <typename FXConfig> struct Flanger : core::EffectTemplateBase<FXConfig>
     const static int LFO_TABLE_MASK = LFO_TABLE_SIZE - 1;
     float sin_lfo_table[LFO_TABLE_SIZE];
     float saw_lfo_table[LFO_TABLE_SIZE]; // don't make it analytic since I want to smooth the edges
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const param)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 
 template <typename FXConfig> inline void Flanger<FXConfig>::initialize()

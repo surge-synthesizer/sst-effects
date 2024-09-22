@@ -380,6 +380,15 @@ fxdata->p[ph_mod_rate].deactivated = false;
     float legacy_span[4] = {2.0, 1.5, 1.0, 0.5};
 
     sst::basic_blocks::modulators::FXModControl<FXConfig::blockSize> modLFOL, modLFOR;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const param)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::effects::phaser
 

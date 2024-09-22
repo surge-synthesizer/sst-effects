@@ -328,6 +328,16 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
   protected:
     float priorSlope = -1234.f;
     std::array<sst::filters::CytomicSVF, 11> filters;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::voice_effects::modulation
 #endif // SCXT_NOISEAM_H

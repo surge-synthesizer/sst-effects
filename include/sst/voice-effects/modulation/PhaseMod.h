@@ -230,6 +230,16 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
     sst::filters::HalfRate::HalfRateFilter pre, post;
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize> pregain;
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize << 1, true> omega;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::voice_effects::modulation
 

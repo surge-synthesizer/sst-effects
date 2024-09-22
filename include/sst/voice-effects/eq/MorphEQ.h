@@ -496,6 +496,16 @@ template <typename VFXConfig> struct MorphEQ : core::VoiceEffectTemplateBase<VFX
     float gainTarget{1.f};
     float gainC0{1.f}, gainC1{1.f};
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, false> gain;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::voice_effects::eq
 

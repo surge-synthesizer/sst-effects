@@ -328,6 +328,16 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
     int priorNum{-1};
     int priorDenom{-1};
     float ratio{-1.f};
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::voice_effects::modulation
 

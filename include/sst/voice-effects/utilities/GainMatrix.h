@@ -108,6 +108,16 @@ template <typename VFXConfig> struct GainMatrix : core::VoiceEffectTemplateBase<
 
   protected:
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> llLerp, rlLerp, rrLerp, lrLerp;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::voice_effects::utilities
 #endif // SCXT_GAINMATRIX_H

@@ -235,6 +235,16 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
     float priorSlope = -1324.f;
     std::array<sst::filters::CytomicSVF, 11> filters;
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> levelLerp, widthLerp, attenLerp;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::voice_effects::generator
 #endif // SCXT_TILTNOISE_H

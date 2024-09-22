@@ -246,6 +246,16 @@ template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFX
     float FreqPrior = -1.f;
     std::array<sst::filters::CytomicSVF, 2> filter;
     sst::filters::CytomicSVF DCfilter;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::voice_effects::dynamics
 #endif // SCXT_AUTOWAH_H

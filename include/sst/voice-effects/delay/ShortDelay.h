@@ -404,6 +404,16 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
         lipolDelay[2];
 
     typename core::VoiceEffectTemplateBase<VFXConfig>::BiquadFilterType lp, hp;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 
 } // namespace sst::voice_effects::delay

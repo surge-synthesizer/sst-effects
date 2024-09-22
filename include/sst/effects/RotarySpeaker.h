@@ -144,6 +144,15 @@ template <typename FXConfig> struct RotarySpeaker : core::EffectTemplateBase<FXC
     sst::basic_blocks::dsp::SurgeLag<float, true> drive;
     bool first_run;
     sst::basic_blocks::tables::SurgeSincTableProvider sincTable;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const param)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 
 template <typename FXConfig> inline void RotarySpeaker<FXConfig>::initialize()
