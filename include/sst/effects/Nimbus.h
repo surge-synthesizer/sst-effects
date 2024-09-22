@@ -66,6 +66,15 @@ template <typename FXConfig> struct Nimbus : core::EffectTemplateBase<FXConfig>
     int getRingoutDecay() const { return -1; }
     sst::basic_blocks::params::ParamMetaData paramAt(int i) const { return {}; }
     void onSampleRateChanged() {}
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const param)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 #else
 namespace sdsp = sst::basic_blocks::dsp;
@@ -201,6 +210,15 @@ template <typename FXConfig> struct Nimbus : core::EffectTemplateBase<FXConfig>
     size_t numStubs{0};
     int consumed = 0, created = 0;
     bool builtBuffer{false};
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const param)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 
 #endif

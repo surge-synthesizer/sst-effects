@@ -203,6 +203,16 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
     bool keytrackOn{false};
     float priorFreq = -1.f;
     sst::filters::CytomicSVF filter;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::voice_effects::distortion
 

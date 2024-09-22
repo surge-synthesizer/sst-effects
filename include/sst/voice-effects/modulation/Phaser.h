@@ -344,6 +344,16 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
     std::array<sst::filters::CytomicSVF, 4> filters;
     float fbAmt[2]{0.f, 0.f};
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> feedbackLerp;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::voice_effects::modulation
 #endif // SCXT_PHASER_H

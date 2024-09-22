@@ -171,6 +171,16 @@ template <typename VFXConfig> struct Slewer : core::VoiceEffectTemplateBase<VFXC
     std::array<typename core::VoiceEffectTemplateBase<VFXConfig>::BiquadFilterType, 2> bq;
 
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> lipolRate;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::voice_effects::distortion
 

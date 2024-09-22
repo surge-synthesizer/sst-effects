@@ -130,6 +130,16 @@ template <typename VFXConfig> struct TiltEQ : core::VoiceEffectTemplateBase<VFXC
     std::array<sst::filters::CytomicSVF, 2> filters;
     float priorSlope = -123456.f;
     float priorFreq = -123456.f;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 
 } // namespace sst::voice_effects::eq

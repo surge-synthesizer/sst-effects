@@ -308,6 +308,16 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
     std::array<sst::filters::CytomicSVF, maxPhases> apfs;
 
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> lipolFb;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::voice_effects::filter
 #endif // SHORTCIRCUITXT_STATICPHASER_H

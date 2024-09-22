@@ -290,6 +290,16 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
     std::array<float, numFloatParams> mLastParam{};
     std::array<int, numIntParams> mLastIParam{};
     std::array<sst::filters::CytomicSVF, 2> cySvf;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 
 } // namespace sst::voice_effects::filter

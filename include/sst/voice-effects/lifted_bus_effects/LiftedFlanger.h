@@ -86,6 +86,16 @@ template <typename VFXConfig> struct LiftedFlanger : core::VoiceEffectTemplateBa
         mech::copy_from_to<VFXConfig::blockSize>(datainR, dataoutR);
         helper.busFX->processBlock(dataoutL, dataoutR);
     }
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::voice_effects::liftbus
 #endif // SHORTCIRCUITXT_LIFTEDREVERB2_H

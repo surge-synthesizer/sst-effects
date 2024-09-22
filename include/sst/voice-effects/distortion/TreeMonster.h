@@ -101,6 +101,16 @@ template <typename VFXConfig> struct TreeMonster : core::VoiceEffectTemplateBase
     float time[2]{0.f, 0.f}, level[2]{0.f, 0.f};
     float priorFreq = -1.f;
     sst::filters::CytomicSVF filter;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 
 template <typename VFXConfig>
