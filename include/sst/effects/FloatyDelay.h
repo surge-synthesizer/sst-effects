@@ -53,11 +53,11 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
     {
         fld_mix = 0,
         fld_time,
-        fld_offset,
         fld_feedback,
+        fld_pitch_warp_depth,
         fld_warp_rate,
-        fld_warp_depth_1,
-        fld_warp_depth_2,
+        fld_warp_width,
+        fld_filt_warp_depth,
         fld_cutoff,
         fld_resonance,
         fld_playrate,
@@ -96,16 +96,11 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
             return pmd()
                 .asEnvelopeTime()
                 .withRange(-5.64386f, 3.f) // 20ms to 8s
-                .withDefault(-1.73697f) // 300ms
+                .withDefault(-1.73697f)    // 300ms
                 .withName("Time");
 
-        case fld_offset:
-            return pmd()
-                .asFloat()
-                .withRange(-10.f, 10.f)
-                .withDefault(0.f)
-                .withLinearScaleFormatting("ms", 2.f)
-                .withName("L/R Offset");
+        case fld_pitch_warp_depth:
+            return pmd().asPercent().withName("Pitch Warp");
 
         case fld_feedback:
             return pmd().asPercent().withDefault(.5f).withName("Feedback");
@@ -113,15 +108,11 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
         case fld_warp_rate:
             return pmd().asLfoRate(-3, 4).withName("Warp Rate");
 
-        case fld_warp_depth_1:
-            return pmd()
-                .asPercent()
-                .withName("Pitch Warp");
-                
-        case fld_warp_depth_2:
-            return pmd()
-                .asPercent()
-                .withName("Filter Warp");
+        case fld_warp_width:
+            return pmd().asPercent().withDefault(0.f).withName("Warp Width");
+
+        case fld_filt_warp_depth:
+            return pmd().asPercent().withName("Filter Warp");
 
         case fld_cutoff:
             return pmd().asAudibleFrequency().withDefault(20.f).withName("Cutoff");
@@ -130,214 +121,230 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
             return pmd().asPercent().withName("Resonance").withDefault(.5f);
 
         case fld_playrate:
-            return pmd()
-                .asFloat()
-                .withRange(-4, 4)
-                .withName("Playrate")
-                .withDefault(1);
+            return pmd().asFloat().withRange(-5, 5).withName("Playrate").withDefault(1);
         }
         return {};
     }
-    
+
     int samplerate = this->sampleRate();
     const float sampleRateInv = 1 / this->sampleRate();
-    inline float envelope_rate_linear_nowrap(float f)
-    {
-        return this->envelopeRateLinear(f);
-    }
-    
-    
+    inline float envelope_rate_linear_nowrap(float f) { return this->envelopeRateLinear(f); }
+
   protected:
     static constexpr int max_delay_length{1 << 19};
-    
+
     const sst::basic_blocks::tables::SurgeSincTableProvider sincTable;
     using line_t = sst::basic_blocks::dsp::SSESincDelayLine<max_delay_length>;
     line_t delayLineL{sincTable};
     line_t delayLineR{sincTable};
-    
+
     float min_delay_length = static_cast<float>(sincTable.FIRipol_N);
-    
+
     using lfo_t = sst::basic_blocks::modulators::SimpleLFO<FloatyDelay, FXConfig::blockSize>;
     lfo_t sineLFO{this, rng};
-    lfo_t noiseLFO{this, rng};
+    lfo_t noiseLFO1{this, rng};
+    lfo_t noiseLFO2{this, rng};
     typename lfo_t::Shape sine = lfo_t::Shape::SINE;
     typename lfo_t::Shape noise = lfo_t::Shape::SMOOTH_NOISE;
-    
-    sst::filters::CytomicSVF filter;
+
+    sst::filters::CytomicSVF inputFilter;
+    sst::filters::CytomicSVF feedbackFilter;
     sst::filters::CytomicSVF DCfilter;
-    
-    sst::basic_blocks::dsp::lipol_sse<FXConfig::blockSize, false> timeLerp, offsLerp, rateLerp, feedbackLerp, mixLerp;
-    
+
+    sst::basic_blocks::dsp::lipol_sse<FXConfig::blockSize, false> timeLerp, modLerpL, modLerpR,
+        rateLerp, feedbackLerp, mixLerp;
+
     // int ringout_time;
 
-    inline float rateToSeconds(float f)
-    {
-        return std::pow(2, f);
-    }
-                                                                 
+    inline float rateToSeconds(float f) { return std::pow(2, f); }
+
     inline void softClip(float &L, float &R)
     {
         L = std::clamp(L, -1.5f, 1.5f);
         L = L - 4.0 / 27.0 * L * L * L;
-        
+
         R = std::clamp(R, -1.5f, 1.5f);
         R = R - 4.0 / 27.0 * R * R * R;
     }
-    
+
     float readHeadMove{0};
+    int test{0};
+    float priorrate{1.f};
 };
 
 template <typename FXConfig> inline void FloatyDelay<FXConfig>::initialize()
 {
     // ringout_time = 100000;
-    filter.init();
+    inputFilter.init();
+    feedbackFilter.init();
     DCfilter.init();
-    DCfilter.template setCoeffForBlock<FXConfig::blockSize>(sst::filters::CytomicSVF::HP, 30.f, .5f, sampleRateInv, 0.f);
+    DCfilter.template setCoeffForBlock<FXConfig::blockSize>(sst::filters::CytomicSVF::HP, 30.f, .5f,
+                                                            sampleRateInv, 0.f);
     timeLerp.instantize();
-    offsLerp.instantize();
+    modLerpL.instantize();
+    modLerpR.instantize();
     rateLerp.instantize();
     feedbackLerp.instantize();
     mixLerp.instantize();
     delayLineL.clear();
     delayLineR.clear();
     sineLFO.attack(sine);
-    noiseLFO.attack(noise);
+    noiseLFO1.attack(noise);
+    noiseLFO2.attack(noise);
 }
 
 template <typename FXConfig>
 inline void FloatyDelay<FXConfig>::processBlock(float *dataL, float *dataR)
 {
-//    if (prior != this->floatValue(fld_test))
-//    {
-//        test = true;
-//        prior = this->floatValue(fld_test);
-//    }
     float wr = this->floatValue(fld_warp_rate);
-    float wd1 = this->floatValue(fld_warp_depth_1);
-    float wd2 = this->floatValue(fld_warp_depth_2);
+    float ww = this->floatValue(fld_warp_width);
+    float pd = this->floatValue(fld_pitch_warp_depth);
+    float fd = this->floatValue(fld_filt_warp_depth);
+
     sineLFO.process_block(wr, 0.f, sine);
-    noiseLFO.process_block(wr + 1, 0.f, noise);
-    float mod = (sineLFO.lastTarget * 0.66f + noiseLFO.lastTarget * 0.33f);
-    
-    auto freqL = 440 * this->noteToPitchIgnoringTuning(this->floatValue(fld_cutoff) + mod * wd2 * 36.f);
-    auto freqR = 440 * this->noteToPitchIgnoringTuning(this->floatValue(fld_cutoff) - mod * wd2 * 36.f);
+    noiseLFO1.process_block(wr + 1, 0.f, noise);
+    noiseLFO2.process_block(wr + 1, 0.f, noise);
+    float sine = sineLFO.lastTarget;
+    float noise1 = noiseLFO1.lastTarget;
+    float noise2 = noiseLFO2.lastTarget;
+
+    float mL = sine + noise1;
+    float mR = sine + (noise1 * (1 - ww)) + (noise2 * ww);
+
+    // input filter is modulated, feedback filter is static 2 1/2 octaves above the input one
+
+    auto freqL =
+        440 * this->noteToPitchIgnoringTuning(this->floatValue(fld_cutoff) + mL * fd * 24.f);
+    auto freqR =
+        440 * this->noteToPitchIgnoringTuning(this->floatValue(fld_cutoff) + mR * fd * 24.f);
     freqL = std::clamp(freqL, 20.f, 20000.f);
     freqR = std::clamp(freqR, 20.f, 20000.f);
-    auto res =  this->floatValue(fld_resonance);
-    filter.template setCoeffForBlock<FXConfig::blockSize>(sst::filters::CytomicSVF::LP, freqL, freqR, res, res, sampleRateInv, 0.f, 0.f);
+    auto freqFB = 440 * this->noteToPitchIgnoringTuning(this->floatValue(fld_cutoff) + 31.02f);
+    auto res = this->floatValue(fld_resonance);
+    inputFilter.template setCoeffForBlock<FXConfig::blockSize>(
+        sst::filters::CytomicSVF::LP, freqL, freqR, res, res, sampleRateInv, 0.f, 0.f);
+    feedbackFilter.template setCoeffForBlock<FXConfig::blockSize>(
+        sst::filters::CytomicSVF::LP, freqFB, freqFB, .55f, .55f, sampleRateInv, 0.f, 0.f);
     DCfilter.template retainCoeffForBlock<FXConfig::blockSize>();
-  
-    float baseTime = std::clamp(rateToSeconds(this->floatValue(fld_time)),.002f, 8.f) * this->sampleRate();
-    
-    mod *= wd1;
-    mod *= .01225f * (baseTime - .002f) + .002f;
-    
-    timeLerp.set_target(baseTime + mod);
+
+    float baseTime =
+        std::clamp(rateToSeconds(this->floatValue(fld_time)), .002f, 8.f) * this->sampleRate();
+    timeLerp.set_target(baseTime);
     float time alignas(16)[FXConfig::blockSize];
     timeLerp.store_block(time);
 
-    offsLerp.set_target(std::clamp(this->floatValue(fld_offset), -10.f, 10.f) * .001 * this->sampleRate());
-    float offset alignas(16)[FXConfig::blockSize];
-    offsLerp.store_block(offset);
-    
+    mL *= pd;
+    mR *= pd;
+    // FIXME: This tries and fails to make pitch warp depth consistent between long and short times
+    mL *= .01225f * (baseTime - .002f) + .002f;
+    mR *= .01225f * (baseTime - .002f) + .002f;
+
+    modLerpL.set_target(mL);
+    modLerpR.set_target(mR);
+    float modL alignas(16)[FXConfig::blockSize];
+    float modR alignas(16)[FXConfig::blockSize];
+    modLerpL.store_block(modL);
+    modLerpR.store_block(modR);
+
     rateLerp.set_target(this->floatValue(fld_playrate));
     float playrate alignas(16)[FXConfig::blockSize];
     rateLerp.store_block(playrate);
-    
+
     float fb = this->floatValue(fld_feedback);
     feedbackLerp.set_target(fb);
     float feedback alignas(16)[FXConfig::blockSize];
     feedbackLerp.store_block(feedback);
-    
+
     float dBufferL alignas(16)[FXConfig::blockSize];
     float dBufferR alignas(16)[FXConfig::blockSize];
-    
+
     float smooth{1.f};
     float smoothWindow = 256.f;
-    
+
     for (int i = 0; i < FXConfig::blockSize; i++)
     {
-        /* Playrate/dir control
-         When we call read(x), x = the read head position relative to the write head.
-         Keep a running counter (readHeadMove) which we subtract from x and increment each sample
-         so the read head moves at a different speed from the write.
-         */
-        
-        // useful
         auto absrate = std::fabs(playrate[i]);
         auto absRHM = std::fabs(readHeadMove);
-        auto adjustedTime = time[i] * absrate;
-        
+        auto adjustedTime = baseTime * absrate;
+
         if (absRHM >= adjustedTime)
         {
-            // Wrap the counter back to 0 when we reach our target delay time.
             readHeadMove = 0;
         }
 
-        // The increment determines the speed.
-        // Write head advance 1 each sample, hence the -1 in fwd and +1 in rev.
-        float increment = (playrate[i] >= 0) ? absrate - 1 : absrate + 1;
-        
         auto readPos = adjustedTime;
-        // fwd: Start all the way back and run towards write
-        // rev: Start at write and run towards the back
         readPos -= (playrate[i] >= 0) ? readHeadMove : readPos - readHeadMove;
-        // Update the counter
+        // The increment determines the playback speed.
+        // Write head advances 1 each sample, and we're setting read positions relative to it,
+        // hence the -1 in fwd and +1 in rev.
+        float increment = (playrate[i] >= 0) ? absrate - 1 : absrate + 1;
         readHeadMove += increment;
-        
-        // Add in the stereo offset, clamp at min_delay lest bad things happen
-        auto readPosL = std::max(readPos + offset[i], min_delay_length);
-        auto readPosR = std::max(readPos - offset[i], min_delay_length);
-        
+
+        auto readPosL = readPos + modL[i];
+        auto readPosR = readPos + modR[i];
+
+        // Clamp at min_delay lest bad things happen
+        readPosL = std::max(readPosL, min_delay_length);
+        readPosR = std::max(readPosR, min_delay_length);
+
         /*
          Smoothing stragegy
          In any playrate except 1, turn the read head signal down around each clicky jump
-         // TODO: Try a 2-head strategy.
+         // TODO: Improve...
+         Either try a 2-head strategy or make the window size relative to the speed
          */
         if (playrate[i] == 1)
         {
             smooth = 1.f; // no smoothing needed
-            
+
             if (readHeadMove > 1) // but delay time will be wrong
             {
-                readHeadMove -= 1; // so wind the head back to zero
+                readHeadMove -= 1; // so wind the head back towards zero
             }
             else if (readHeadMove < 1)
             {
                 readHeadMove += 1;
             }
-            // -1...1 is close enough anyway
+            // (yeah yeah -1...1 != 0 but close enough here)
         }
         else
         {
             if (playrate[i] < 0)
             {
-                smoothWindow = 512.f; // longer window in reverse
+                smoothWindow = 512.f; // lengthen the window in reverse
             }
-            // this looks a little cursed but hey, it works
+            // this slightly cursed nest of mins answers "how far are we from a jump"
             auto s = std::min(std::min(smoothWindow, absRHM),
                               std::min(smoothWindow, adjustedTime - absRHM));
+            // the answer has no business outside these bounds
+            s = std::clamp(s, 0.f, smoothWindow);
+            // divide it by the window total to get the smoothing amount
             smooth = s / smoothWindow;
         }
-        
+
         auto fromLineL = delayLineL.read(readPosL) * smooth;
         auto fromLineR = delayLineR.read(readPosR) * smooth;
-        
+
+        // lest very slow speeds get a little unwieldy
         DCfilter.processBlockStep(fromLineL, fromLineR);
-        
+
         dBufferL[i] = fromLineL;
         dBufferR[i] = fromLineR;
-        
-        auto toLineL = feedback[i] * dBufferL[i] + dataL[i];
-        auto toLineR = feedback[i] * dBufferR[i] + dataR[i];
-        
-        filter.processBlockStep(toLineL, toLineR);
+
+        auto inL = dataL[i];
+        auto inR = dataR[i];
+        inputFilter.processBlockStep(inL, inR);
+
+        auto toLineL = inL + feedback[i] * dBufferL[i];
+        auto toLineR = inR + feedback[i] * dBufferR[i];
+
+        feedbackFilter.processBlockStep(toLineL, toLineR);
         softClip(toLineL, toLineR);
 
         delayLineL.write(toLineL);
         delayLineR.write(toLineR);
     }
-    
+
     mixLerp.set_target(this->floatValue(fld_mix));
     mixLerp.fade_2_blocks_inplace(dataL, dBufferL, dataR, dBufferR, this->blockSize_quad);
 }
