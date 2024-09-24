@@ -24,6 +24,7 @@
 #include "simd-test-include.h"
 
 #include "sst/effects/Delay.h"
+#include "sst/effects/FloatyDelay.h"
 #include "sst/effects/Flanger.h"
 #include "sst/effects/Reverb1.h"
 #include "sst/effects/Bonsai.h"
@@ -124,6 +125,10 @@ TEST_CASE("Can Create Types")
     SECTION("Reverb2") { Tester<sst::effects::reverb2::Reverb2<TestConfig>>::TestFX(); }
     SECTION("TreeMonster") { Tester<sst::effects::treemonster::TreeMonster<TestConfig>>::TestFX(); }
     SECTION("Nimbus") { Tester<sst::effects::nimbus::Nimbus<TestConfig>>::TestFX(); }
+    SECTION("Floaty Delay")
+    {
+        Tester<sst::effects::floatydelay::FloatyDelay<TestConfig>>::TestFX();
+    }
     SECTION("RotarySpeaker")
     {
         Tester<sst::effects::rotaryspeaker::RotarySpeaker<TestConfig>>::TestFX();
