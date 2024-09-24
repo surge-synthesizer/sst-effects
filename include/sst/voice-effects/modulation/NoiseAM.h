@@ -192,8 +192,8 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
         }
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         bool stereo = this->getIntParam(ipStereo);
         float threshold = this->getFloatParam(fpThreshold);
@@ -270,7 +270,7 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
         }
     }
 
-    void processMonoToMono(float *datain, float *dataout, float pitch)
+    void processMonoToMono(const float *const datain, float *dataout, float pitch)
     {
         float threshold = this->getFloatParam(fpThreshold);
         auto depth = this->getFloatParam(fpDepth);
@@ -317,7 +317,8 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
         }
     }
 
-    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
+    void processMonoToStereo(const float *const datainL, float *dataoutL, float *dataoutR,
+                             float pitch)
     {
         processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
     }
@@ -327,6 +328,16 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
   protected:
     float priorSlope = -1234.f;
     std::array<sst::filters::CytomicSVF, 11> filters;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::voice_effects::modulation
 #endif // SCXT_NOISEAM_H

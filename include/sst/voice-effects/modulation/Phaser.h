@@ -171,8 +171,8 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
 
     bool phaseSet = false;
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         auto lfoRate = this->getFloatParam(fpRate);
         auto lfoDepth = this->getFloatParam(fpDepth);
@@ -226,12 +226,13 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
         }
     }
 
-    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
+    void processMonoToStereo(const float *const datainL, float *dataoutL, float *dataoutR,
+                             float pitch)
     {
         processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
     }
 
-    void processMonoToMono(float *dataIn, float *dataOut, float pitch)
+    void processMonoToMono(const float *const dataIn, float *dataOut, float pitch)
     {
         auto lfoRate = this->getFloatParam(fpRate);
         auto lfoDepth = this->getFloatParam(fpDepth);
@@ -343,6 +344,16 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
     std::array<sst::filters::CytomicSVF, 4> filters;
     float fbAmt[2]{0.f, 0.f};
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> feedbackLerp;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::voice_effects::modulation
 #endif // SCXT_PHASER_H

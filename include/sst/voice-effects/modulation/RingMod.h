@@ -111,8 +111,8 @@ template <typename VFXConfig> struct RingMod : core::VoiceEffectTemplateBase<VFX
         return 12 * std::log2(ratio);
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         namespace mech = sst::basic_blocks::mechanics;
 
@@ -130,7 +130,7 @@ template <typename VFXConfig> struct RingMod : core::VoiceEffectTemplateBase<VFX
         }
     }
 
-    void processMonoToMono(float *datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         namespace mech = sst::basic_blocks::mechanics;
         auto pt = this->getFloatParam(fpCarrierFrequency) + (keytrackOn ? pitch : 0);
@@ -158,6 +158,16 @@ template <typename VFXConfig> struct RingMod : core::VoiceEffectTemplateBase<VFX
     sst::basic_blocks::dsp::QuadratureOscillator<float> qosc;
     int priorNum = -1;
     int priorDenom = -1;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 
 } // namespace sst::voice_effects::modulation

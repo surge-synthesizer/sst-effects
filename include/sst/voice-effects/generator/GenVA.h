@@ -149,7 +149,7 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
     void initVoiceEffect() {}
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
-    void processSine(float *datainL, float *dataoutL, float pitch)
+    void processSine(const float *const datainL, float *dataoutL, float pitch)
     {
         if (keytrackOn)
         {
@@ -175,7 +175,7 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
         sLevelLerp.multiply_block(dataoutL);
     }
 
-    void processSaw(float *datainL, float *dataoutL, float pitch)
+    void processSaw(const float *const datainL, float *dataoutL, float pitch)
     {
         auto tune = this->getFloatParam(fpOffset);
         auto lp = this->getFloatParam(fpLowpass);
@@ -206,7 +206,7 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
         sLevelLerp.multiply_block(dataoutL);
     }
 
-    void processPulse(float *datainL, float *dataoutL, float pitch)
+    void processPulse(const float *const datainL, float *dataoutL, float pitch)
     {
         mTuneLerp.newValue(this->getFloatParam(fpOffset));
         mWidthLerp.newValue(this->getFloatParam(fpWidth));
@@ -258,7 +258,7 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
         }
     }
 
-    void processMonoToMono(float *datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         int wave = this->getIntParam(ipWaveform);
         if (wave == 0)
@@ -275,8 +275,8 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
         }
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
 
         processMonoToMono(datainL, dataoutL, pitch);
@@ -364,6 +364,16 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
 
         mOscState += rate;
         mPolarity = !mPolarity;
+    }
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
     }
 };
 } // namespace sst::voice_effects::generator

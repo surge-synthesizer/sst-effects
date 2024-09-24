@@ -82,8 +82,8 @@ template <typename VFXConfig> struct VolumeAndPan : core::VoiceEffectTemplateBas
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         auto pan = (this->getFloatParam(fpPan) + 1) / 2;
         basic_blocks::dsp::pan_laws::panmatrix_t pmat{1, 1, 0, 0};
@@ -104,6 +104,18 @@ template <typename VFXConfig> struct VolumeAndPan : core::VoiceEffectTemplateBas
 
   protected:
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> volLerp, leftLerp, rightLerp;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        // assert(streamedFrom == 1);
+        if (streamedFrom == 1)
+            fparam[fpPan] = -0.5;
+    }
 };
 } // namespace sst::voice_effects::utilities
 #endif // SCXT_VOLUMEANDPAN_H

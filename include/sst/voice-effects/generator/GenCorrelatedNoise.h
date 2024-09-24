@@ -119,8 +119,8 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
         rightOut = midIn - sideIn;
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         auto isStereo = this->getIntParam(ipStereo) != 0;
         if (!isStereo)
@@ -162,7 +162,7 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
         mLevelLerp.multiply_2_blocks(dataoutL, dataoutR);
     }
 
-    void processMonoToMono(float *datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         auto levT = std::clamp(this->getFloatParam(fpLevel), 0.f, 1.f);
         levT = levT * levT * levT;
@@ -184,7 +184,8 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
         mLevelLerp.multiply_block(dataoutL);
     }
 
-    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
+    void processMonoToStereo(const float *const datainL, float *dataoutL, float *dataoutR,
+                             float pitch)
     {
         processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
     }
@@ -197,6 +198,16 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
 
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> mLevelLerp;
     sst::basic_blocks::dsp::lipol<float, VFXConfig::blockSize, true> mColorLerp;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::voice_effects::generator
 

@@ -78,13 +78,23 @@ template <typename VFXConfig> struct LiftedFlanger : core::VoiceEffectTemplateBa
         helper.valuesForFX[flanger_t::fl_width] = helper.busFX->getDefaultWidth();
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         setupValues();
         mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
         mech::copy_from_to<VFXConfig::blockSize>(datainR, dataoutR);
         helper.busFX->processBlock(dataoutL, dataoutR);
+    }
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
     }
 };
 } // namespace sst::voice_effects::liftbus

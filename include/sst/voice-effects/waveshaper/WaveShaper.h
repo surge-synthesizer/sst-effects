@@ -135,7 +135,8 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     template <bool stereo>
-    void processInternal(float *datainL, float *datainR, float *dataoutL, float *dataoutR)
+    void processInternal(const float *const datainL, const float *const datainR, float *dataoutL,
+                         float *dataoutR)
     {
         // Todo: Smooth
         auto drv = this->dbToLinear(this->getFloatParam((int)WaveShaperFloatParams::drive));
@@ -211,8 +212,8 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
         }
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         bool hpActive = !this->getIsDeactivated((int)WaveShaperFloatParams::highpass);
         bool lpActive = !this->getIsDeactivated((int)WaveShaperFloatParams::lowpass);
@@ -249,7 +250,7 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
         }
     }
 
-    void processMonoToMono(float *datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         bool hpActive = !this->getIsDeactivated((int)WaveShaperFloatParams::highpass);
         bool lpActive = !this->getIsDeactivated((int)WaveShaperFloatParams::lowpass);
@@ -321,6 +322,16 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
     sst::basic_blocks::dsp::lipol<float, VFXConfig::blockSize, true> mDriveLerp, mBiasLerp,
         mGainLerp;
     std::array<sst::filters::CytomicSVF, 2> filters;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::voice_effects::waveshaper
 

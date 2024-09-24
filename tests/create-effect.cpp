@@ -33,6 +33,7 @@
 #include "sst/effects/TreeMonster.h"
 #include "sst/effects/Nimbus.h"
 #include "sst/effects/NimbusImpl.h"
+#include "sst/effects/RotarySpeaker.h"
 
 struct TestConfig
 {

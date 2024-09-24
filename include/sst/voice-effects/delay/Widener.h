@@ -118,8 +118,8 @@ template <typename VFXConfig> struct Widener : core::VoiceEffectTemplateBase<VFX
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     template <typename Line>
-    void processOntoLine(Line *line, float *datainL, float *datainR, float *dataoutL,
-                         float *dataoutR, float pitch)
+    void processOntoLine(Line *line, const float *const datainL, const float *const datainR,
+                         float *dataoutL, float *dataoutR, float pitch)
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
@@ -154,8 +154,8 @@ template <typename VFXConfig> struct Widener : core::VoiceEffectTemplateBase<VFX
         sdsp::decodeMS<VFXConfig::blockSize>(mid, side, dataoutL, dataoutR);
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         if (isShort)
         {
@@ -176,6 +176,16 @@ template <typename VFXConfig> struct Widener : core::VoiceEffectTemplateBase<VFX
     std::array<float, numFloatParams> mLastParam{};
 
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> lipolAmp, lipolSource, lipolDelay;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 
 } // namespace sst::voice_effects::delay

@@ -280,6 +280,15 @@ template <typename FXConfig> struct EffectTemplateBase : public FXConfig::BaseCl
         else
             width.set_target_smoothed(this->floatValue(idx));
     }
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const param)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::effects::core
 

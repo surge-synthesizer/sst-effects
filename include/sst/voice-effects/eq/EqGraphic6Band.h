@@ -66,12 +66,12 @@ template <typename VFXConfig> struct EqGraphic6Band : core::VoiceEffectTemplateB
     void initVoiceEffect() {}
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         calc_coeffs();
-        float *inL = datainL;
-        float *inR = datainR;
+        auto *inL = datainL;
+        auto *inR = datainR;
         for (int i = 0; i < nBands; ++i)
         {
             mParametric[i].process_block_to(inL, inR, dataoutL, dataoutR);
@@ -80,10 +80,10 @@ template <typename VFXConfig> struct EqGraphic6Band : core::VoiceEffectTemplateB
         }
     }
 
-    void processMonoToMono(float *datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         calc_coeffs();
-        float *inL = datainL;
+        auto *inL = datainL;
         for (int i = 0; i < nBands; ++i)
         {
             mParametric[i].process_block_to(inL, dataoutL);
@@ -129,6 +129,16 @@ template <typename VFXConfig> struct EqGraphic6Band : core::VoiceEffectTemplateB
     std::array<float, nBands * 3> mLastParam{};
     std::array<typename core::VoiceEffectTemplateBase<VFXConfig>::BiquadFilterType, nBands>
         mParametric;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 
 } // namespace sst::voice_effects::eq

@@ -239,6 +239,14 @@ template <typename FXConfig> struct Reverb2 : core::EffectTemplateBase<FXConfig>
     }
 
     static constexpr double db60{0.001}; // powf(10.f, 0.05f * -60.f);
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const param)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 
 template <typename FXConfig>

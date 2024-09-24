@@ -215,8 +215,8 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
         return z;
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         auto makeup = decibelsToAmplitude(this->getFloatParam(fpMakeUp));
         gainLerp.set_target(makeup);
@@ -271,7 +271,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
         gainLerp.multiply_2_blocks(dataoutL, dataoutR);
     }
 
-    void processMonoToMono(float *datain, float *dataout, float pitch)
+    void processMonoToMono(const float *const datain, float *dataout, float pitch)
     {
         auto makeup = decibelsToAmplitude(this->getFloatParam(fpMakeUp));
         gainLerp.set_target(makeup);
@@ -376,6 +376,16 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
     std::array<sst::filters::CytomicSVF, 2> filters;
     float priorSlope = -123456.f;
     float priorFreq = -123456.f;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::voice_effects::dynamics
 #endif // SCXT_COMPRESSOR_H

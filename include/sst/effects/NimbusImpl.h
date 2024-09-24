@@ -245,5 +245,6 @@ void Nimbus<FXConfig>::processBlock(float *__restrict dataL, float *__restrict d
 
 } // namespace sst::effects::nimbus
 #endif
+#undef CLIP
 
 #endif // SURGE_NIMBUSIMPL_H

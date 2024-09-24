@@ -153,8 +153,8 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
     }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         namespace mech = sst::basic_blocks::mechanics;
 
@@ -182,12 +182,13 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
         }
     }
 
-    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
+    void processMonoToStereo(const float *const datainL, float *dataoutL, float *dataoutR,
+                             float pitch)
     {
         processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
     }
 
-    void processMonoToMono(float *dataIn, float *dataOut, float pitch)
+    void processMonoToMono(const float *const dataIn, float *dataOut, float pitch)
     {
         namespace mech = sst::basic_blocks::mechanics;
 
@@ -307,6 +308,16 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
     std::array<sst::filters::CytomicSVF, maxPhases> apfs;
 
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> lipolFb;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::voice_effects::filter
 #endif // SHORTCIRCUITXT_STATICPHASER_H

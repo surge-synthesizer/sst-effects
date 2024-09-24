@@ -194,6 +194,14 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
     float LFOval;
     bool LFOdirection, FBsign;
     // int ringout_time;
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const param)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 
 template <typename FXConfig> inline void Delay<FXConfig>::initialize()

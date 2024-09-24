@@ -124,8 +124,8 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
         return res * .5 + .5;
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         auto stereo = this->getIntParam(ipStereo);
         auto range = std::clamp(this->getFloatParam(fpEndFreq), -60.f, 70.f) -
@@ -256,7 +256,7 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
         }
     }
 
-    void processMonoToMono(float *datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         auto range = std::clamp(this->getFloatParam(fpEndFreq), -60.f, 70.f) -
                      std::clamp(this->getFloatParam(fpStartFreq), -60.f, 70.f);
@@ -320,7 +320,8 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
         }
     }
 
-    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
+    void processMonoToStereo(const float *const datainL, float *dataoutL, float *dataoutR,
+                             float pitch)
     {
         processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
     }
@@ -339,6 +340,16 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
     float gainScale{1.f};
 
     bool isFirst{true};
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::voice_effects::modulation
 #endif // SCXT_SHEPARD_PHASER_H

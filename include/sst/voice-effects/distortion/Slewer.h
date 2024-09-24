@@ -117,8 +117,8 @@ template <typename VFXConfig> struct Slewer : core::VoiceEffectTemplateBase<VFXC
         }
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         calc_coeffs();
         float rate alignas(16)[VFXConfig::blockSize];
@@ -144,7 +144,7 @@ template <typename VFXConfig> struct Slewer : core::VoiceEffectTemplateBase<VFXC
         bq[1].process_block_to(dataoutL, dataoutR, dataoutL, dataoutR);
     }
 
-    void processMonoToMono(float *datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         calc_coeffs();
         float rate alignas(16)[VFXConfig::blockSize];
@@ -171,6 +171,16 @@ template <typename VFXConfig> struct Slewer : core::VoiceEffectTemplateBase<VFXC
     std::array<typename core::VoiceEffectTemplateBase<VFXConfig>::BiquadFilterType, 2> bq;
 
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> lipolRate;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::voice_effects::distortion
 

@@ -115,8 +115,8 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
         return 12 * std::log2(ratio);
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         namespace sdsp = sst::basic_blocks::dsp;
 
@@ -168,7 +168,7 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
         post.process_block_D2(OS[0], OS[1], bs2, dataoutL, dataoutR);
     }
 
-    void processMonoToMono(float *datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         namespace sdsp = sst::basic_blocks::dsp;
 
@@ -230,6 +230,16 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
     sst::filters::HalfRate::HalfRateFilter pre, post;
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize> pregain;
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize << 1, true> omega;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 } // namespace sst::voice_effects::modulation
 

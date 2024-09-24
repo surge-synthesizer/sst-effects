@@ -929,6 +929,15 @@ template <typename FXConfig> struct Bonsai : core::EffectTemplateBase<FXConfig>
     float coef8000{0.f};
     float coef11000{0.f};
     float coef22000{0.f};
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const param)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 
 template <typename FXConfig> inline void Bonsai<FXConfig>::initialize()

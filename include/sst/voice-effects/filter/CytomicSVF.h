@@ -240,8 +240,8 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
         }
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         calc_coeffs(pitch);
         cySvf[0].template processBlock<VFXConfig::blockSize>(datainL, datainR, dataoutL, dataoutR);
@@ -252,7 +252,7 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
         }
     }
 
-    void processMonoToMono(float *datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         calc_coeffs(pitch);
         cySvf[0].template processBlock<VFXConfig::blockSize>(datainL, dataoutL);
@@ -262,7 +262,8 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
         }
     }
 
-    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
+    void processMonoToStereo(const float *const datainL, float *dataoutL, float *dataoutR,
+                             float pitch)
     {
         calc_coeffs(pitch);
         cySvf[0].template processBlock<VFXConfig::blockSize>(datainL, datainL, dataoutL, dataoutR);
@@ -289,6 +290,16 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
     std::array<float, numFloatParams> mLastParam{};
     std::array<int, numIntParams> mLastIParam{};
     std::array<sst::filters::CytomicSVF, 2> cySvf;
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 
 } // namespace sst::voice_effects::filter

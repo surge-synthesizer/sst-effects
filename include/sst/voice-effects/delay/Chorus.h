@@ -206,8 +206,8 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
     bool phaseSet = false;
 
     template <typename T>
-    void stereoImpl(const std::array<T *, 2> &lines, float *datainL, float *datainR,
-                    float *dataoutL, float *dataoutR)
+    void stereoImpl(const std::array<T *, 2> &lines, const float *const datainL,
+                    const float *const datainR, float *dataoutL, float *dataoutR)
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
@@ -286,7 +286,7 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
         }
     }
 
-    template <typename T> void monoImpl(T *line, float *datainL, float *dataoutL)
+    template <typename T> void monoImpl(T *line, const float *const datainL, float *dataoutL)
     {
         namespace mech = sst::basic_blocks::mechanics;
         namespace sdsp = sst::basic_blocks::dsp;
@@ -351,8 +351,8 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
         }
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         if (isShort)
         {
@@ -368,12 +368,13 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
         }
     }
 
-    void processMonoToStereo(float *datainL, float *dataoutL, float *dataoutR, float pitch)
+    void processMonoToStereo(const float *const datainL, float *dataoutL, float *dataoutR,
+                             float pitch)
     {
         processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
     }
 
-    void processMonoToMono(float *datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         if (isShort)
         {
@@ -392,6 +393,16 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
     bool isShort{true};
 
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> feedbackLerp, timeLerp[2];
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 
 } // namespace sst::voice_effects::delay

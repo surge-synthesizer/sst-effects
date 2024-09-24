@@ -238,8 +238,8 @@ template <typename VFXConfig> struct SSTFilters : core::VoiceEffectTemplateBase<
         mLastParam = param;
     }
 
-    void processStereo(float *datainL, float *datainR, float *dataoutL, float *dataoutR,
-                       float pitch)
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
         updateCoefficients(pitch, true);
         if (filterUnitPtr)
@@ -266,7 +266,7 @@ template <typename VFXConfig> struct SSTFilters : core::VoiceEffectTemplateBase<
         }
     }
 
-    void processMonoToMono(float *datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         updateCoefficients(pitch, false);
 
@@ -316,6 +316,16 @@ template <typename VFXConfig> struct SSTFilters : core::VoiceEffectTemplateBase<
     bool keytrackOn{false}, wasKeytrackOn{false}, lastBuildWasStereo{false};
     std::array<float, numFloatParams> mLastParam{};
     std::array<int, numIntParams> mLastIParam{};
+
+  public:
+    static constexpr int16_t streamingVersion{1};
+    static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
+                                                   int *const iparam)
+    {
+        // base implementation - we have never updated streaming
+        // input is parameters from stream version
+        assert(streamedFrom == 1);
+    }
 };
 
 } // namespace sst::voice_effects::filter
