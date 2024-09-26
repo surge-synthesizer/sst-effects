@@ -42,6 +42,11 @@
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
 #include "sst/basic-blocks/dsp/RNG.h"
 
+/*
+ Big thanks to Danial Arena at remaincalm.org for writing the reaper JS plug which
+inspired this effect! :)
+ */
+
 namespace sst::effects::floatydelay
 {
 namespace sdsp = sst::basic_blocks::dsp;
@@ -51,17 +56,16 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
 {
     enum floaty_params
     {
-        fld_mix = 0,
         fld_time,
+        fld_playrate,
         fld_feedback,
-        fld_pitch_warp_depth,
-        fld_warp_rate,
-        fld_warp_width,
-        fld_filt_warp_depth,
         fld_cutoff,
         fld_resonance,
-        fld_playrate,
-
+        fld_warp_rate,
+        fld_warp_width,
+        fld_pitch_warp_depth,
+        fld_filt_warp_depth,
+        fld_mix,
         fld_num_params,
     };
 
@@ -89,9 +93,6 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
 
         switch (idx)
         {
-        case fld_mix:
-            return pmd().withName("Mix").asPercent().withDefault(0.3f);
-
         case fld_time:
             return pmd()
                 .asEnvelopeTime()
@@ -99,20 +100,11 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
                 .withDefault(-1.73697f)    // 300ms
                 .withName("Time");
 
-        case fld_pitch_warp_depth:
-            return pmd().asPercent().withName("Pitch Warp");
+        case fld_playrate:
+            return pmd().asFloat().withRange(-5, 5).withName("Playrate").withDefault(1);
 
         case fld_feedback:
             return pmd().asPercent().withDefault(.5f).withName("Feedback");
-
-        case fld_warp_rate:
-            return pmd().asLfoRate(-3, 4).withName("Warp Rate");
-
-        case fld_warp_width:
-            return pmd().asPercent().withDefault(0.f).withName("Warp Width");
-
-        case fld_filt_warp_depth:
-            return pmd().asPercent().withName("Filter Warp");
 
         case fld_cutoff:
             return pmd().asAudibleFrequency().withDefault(20.f).withName("Cutoff");
@@ -120,8 +112,20 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
         case fld_resonance:
             return pmd().asPercent().withName("Resonance").withDefault(.5f);
 
-        case fld_playrate:
-            return pmd().asFloat().withRange(-5, 5).withName("Playrate").withDefault(1);
+        case fld_warp_rate:
+            return pmd().asLfoRate(-3, 4).withName("Rate");
+
+        case fld_warp_width:
+            return pmd().asPercent().withDefault(0.f).withName("Width");
+
+        case fld_pitch_warp_depth:
+            return pmd().asPercent().withName("Pitch Depth");
+
+        case fld_filt_warp_depth:
+            return pmd().asPercent().withName("Filter Depth");
+
+        case fld_mix:
+            return pmd().withName("Mix").asPercent().withDefault(0.3f);
         }
         return {};
     }
