@@ -18,8 +18,8 @@
  * https://github.com/surge-synthesizer/sst-effects
  */
 
-#ifndef INCLUDE_SST_EFFECTS_FLOATY_DELAY_H
-#define INCLUDE_SST_EFFECTS_FLOATY_DELAY_H
+#ifndef INCLUDE_SST_EFFECTS_FLOATYDELAY_H
+#define INCLUDE_SST_EFFECTS_FLOATYDELAY_H
 
 #include <cstring>
 #include <cmath>
@@ -101,7 +101,12 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
                 .withName("Time");
 
         case fld_playrate:
-            return pmd().asFloat().withRange(-5, 5).withName("Playrate").withDefault(1);
+            return pmd()
+                .asFloat()
+                .withRange(-5, 5)
+                .withName("Playrate")
+                .withDefault(1)
+                .withLinearScaleFormatting("x");
 
         case fld_feedback:
             return pmd().asPercent().withDefault(.5f).withName("Feedback");
@@ -113,7 +118,7 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
             return pmd().asPercent().withName("Resonance").withDefault(.5f);
 
         case fld_warp_rate:
-            return pmd().asLfoRate(-3, 4).withName("Rate");
+            return pmd().asLfoRate(-3, 4).withName("Rate").temposyncable(false);
 
         case fld_warp_width:
             return pmd().asPercent().withDefault(0.f).withName("Width");
