@@ -89,7 +89,7 @@ int main(int argc, char const *argv[]) {
     }
     fclose(datFile);
 
-    system("gnuplot -p -e \"plot '/tmp/data2.dat' using 1:2 with lines, '' using 1:3 with lines\"");
+    system("gnuplot -p -e \"plot '/tmp/data.dat' using 1:2 with lines, '' using 1:3 with lines\"");
   }
   return 0;
 }
