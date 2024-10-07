@@ -7,6 +7,10 @@ add_library(${PROJECT_NAME} INTERFACE)
 target_include_directories(${PROJECT_NAME} INTERFACE include)
 # there's a bit more below this
 
+if (${SST_EFFECTS_BUILD_EXAMPLES})
+    set(SST_EFFECTS_BUILD_TESTS ON)
+endif()
+
 if (${SST_EFFECTS_BUILD_TESTS})
     include(cmake/CPM.cmake)
 
@@ -74,6 +78,24 @@ if (${SST_EFFECTS_BUILD_TESTS})
     target_compile_definitions(${PROJECT_NAME}-test PUBLIC _USE_MATH_DEFINES=1)
     target_compile_definitions(${PROJECT_NAME}-test PRIVATE CATCH_CONFIG_DISABLE_EXCEPTIONS=1)
     target_include_directories(${PROJECT_NAME}-test PRIVATE libs/catch2)
+    
+    
+    if(${SST_EFFECTS_BUILD_EXAMPLES})
+        if (NOT TARGET dr_libs)
+            CPMAddPackage(NAME dr_libs
+                    GITHUB_REPOSITORY mackron/dr_libs
+                    GIT_TAG master
+                    )
+            add_library(dr_libs INTERFACE)
+            target_include_directories(dr_libs INTERFACE ${dr_libs_SOURCE_DIR})
+        endif ()
+        
+        add_executable(${PROJECT_NAME}-example
+            examples/example.cpp
+        )
+        target_link_libraries(${PROJECT_NAME}-example PUBLIC dr_libs simde sst-basic-blocks sst-filters sst-waveshapers fmt ${PROJECT_NAME})
+        target_compile_definitions(${PROJECT_NAME}-example PUBLIC _USE_MATH_DEFINES=1)
+    endif()
 
 endif ()
 
