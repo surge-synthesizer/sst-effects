@@ -90,11 +90,11 @@ if (${SST_EFFECTS_BUILD_TESTS})
             target_include_directories(dr_libs INTERFACE ${dr_libs_SOURCE_DIR})
         endif ()
         
-        add_executable(${PROJECT_NAME}-example
-            examples/example.cpp
+        add_executable(voice-effet-example
+            examples/voice-effect-example.cpp
         )
-        target_link_libraries(${PROJECT_NAME}-example PUBLIC dr_libs simde sst-basic-blocks sst-filters sst-waveshapers fmt ${PROJECT_NAME})
-        target_compile_definitions(${PROJECT_NAME}-example PUBLIC _USE_MATH_DEFINES=1)
+        target_link_libraries(voice-effet-example PUBLIC dr_libs simde sst-basic-blocks sst-filters sst-waveshapers fmt ${PROJECT_NAME})
+        target_compile_definitions(voice-effet-example PUBLIC _USE_MATH_DEFINES=1)
     endif()
 
 endif ()
