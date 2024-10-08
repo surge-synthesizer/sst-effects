@@ -150,6 +150,12 @@ int main(int argc, char const *argv[])
     bool launchGnuplot;
     app.add_option("--gnuplot", launchGnuplot, "Attempt to launch gnuplot on datfile");
 
+    // TODO
+    // 1. Add a vec option (https://cliutils.github.io/CLI11/book/chapters/options.html)
+    //    for float and int params
+    // 2. templatize the runner by type and allow you to select types with command line
+    // 3. RTAudio rather than file output
+
     CLI11_PARSE(app, argc, argv);
 
     if (launchGnuplot && datfileName.empty())
@@ -187,7 +193,9 @@ int main(int argc, char const *argv[])
 
     uint32_t sample_count = 0;
 
-    float outputSamples[totalPCMFrameCount * 2];
+    // FIXME - if we can block this we probably should
+    // FIXME - there are tails on effects and we need a way to specify how many sapmle tails
+    auto outputSamples = new float[totalPCMFrameCount * 2];
 
     FILE *datFile{nullptr};
     if (!datfileName.empty())
@@ -251,13 +259,17 @@ int main(int argc, char const *argv[])
     drwav_init_file_write(&wav, outfileName.c_str(), &format, NULL);
     drwav_uint64 framesWritten = drwav_write_pcm_frames(&wav, sample_count, outputSamples);
 
+    delete[] outputSamples;
+
     if (launchGnuplot)
     {
-        auto cmd = fmt::format("gnuplot -p -e \"plot '{}}' using 1:2 with lines, '' using "
+        auto cmd = fmt::format("gnuplot -p -e \"plot '{}' using 1:2 with lines, '' using "
                                "1:3 with lines\"",
                                datfileName);
         std::cout << "Launching " << cmd << std::endl;
         system(cmd.c_str());
     }
+
+
     return 0;
 }
