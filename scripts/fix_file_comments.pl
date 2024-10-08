@@ -21,6 +21,15 @@ find(
 
 
 
+find(
+    {
+        wanted => \&findfiles,
+    },
+    'examples'
+);
+
+
+
 sub findfiles
 {
 
