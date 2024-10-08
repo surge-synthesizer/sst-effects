@@ -5,6 +5,7 @@
 #include "../tests/simd-test-include.h"
 #include "sst/voice-effects/distortion/BitCrusher.h"
 #include "sst/voice-effects/utilities/VolumeAndPan.h"
+#include "sst/voice-effects/dynamics/Compressor.h"
 
 struct DbToLinearProvider
 {
@@ -53,6 +54,10 @@ struct SSTFX {
   
   std::unique_ptr<sst::voice_effects::utilities::VolumeAndPan<FxConfig>> fx;
   
+  // std::unique_ptr<sst::voice_effects::distortion::BitCrusher<FxConfig>> fx;
+
+  // std::unique_ptr<sst::voice_effects::dynamics::Compressor<FxConfig>> fx;
+
   SSTFX()
   {
     dbtlp.init();
@@ -62,6 +67,18 @@ struct SSTFX {
     sampleRate = sampleRate;
     dbtlp.init();
     
+    // fx = std::make_unique<sst::voice_effects::dynamics::Compressor<FxConfig>>();
+    // fx->initVoiceEffect();
+    // fx->initVoiceEffectParams();
+    // fx->setFloatParam(sst::voice_effects::dynamics::Compressor<FxConfig>::fpThreshold, -10);
+    // fx->setFloatParam(sst::voice_effects::dynamics::Compressor<FxConfig>::fpRatio, 7);
+    // fx->setFloatParam(sst::voice_effects::dynamics::Compressor<FxConfig>::fpMakeUp, 3);
+
+    // fx = std::make_unique<sst::voice_effects::distortion::BitCrusher<FxConfig>>();
+    // fx->initVoiceEffectParams();
+    // fx->setFloatParam(sst::voice_effects::distortion::BitCrusher<FxConfig>::fpBitdepth, 0.3);
+    // fx->setFloatParam(sst::voice_effects::distortion::BitCrusher<FxConfig>::fpSamplerate, 0.0);
+
     fx = std::make_unique<sst::voice_effects::utilities::VolumeAndPan<FxConfig>>();
     fx->initVoiceEffectParams();
     fx->setFloatParam(sst::voice_effects::utilities::VolumeAndPan<FxConfig>::fpVolume, 8);
