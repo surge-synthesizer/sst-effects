@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.10)
 project(sst-effects VERSION 0.5 LANGUAGES C CXX)
 
+option(SST_EFFECTS_BUILD_EXAMPLES "Build the example drivers (which will also acivate tests)" OFF)
+option(SST_EFFECTS_BUILD_TESTS "Build the test harness" OFF)
+
 set(CMAKE_CXX_STANDARD 17)
 
 add_library(${PROJECT_NAME} INTERFACE)
@@ -12,6 +15,7 @@ if (${SST_EFFECTS_BUILD_EXAMPLES})
 endif()
 
 if (${SST_EFFECTS_BUILD_TESTS})
+    message(STATUS "Building tests")
     include(cmake/CPM.cmake)
 
     if (NOT TARGET sst-basic-blocks)
@@ -81,6 +85,7 @@ if (${SST_EFFECTS_BUILD_TESTS})
     
     
     if(${SST_EFFECTS_BUILD_EXAMPLES})
+        message(STATUS "Building Examples / CLI Driver")
         if (NOT TARGET dr_libs)
             CPMAddPackage(NAME dr_libs
                     GITHUB_REPOSITORY mackron/dr_libs
@@ -88,13 +93,18 @@ if (${SST_EFFECTS_BUILD_TESTS})
                     )
             add_library(dr_libs INTERFACE)
             target_include_directories(dr_libs INTERFACE ${dr_libs_SOURCE_DIR})
+
+            CPMAddPackage(NAME CL11
+                    GITHUB_REPOSITORY CLIUtils/CLI11
+                    GIT_TAG main)
+
         endif ()
         
-        add_executable(voice-effet-example
+        add_executable(voice-effect-example
             examples/voice-effect-example.cpp
         )
-        target_link_libraries(voice-effet-example PUBLIC dr_libs simde sst-basic-blocks sst-filters sst-waveshapers fmt ${PROJECT_NAME})
-        target_compile_definitions(voice-effet-example PUBLIC _USE_MATH_DEFINES=1)
+        target_link_libraries(voice-effect-example PUBLIC dr_libs CLI11::CLI11 simde sst-basic-blocks sst-filters sst-waveshapers fmt ${PROJECT_NAME})
+        target_compile_definitions(voice-effect-example PUBLIC _USE_MATH_DEFINES=1)
     endif()
 
 endif ()

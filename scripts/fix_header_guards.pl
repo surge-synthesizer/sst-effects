@@ -20,6 +20,14 @@ find(
 );
 
 
+find(
+    {
+        wanted => \&findfiles,
+    },
+    'examples'
+);
+
+
 sub findfiles
 {
     $f = $File::Find::name;
