@@ -23,6 +23,7 @@
 #include <iostream>
 #include <cstring>
 #include <cstdint>
+#include <vector>
 #include <stdio.h>
 #include <CLI/CLI.hpp>
 #include <fmt/core.h>
@@ -38,11 +39,13 @@ struct DbToLinearProvider
 {
     static constexpr size_t nPoints{512};
     float table_dB[nPoints];
+
     void init()
     {
         for (auto i = 0U; i < nPoints; i++)
             table_dB[i] = powf(10.f, 0.05f * ((float)i - 384.f));
     }
+
     float dbToLinear(float db) const
     {
         db += 384;
@@ -58,6 +61,9 @@ struct CLIArgBundle
     std::string outfileName{};
     std::string datfileName{};
     bool launchGnuplot{false};
+
+    std::vector<float> fArgs;
+    std::vector<int> iArgs;
 };
 
 struct SSTFX
@@ -78,21 +84,26 @@ struct SSTFX
         static int getIntParam(const BaseClass *b, int i) { return b->ib[i]; }
 
         static float dbToLinear(const BaseClass *b, float f) { return b->dbtlp.dbToLinear(f); }
+
         static float equalNoteToPitch(const BaseClass *, float f)
         {
             return pow(2.f, (f + 69) / 12.f);
         }
+
         static float getSampleRate(const BaseClass *b) { return b->sampleRate; }
         static float getSampleRateInv(const BaseClass *b) { return 1.0 / b->sampleRate; }
 
         static void preReservePool(BaseClass *, size_t) {}
+
         static void preReserveSingleInstancePool(BaseClass *, size_t) {}
+
         static uint8_t *checkoutBlock(BaseClass *, size_t n)
         {
             printf("checkoutBlock %zu\n", n);
             uint8_t *ptr = (uint8_t *)malloc(n);
             return ptr;
         }
+
         static void returnBlock(BaseClass *, uint8_t *ptr, size_t n)
         {
             printf("returnBlock %zu\n", n);
@@ -107,8 +118,7 @@ struct SSTFX
     SSTFX() { dbtlp.init(); }
 };
 
-template<typename FXT>
-int exampleHarness(const CLIArgBundle &arg)
+template <typename FXT> int exampleHarness(const CLIArgBundle &arg)
 {
     if (arg.launchGnuplot && arg.datfileName.empty())
     {
@@ -140,8 +150,19 @@ int exampleHarness(const CLIArgBundle &arg)
     auto fx = std::make_unique<FXT>();
     fx->sampleRate = sampleRate;
     fx->initVoiceEffectParams();
-    fx->setFloatParam(0 /*sst::voice_effects::utilities::VolumeAndPan<FxConfig>::fpVolume */, 8);
-    fx->setFloatParam(1 /*sst::voice_effects::utilities::VolumeAndPan<FxConfig>::fpPan*/, -0.4);
+
+    int ai{0};
+    for (const auto &f : arg.fArgs)
+    {
+        fx->setFloatParam(ai, f);
+        ai++;
+    }
+    ai = 0;
+    for (const auto &i : arg.iArgs)
+    {
+        fx->setIntParam(ai, i);
+        ai++;
+    }
 
     static constexpr auto blockSize = SSTFX::FxConfig::blockSize;
 
@@ -186,8 +207,8 @@ int exampleHarness(const CLIArgBundle &arg)
             }
         }
 
-        fx->processStereo((const float *)&inputL[0], (const float *)&inputR[0], &outputL[0], &outputR[0],
-                   1);
+        fx->processStereo((const float *)&inputL[0], (const float *)&inputR[0], &outputL[0],
+                          &outputR[0], 1);
 
         for (size_t sample_index = 0; sample_index < blockSize; sample_index++)
         {
@@ -212,7 +233,8 @@ int exampleHarness(const CLIArgBundle &arg)
     format.channels = 2;
     format.sampleRate = sampleRate;
     format.bitsPerSample = 32;
-    std::cout << "Writing " << sample_count << " r=" << sampleRate << " sample wav file to " << arg.outfileName << std::endl;
+    std::cout << "Writing " << sample_count << " r=" << sampleRate << " sample wav file to "
+              << arg.outfileName << std::endl;
     if (!drwav_init_file_write(&wav, arg.outfileName.c_str(), &format, nullptr))
     {
         std::cout << "Cannot init file write the outfile" << std::endl;
@@ -246,6 +268,11 @@ int main(int argc, char const *argv[])
     app.add_option("-o,--outfile", arg.outfileName, "Output wav file for session")->required();
     app.add_option("-d,--datfile", arg.datfileName, "Optional plain text dat file");
     app.add_option("--gnuplot", arg.launchGnuplot, "Attempt to launch gnuplot on datfile");
+    app.add_option("--fargs", arg.fArgs, "Floating arguments in order");
+    app.add_option("--iargs", arg.iArgs, "Floating arguments in order");
+
+    std::string fxType;
+    app.add_option("-t,--type", fxType, "FX Type to run");
 
     // TODO
     // - Add a vec option (https://cliutils.github.io/CLI11/book/chapters/options.html)
@@ -255,6 +282,22 @@ int main(int argc, char const *argv[])
 
     CLI11_PARSE(app, argc, argv);
 
-    // This style will allow us to have a switch statement in the near future for effect
-    return exampleHarness<sst::voice_effects::utilities::VolumeAndPan<SSTFX::FxConfig>>(arg);
+    std::vector<std::string> types;
+#define ADDTYPE(key, cls)                                                                          \
+    {                                                                                              \
+        types.push_back(std::string(key) + " -> " + #cls);                                         \
+        if (fxType == std::string(key))                                                            \
+            return exampleHarness<sst::voice_effects::cls<SSTFX::FxConfig>>(arg);                  \
+    }
+    ADDTYPE("volpan", utilities::VolumeAndPan);
+    ADDTYPE("bitcrush", distortion::BitCrusher);
+
+    // If we get kere no keys matched
+    std::cout << "Unable to find fx '" << fxType << "'. Available options are :\n";
+    for (const auto &opt : types)
+    {
+        std::cout << "   -t " << opt << "\n";
+    }
+    std::cout << std::endl;
+    return 1;
 }
