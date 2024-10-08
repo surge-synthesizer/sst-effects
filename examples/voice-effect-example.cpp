@@ -267,9 +267,9 @@ int main(int argc, char const *argv[])
     app.add_option("-i,--infile", arg.infileName, "Input wav file for session")->required();
     app.add_option("-o,--outfile", arg.outfileName, "Output wav file for session")->required();
     app.add_option("-d,--datfile", arg.datfileName, "Optional plain text dat file");
-    app.add_option("--gnuplot", arg.launchGnuplot, "Attempt to launch gnuplot on datfile");
+    app.add_flag("--gnuplot", arg.launchGnuplot, "Attempt to launch gnuplot on datfile");
     app.add_option("--fargs", arg.fArgs, "Floating arguments in order");
-    app.add_option("--iargs", arg.iArgs, "Floating arguments in order");
+    app.add_option("--iargs", arg.iArgs, "Integer arguments in order");
 
     std::string fxType;
     app.add_option("-t,--type", fxType, "FX Type to run");
