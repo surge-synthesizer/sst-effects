@@ -29,7 +29,7 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Build Smoke test
+      - name: Build Example Harness
         run: |
           cmake -S . -B ./build -DCMAKE_BUILD_TYPE=Debug -DSST_EFFECTS_BUILD_EXAMPLES=TRUE -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
           cmake --build ./build --config Debug --target voice-effect-example

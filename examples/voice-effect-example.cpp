@@ -81,13 +81,13 @@ struct SSTFX
         static void preReserveSingleInstancePool(BaseClass *, size_t) {}
         static uint8_t *checkoutBlock(BaseClass *, size_t n)
         {
-            printf("checkoutBlock %ud\n", n);
+            printf("checkoutBlock %zu\n", n);
             uint8_t *ptr = (uint8_t *)malloc(n);
             return ptr;
         }
         static void returnBlock(BaseClass *, uint8_t *ptr, size_t n)
         {
-            printf("returnBlock %ud\n", n);
+            printf("returnBlock %zu\n", n);
             free(ptr);
         }
     };
@@ -170,7 +170,7 @@ int main(int argc, char const *argv[])
         std::cout << "No samples in file. Exiting" << std::endl;
         exit(2);
     }
-    printf("sampleRate: %d channels: %d, totalPCMFrameCount: %d\n", sampleRate, channels,
+    printf("sampleRate: %d channels: %d, totalPCMFrameCount: %llu\n", sampleRate, channels,
            totalPCMFrameCount);
 
     if (channels > 2)
@@ -181,7 +181,7 @@ int main(int argc, char const *argv[])
 
     SSTFX fx;
     fx.init(sampleRate);
-    auto blockSize = SSTFX::FxConfig::blockSize;
+    static constexpr auto blockSize = SSTFX::FxConfig::blockSize;
 
     uint32_t total_blocks = totalPCMFrameCount / blockSize;
 
