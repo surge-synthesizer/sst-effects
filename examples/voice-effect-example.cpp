@@ -23,6 +23,7 @@
 #include <iostream>
 #include <cstring>
 #include <cstdint>
+#include <vector>
 #include <stdio.h>
 #include <CLI/CLI.hpp>
 #include <fmt/core.h>
@@ -38,11 +39,13 @@ struct DbToLinearProvider
 {
     static constexpr size_t nPoints{512};
     float table_dB[nPoints];
+
     void init()
     {
         for (auto i = 0U; i < nPoints; i++)
             table_dB[i] = powf(10.f, 0.05f * ((float)i - 384.f));
     }
+
     float dbToLinear(float db) const
     {
         db += 384;
@@ -50,6 +53,17 @@ struct DbToLinearProvider
         float a = db - (float)e;
         return (1.f - a) * table_dB[e & (nPoints - 1)] + a * table_dB[(e + 1) & (nPoints - 1)];
     }
+};
+
+struct CLIArgBundle
+{
+    std::string infileName{};
+    std::string outfileName{};
+    std::string datfileName{};
+    bool launchGnuplot{false};
+
+    std::vector<float> fArgs;
+    std::vector<int> iArgs;
 };
 
 struct SSTFX
@@ -70,21 +84,26 @@ struct SSTFX
         static int getIntParam(const BaseClass *b, int i) { return b->ib[i]; }
 
         static float dbToLinear(const BaseClass *b, float f) { return b->dbtlp.dbToLinear(f); }
+
         static float equalNoteToPitch(const BaseClass *, float f)
         {
             return pow(2.f, (f + 69) / 12.f);
         }
+
         static float getSampleRate(const BaseClass *b) { return b->sampleRate; }
         static float getSampleRateInv(const BaseClass *b) { return 1.0 / b->sampleRate; }
 
         static void preReservePool(BaseClass *, size_t) {}
+
         static void preReserveSingleInstancePool(BaseClass *, size_t) {}
+
         static uint8_t *checkoutBlock(BaseClass *, size_t n)
         {
             printf("checkoutBlock %zu\n", n);
             uint8_t *ptr = (uint8_t *)malloc(n);
             return ptr;
         }
+
         static void returnBlock(BaseClass *, uint8_t *ptr, size_t n)
         {
             printf("returnBlock %zu\n", n);
@@ -92,89 +111,32 @@ struct SSTFX
         }
     };
 
-    std::unique_ptr<sst::voice_effects::utilities::VolumeAndPan<FxConfig>> fx;
-
     // std::unique_ptr<sst::voice_effects::distortion::BitCrusher<FxConfig>> fx;
 
     // std::unique_ptr<sst::voice_effects::dynamics::Compressor<FxConfig>> fx;
 
     SSTFX() { dbtlp.init(); }
-
-    void init(float sampleRate)
-    {
-        sampleRate = sampleRate;
-        dbtlp.init();
-
-        // fx = std::make_unique<sst::voice_effects::dynamics::Compressor<FxConfig>>();
-        // fx->initVoiceEffect();
-        // fx->initVoiceEffectParams();
-        // fx->setFloatParam(sst::voice_effects::dynamics::Compressor<FxConfig>::fpThreshold, -10);
-        // fx->setFloatParam(sst::voice_effects::dynamics::Compressor<FxConfig>::fpRatio, 7);
-        // fx->setFloatParam(sst::voice_effects::dynamics::Compressor<FxConfig>::fpMakeUp, 3);
-
-        // fx = std::make_unique<sst::voice_effects::distortion::BitCrusher<FxConfig>>();
-        // fx->initVoiceEffectParams();
-        // fx->setFloatParam(sst::voice_effects::distortion::BitCrusher<FxConfig>::fpBitdepth, 0.3);
-        // fx->setFloatParam(sst::voice_effects::distortion::BitCrusher<FxConfig>::fpSamplerate,
-        // 0.0);
-
-        fx = std::make_unique<sst::voice_effects::utilities::VolumeAndPan<FxConfig>>();
-        fx->initVoiceEffectParams();
-        fx->setFloatParam(sst::voice_effects::utilities::VolumeAndPan<FxConfig>::fpVolume, 8);
-        fx->setFloatParam(sst::voice_effects::utilities::VolumeAndPan<FxConfig>::fpPan, -0.4);
-    }
-
-    void process(const float *const datainL, const float *const datainR, float *dataoutL,
-                 float *dataoutR, float pitch)
-    {
-        fx->processStereo(datainL, datainR, dataoutL, dataoutR, pitch);
-    }
 };
 
-int main(int argc, char const *argv[])
+template <typename FXT> int exampleHarness(const CLIArgBundle &arg)
 {
-    /*
-     * Set up command line arguments
-     */
-    CLI::App app("..:: Voice Effects Example - Command Line player for SST Voice Effects ::..");
-
-    std::string infileName;
-    app.add_option("-i,--infile", infileName, "Input wav file for session")->required();
-
-    std::string outfileName;
-    app.add_option("-o,--outfile", outfileName, "Output wav file for session")->required();
-
-    std::string datfileName;
-    app.add_option("-d,--datfile", datfileName, "Optional plain text dat file");
-
-    bool launchGnuplot;
-    app.add_option("--gnuplot", launchGnuplot, "Attempt to launch gnuplot on datfile");
-
-    // TODO
-    // 1. Add a vec option (https://cliutils.github.io/CLI11/book/chapters/options.html)
-    //    for float and int params
-    // 2. templatize the runner by type and allow you to select types with command line
-    // 3. RTAudio rather than file output
-
-    CLI11_PARSE(app, argc, argv);
-
-    if (launchGnuplot && datfileName.empty())
+    if (arg.launchGnuplot && arg.datfileName.empty())
     {
         std::cout << "To launch gnuplot you need to specify a datfile with -d" << std::endl;
-        exit(2);
+        return 2;
     }
 
     unsigned int channels;
     unsigned int sampleRate;
     drwav_uint64 totalPCMFrameCount;
     float *pSampleData = drwav_open_file_and_read_pcm_frames_f32(
-        infileName.c_str(), &channels, &sampleRate, &totalPCMFrameCount, NULL);
+        arg.infileName.c_str(), &channels, &sampleRate, &totalPCMFrameCount, NULL);
 
     // TODO - how does this report errors?
     if (totalPCMFrameCount <= 0 || pSampleData == nullptr)
     {
         std::cout << "No samples in file. Exiting" << std::endl;
-        exit(2);
+        return 2;
     }
     printf("sampleRate: %d channels: %d, totalPCMFrameCount: %llu\n", sampleRate, channels,
            totalPCMFrameCount);
@@ -182,11 +144,26 @@ int main(int argc, char const *argv[])
     if (channels > 2)
     {
         printf("Only 1 or 2 channels wav files supported, exiting.\n");
-        exit(3);
+        return 3;
     }
 
-    SSTFX fx;
-    fx.init(sampleRate);
+    auto fx = std::make_unique<FXT>();
+    fx->sampleRate = sampleRate;
+    fx->initVoiceEffectParams();
+
+    int ai{0};
+    for (const auto &f : arg.fArgs)
+    {
+        fx->setFloatParam(ai, f);
+        ai++;
+    }
+    ai = 0;
+    for (const auto &i : arg.iArgs)
+    {
+        fx->setIntParam(ai, i);
+        ai++;
+    }
+
     static constexpr auto blockSize = SSTFX::FxConfig::blockSize;
 
     uint32_t total_blocks = totalPCMFrameCount / blockSize;
@@ -198,14 +175,14 @@ int main(int argc, char const *argv[])
     auto outputSamples = new float[totalPCMFrameCount * 2];
 
     FILE *datFile{nullptr};
-    if (!datfileName.empty())
+    if (!arg.datfileName.empty())
     {
-        datFile = fopen(datfileName.c_str(), "w");
+        datFile = fopen(arg.datfileName.c_str(), "w");
 
         if (!datFile)
         {
-            std::cout << "Datfile not open at '" << datfileName << "'" << std::endl;
-            exit(4);
+            std::cout << "Datfile not open at '" << arg.datfileName << "'" << std::endl;
+            return 4;
         }
     }
 
@@ -230,8 +207,8 @@ int main(int argc, char const *argv[])
             }
         }
 
-        fx.process((const float *)&inputL[0], (const float *)&inputR[0], &outputL[0], &outputR[0],
-                   1);
+        fx->processStereo((const float *)&inputL[0], (const float *)&inputR[0], &outputL[0],
+                          &outputR[0], 1);
 
         for (size_t sample_index = 0; sample_index < blockSize; sample_index++)
         {
@@ -254,22 +231,73 @@ int main(int argc, char const *argv[])
     format.container = drwav_container_riff;
     format.format = DR_WAVE_FORMAT_IEEE_FLOAT;
     format.channels = 2;
-    format.sampleRate = 44100;
+    format.sampleRate = sampleRate;
     format.bitsPerSample = 32;
-    drwav_init_file_write(&wav, outfileName.c_str(), &format, NULL);
+    std::cout << "Writing " << sample_count << " r=" << sampleRate << " sample wav file to "
+              << arg.outfileName << std::endl;
+    if (!drwav_init_file_write(&wav, arg.outfileName.c_str(), &format, nullptr))
+    {
+        std::cout << "Cannot init file write the outfile" << std::endl;
+        return 3;
+    }
     drwav_uint64 framesWritten = drwav_write_pcm_frames(&wav, sample_count, outputSamples);
+    drwav_uninit(&wav);
 
     delete[] outputSamples;
 
-    if (launchGnuplot)
+    if (arg.launchGnuplot)
     {
         auto cmd = fmt::format("gnuplot -p -e \"plot '{}' using 1:2 with lines, '' using "
                                "1:3 with lines\"",
-                               datfileName);
+                               arg.datfileName);
         std::cout << "Launching " << cmd << std::endl;
         system(cmd.c_str());
     }
-
-
     return 0;
+}
+
+int main(int argc, char const *argv[])
+{
+    /*
+     * Set up command line arguments
+     */
+    CLI::App app("..:: Voice Effects Example - Command Line player for SST Voice Effects ::..");
+    CLIArgBundle arg;
+
+    app.add_option("-i,--infile", arg.infileName, "Input wav file for session")->required();
+    app.add_option("-o,--outfile", arg.outfileName, "Output wav file for session")->required();
+    app.add_option("-d,--datfile", arg.datfileName, "Optional plain text dat file");
+    app.add_flag("--gnuplot", arg.launchGnuplot, "Attempt to launch gnuplot on datfile");
+    app.add_option("--fargs", arg.fArgs, "Floating arguments in order");
+    app.add_option("--iargs", arg.iArgs, "Integer arguments in order");
+
+    std::string fxType;
+    app.add_option("-t,--type", fxType, "FX Type to run");
+
+    // TODO
+    // - Add a vec option (https://cliutils.github.io/CLI11/book/chapters/options.html)
+    //   for float and int params
+    // - RTAudio rather than file output
+    // - Add a ringout option
+
+    CLI11_PARSE(app, argc, argv);
+
+    std::vector<std::string> types;
+#define ADDTYPE(key, cls)                                                                          \
+    {                                                                                              \
+        types.push_back(std::string(key) + " -> " + #cls);                                         \
+        if (fxType == std::string(key))                                                            \
+            return exampleHarness<sst::voice_effects::cls<SSTFX::FxConfig>>(arg);                  \
+    }
+    ADDTYPE("volpan", utilities::VolumeAndPan);
+    ADDTYPE("bitcrush", distortion::BitCrusher);
+
+    // If we get kere no keys matched
+    std::cout << "Unable to find fx '" << fxType << "'. Available options are :\n";
+    for (const auto &opt : types)
+    {
+        std::cout << "   -t " << opt << "\n";
+    }
+    std::cout << std::endl;
+    return 1;
 }
