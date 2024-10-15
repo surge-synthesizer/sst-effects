@@ -35,6 +35,10 @@
 #include "sst/voice-effects/utilities/VolumeAndPan.h"
 #include "sst/voice-effects/dynamics/Compressor.h"
 
+#include "sst/effects/Reverb2.h"
+#include "sst/effects/Bonsai.h"
+#include "sst/effects/FloatyDelay.h"
+
 struct DbToLinearProvider
 {
     static constexpr size_t nPoints{512};
@@ -218,7 +222,7 @@ void launchGnuplot(std::string filename)
     system(cmd.c_str());
 }
 
-template <typename FXT> int exampleHarness(const CLIArgBundle &arg)
+template <typename FXT> int voiceEffectExampleHarness(const CLIArgBundle &arg)
 {
     unsigned int channels;
     unsigned int sampleRate;
@@ -316,6 +320,99 @@ template <typename FXT> int exampleHarness(const CLIArgBundle &arg)
     return 0;
 }
 
+template <typename FXT> int effectExampleHarness(const CLIArgBundle &arg)
+{
+    unsigned int channels;
+    unsigned int sampleRate;
+    drwav_uint64 totalPCMFrameCount;
+    float *pSampleData = drwav_open_file_and_read_pcm_frames_f32(
+        arg.infileName.c_str(), &channels, &sampleRate, &totalPCMFrameCount, NULL);
+
+    // TODO - how does this report errors?
+    if (totalPCMFrameCount <= 0 || pSampleData == nullptr)
+    {
+        std::cout << "No samples in file. Exiting" << std::endl;
+        return 2;
+    }
+    printf("sampleRate: %d channels: %d, totalPCMFrameCount: %llu\n", sampleRate, channels,
+           totalPCMFrameCount);
+
+    if (channels > 2)
+    {
+        printf("Only 1 or 2 channels wav files supported, exiting.\n");
+        return 3;
+    }
+
+    auto gs = ConcreteConfig::GlobalStorage(sampleRate);
+    auto es = ConcreteConfig::EffectStorage();
+
+    auto fx = std::make_unique<FXT>(&gs, &es, nullptr);
+    for (int i = 0; i < FXT::numParams; ++i)
+      fx->paramStorage[i] = fx->paramAt(i).defaultVal;
+
+    int ai{0};
+    for (const auto &f : arg.fArgs)
+    {
+        fx->paramStorage[ai] = f;
+        ai++;
+    }
+    fx->initialize();
+
+    static constexpr auto blockSize = ConcreteConfig::blockSize;
+
+    uint32_t total_blocks = totalPCMFrameCount / blockSize;
+
+    uint32_t sample_count = 0;
+
+    // FIXME - if we can block this we probably should
+    // FIXME - there are tails on effects and we need a way to specify how many sapmle tails
+    auto outputSamples = new float[totalPCMFrameCount * 2];
+
+    for (size_t block = 0; block < total_blocks; block++)
+    {
+        float outputL[blockSize];
+        float outputR[blockSize];
+
+        for (size_t s = 0; s < blockSize; s++)
+        {
+            if (channels == 2)
+            {
+                outputL[s] = pSampleData[(block * (blockSize * 2)) + (s * 2)];
+                outputR[s] = pSampleData[(block * (blockSize * 2)) + (s * 2) + 1];
+            }
+            else
+            {
+                outputL[s] = pSampleData[(block * blockSize) + s];
+                outputR[s] = outputL[s];
+            }
+        }
+
+        fx->processBlock(outputL, outputR);
+
+        for (size_t sample_index = 0; sample_index < blockSize; sample_index++)
+        {
+            outputSamples[(block * (blockSize * 2)) + (sample_index * 2)] = outputL[sample_index];
+            outputSamples[(block * (blockSize * 2)) + (sample_index * 2) + 1] =
+                outputR[sample_index];
+
+            sample_count++;
+        }
+    }
+
+    int err;
+    if (err = writeOutfile(arg.outfileName, sampleRate, sample_count, outputSamples)) return err;
+
+    if (!arg.datfileName.empty() && (err = writeDatfile(arg.datfileName, sample_count, outputSamples)))
+        return err;
+
+    if (arg.launchGnuplot)
+        launchGnuplot(arg.datfileName);
+
+    delete[] outputSamples;
+
+    return 0;
+}
+
 int main(int argc, char const *argv[])
 {
     /*
@@ -349,14 +446,24 @@ int main(int argc, char const *argv[])
     }
 
     std::vector<std::string> types;
-#define ADDTYPE(key, cls)                                                                          \
+#define ADD_VFX_TYPE(key, cls)                                                                          \
     {                                                                                              \
         types.push_back(std::string(key) + " -> " + #cls);                                         \
         if (fxType == std::string(key))                                                            \
-            return exampleHarness<sst::voice_effects::cls<SSTFX::FxConfig>>(arg);                  \
+            return voiceEffectExampleHarness<sst::voice_effects::cls<SSTFX::FxConfig>>(arg);                  \
     }
-    ADDTYPE("volpan", utilities::VolumeAndPan);
-    ADDTYPE("bitcrush", distortion::BitCrusher);
+#define ADD_FX_TYPE(key, cls)                                                                          \
+    {                                                                                              \
+        types.push_back(std::string(key) + " -> " + #cls);                                         \
+        if (fxType == std::string(key))                                                            \
+            return effectExampleHarness<sst::effects::cls<ConcreteConfig>>(arg);                  \
+    }
+    ADD_VFX_TYPE("volpan", utilities::VolumeAndPan);
+    ADD_VFX_TYPE("bitcrush", distortion::BitCrusher);
+    
+    ADD_FX_TYPE("reverb2", reverb2::Reverb2);
+    ADD_FX_TYPE("floaty", floatydelay::FloatyDelay);
+    ADD_FX_TYPE("bonsai", bonsai::Bonsai);
 
     // If we get kere no keys matched
     std::cout << "Unable to find fx '" << fxType << "'. Available options are :\n";
