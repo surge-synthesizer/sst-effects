@@ -97,7 +97,7 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
 
     void setCoeffs()
     {
-        float slope = std::clamp(this->getFloatParam(fpTilt), -6, 6) / 2;
+        float slope = std::clamp(this->getFloatParam(fpTilt), -6.f, 6.f) / 2.f;
         float posGain = this->dbToLinear(slope);
         float negGain = this->dbToLinear(-1 * slope);
         float res = .07f;
