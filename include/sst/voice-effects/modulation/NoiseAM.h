@@ -111,7 +111,7 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
 
     void setCoeffs()
     {
-        float slope = std::clamp(this->getFloatParam(fpTilt), -6, 6) / 2;
+        float slope = clamp(this->getFloatParam(fpTilt), -6, 6) / 2;
         float posGain = this->dbToLinear(slope);
         float negGain = this->dbToLinear(-1 * slope);
         float res = .07f;
