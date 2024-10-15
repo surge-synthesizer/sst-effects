@@ -106,11 +106,6 @@ if (${SST_EFFECTS_BUILD_TESTS})
         target_link_libraries(voice-effect-example PUBLIC dr_libs CLI11::CLI11 simde sst-basic-blocks sst-filters sst-waveshapers fmt ${PROJECT_NAME})
         target_compile_definitions(voice-effect-example PUBLIC _USE_MATH_DEFINES=1)
         
-        add_executable(effect-example
-            examples/effect-example.cpp
-        )
-        target_link_libraries(effect-example PUBLIC dr_libs CLI11::CLI11 simde sst-basic-blocks sst-filters sst-waveshapers fmt ${PROJECT_NAME})
-        target_compile_definitions(effect-example PUBLIC _USE_MATH_DEFINES=1)
     endif()
 
 endif ()
