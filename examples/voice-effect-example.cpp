@@ -118,14 +118,108 @@ struct SSTFX
     SSTFX() { dbtlp.init(); }
 };
 
+struct ConcreteConfig
+{
+    struct BC
+    {
+        static constexpr uint16_t maxParamCount{20};
+        float paramStorage[maxParamCount];
+        template <typename... Types> BC(Types...) {}
+    };
+    struct GS
+    {
+        double sampleRate;
+        DbToLinearProvider dbtlp;
+        // It is painful that sst-filters makes us over-adapt
+        // this class
+        GS(double sr) : sampleRate(sr) {
+          dbtlp.init();
+        }
+    };
+    struct ES
+    {
+    };
+    using BaseClass = BC;
+    using GlobalStorage = GS;
+    using EffectStorage = ES;
+    using ValueStorage = float *;
+    using BiquadAdapter = ConcreteConfig;
+
+    static constexpr int blockSize{16};
+
+    static inline float floatValueAt(const BaseClass *const e, const ValueStorage *const v, int idx)
+    {
+        return e->paramStorage[idx];
+    }
+    static inline int intValueAt(const BaseClass *const e, const ValueStorage *const v, int idx)
+    {
+        return (int)std::round(e->paramStorage[idx]);
+    }
+    static inline float envelopeRateLinear(GlobalStorage *s, float f)
+    {
+        return 1.f * blockSize / (s->sampleRate) * pow(-2, f);
+    }
+    static inline float temposyncRatio(GlobalStorage *s, EffectStorage *e, int idx) { return 1; }
+    static inline bool isDeactivated(EffectStorage *e, int idx) { return false; }
+    static inline bool isExtended(EffectStorage *e, int idx) { return false; }
+    static inline float rand01(GlobalStorage *s) { return (float)rand() / (float)RAND_MAX; }
+    static inline double sampleRate(GlobalStorage *s) { return s->sampleRate; }
+    static inline double sampleRateInv(GlobalStorage *s) { return 1.0 / s->sampleRate; }
+    static inline float noteToPitch(GlobalStorage *s, float p) { return pow(2.0, p / 12); }
+    static inline float noteToPitchIgnoringTuning(GlobalStorage *s, float p) { return noteToPitch(s, p); }
+    static inline float noteToPitchInv(GlobalStorage *s, float p) { return 1.0 / noteToPitch(s, p); }
+    static inline float dbToLinear(GlobalStorage *s, float f) { return s->dbtlp.dbToLinear(f); }
+};
+
+int writeOutfile(std::string filename, int sampleRate, uint32_t sample_count, float* samples)
+{
+    drwav wav;
+    drwav_data_format format;
+    format.container = drwav_container_riff;
+    format.format = DR_WAVE_FORMAT_IEEE_FLOAT;
+    format.channels = 2;
+    format.sampleRate = sampleRate;
+    format.bitsPerSample = 32;
+    std::cout << "Writing " << sample_count << " r=" << sampleRate << " sample wav file to "
+              << filename << std::endl;
+    if (!drwav_init_file_write(&wav, filename.c_str(), &format, nullptr))
+    {
+        std::cout << "Cannot init file write the outfile" << std::endl;
+        return 3;
+    }
+    drwav_uint64 framesWritten = drwav_write_pcm_frames(&wav, sample_count, samples);
+    drwav_uninit(&wav);
+    return 0;
+}
+
+int writeDatfile(std::string filename, uint32_t sample_count, float* samples)
+{
+    FILE *datFile = fopen(filename.c_str(), "w");
+    
+    if (!datFile)
+    {
+        std::cout << "Datfile not open at '" << filename << "'" << std::endl;
+        return 4;
+    } else {
+        for (size_t s = 0; s < sample_count; s++) {
+            fprintf(datFile, "%d %f %f\n", s, samples[s * 2], samples[s * 2 + 1]);
+        }
+        fclose(datFile);
+    }
+    return 0;
+}
+
+void launchGnuplot(std::string filename)
+{
+    auto cmd = fmt::format("gnuplot -p -e \"plot '{}' using 1:2 with lines, '' using "
+                           "1:3 with lines;pause mouse close\"",
+                           filename);
+    std::cout << "Launching " << cmd << std::endl;
+    system(cmd.c_str());
+}
+
 template <typename FXT> int exampleHarness(const CLIArgBundle &arg)
 {
-    if (arg.launchGnuplot && arg.datfileName.empty())
-    {
-        std::cout << "To launch gnuplot you need to specify a datfile with -d" << std::endl;
-        return 2;
-    }
-
     unsigned int channels;
     unsigned int sampleRate;
     drwav_uint64 totalPCMFrameCount;
@@ -174,18 +268,6 @@ template <typename FXT> int exampleHarness(const CLIArgBundle &arg)
     // FIXME - there are tails on effects and we need a way to specify how many sapmle tails
     auto outputSamples = new float[totalPCMFrameCount * 2];
 
-    FILE *datFile{nullptr};
-    if (!arg.datfileName.empty())
-    {
-        datFile = fopen(arg.datfileName.c_str(), "w");
-
-        if (!datFile)
-        {
-            std::cout << "Datfile not open at '" << arg.datfileName << "'" << std::endl;
-            return 4;
-        }
-    }
-
     for (size_t block = 0; block < total_blocks; block++)
     {
         float inputL[blockSize];
@@ -216,43 +298,21 @@ template <typename FXT> int exampleHarness(const CLIArgBundle &arg)
             outputSamples[(block * (blockSize * 2)) + (sample_index * 2) + 1] =
                 outputR[sample_index];
 
-            if (datFile)
-            {
-                fprintf(datFile, "%d %f %f\n", sample_count, inputL[sample_index],
-                        outputL[sample_index]);
-            }
             sample_count++;
         }
     }
-    fclose(datFile);
 
-    drwav wav;
-    drwav_data_format format;
-    format.container = drwav_container_riff;
-    format.format = DR_WAVE_FORMAT_IEEE_FLOAT;
-    format.channels = 2;
-    format.sampleRate = sampleRate;
-    format.bitsPerSample = 32;
-    std::cout << "Writing " << sample_count << " r=" << sampleRate << " sample wav file to "
-              << arg.outfileName << std::endl;
-    if (!drwav_init_file_write(&wav, arg.outfileName.c_str(), &format, nullptr))
-    {
-        std::cout << "Cannot init file write the outfile" << std::endl;
-        return 3;
-    }
-    drwav_uint64 framesWritten = drwav_write_pcm_frames(&wav, sample_count, outputSamples);
-    drwav_uninit(&wav);
+    int err;
+    if (err = writeOutfile(arg.outfileName, sampleRate, sample_count, outputSamples)) return err;
+
+    if (!arg.datfileName.empty() && (err = writeDatfile(arg.datfileName, sample_count, outputSamples)))
+        return err;
+
+    if (arg.launchGnuplot)
+        launchGnuplot(arg.datfileName);
 
     delete[] outputSamples;
 
-    if (arg.launchGnuplot)
-    {
-        auto cmd = fmt::format("gnuplot -p -e \"plot '{}' using 1:2 with lines, '' using "
-                               "1:3 with lines\"",
-                               arg.datfileName);
-        std::cout << "Launching " << cmd << std::endl;
-        system(cmd.c_str());
-    }
     return 0;
 }
 
@@ -281,6 +341,12 @@ int main(int argc, char const *argv[])
     // - Add a ringout option
 
     CLI11_PARSE(app, argc, argv);
+    
+    if (arg.launchGnuplot && arg.datfileName.empty())
+    {
+        std::cout << "To launch gnuplot you need to specify a datfile with -d" << std::endl;
+        return 2;
+    }
 
     std::vector<std::string> types;
 #define ADDTYPE(key, cls)                                                                          \
