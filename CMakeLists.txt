@@ -100,11 +100,11 @@ if (${SST_EFFECTS_BUILD_TESTS})
 
         endif ()
         
-        add_executable(voice-effect-example
-            examples/voice-effect-example.cpp
+        add_executable(CLIExample
+            examples/CLIExample.cpp
         )
-        target_link_libraries(voice-effect-example PUBLIC dr_libs CLI11::CLI11 simde sst-basic-blocks sst-filters sst-waveshapers fmt ${PROJECT_NAME})
-        target_compile_definitions(voice-effect-example PUBLIC _USE_MATH_DEFINES=1)
+        target_link_libraries(CLIExample PUBLIC dr_libs CLI11::CLI11 simde sst-basic-blocks sst-filters sst-waveshapers fmt ${PROJECT_NAME})
+        target_compile_definitions(CLIExample PUBLIC _USE_MATH_DEFINES=1)
         
     endif()
 
