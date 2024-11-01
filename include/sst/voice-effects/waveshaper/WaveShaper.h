@@ -150,21 +150,21 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
         float resa alignas(16)[4];
         for (auto i = 0U; i < VFXConfig::blockSize; ++i)
         {
-            auto mdrv = _mm_set1_ps(mDriveLerp.v);
+            auto mdrv = SIMD_MM(set1_ps)(mDriveLerp.v);
 
-            __m128 val;
+            SIMD_M128 val;
 
             if constexpr (stereo)
             {
-                val = _mm_set_ps(0.f, 0.f, datainR[i] + mBiasLerp.v, datainL[i] + mBiasLerp.v);
+                val = SIMD_MM(set_ps)(0.f, 0.f, datainR[i] + mBiasLerp.v, datainL[i] + mBiasLerp.v);
             }
             else
             {
-                val = _mm_set_ps(0.f, 0.f, 0.f, datainL[i] + mBiasLerp.v);
+                val = SIMD_MM(set_ps)(0.f, 0.f, 0.f, datainL[i] + mBiasLerp.v);
             }
             auto res = mWSOp(&mWss, val, mdrv);
-            res = _mm_mul_ps(res, _mm_set1_ps(mGainLerp.v));
-            _mm_store_ps(resa, res);
+            res = SIMD_MM(mul_ps)(res, SIMD_MM(set1_ps)(mGainLerp.v));
+            SIMD_MM(store_ps)(resa, res);
             dataoutL[i] = resa[0];
             if constexpr (stereo)
             {
@@ -294,9 +294,9 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
             sst::waveshapers::initializeWaveshaperRegister(mWSType, R);
             for (int i = 0; i < sst::waveshapers::n_waveshaper_registers; ++i)
             {
-                mWss.R[i] = _mm_set1_ps(R[i]);
+                mWss.R[i] = SIMD_MM(set1_ps)(R[i]);
             }
-            mWss.init = _mm_cmpeq_ps(_mm_setzero_ps(), _mm_setzero_ps());
+            mWss.init = SIMD_MM(cmpeq_ps)(SIMD_MM(setzero_ps)(), SIMD_MM(setzero_ps)());
             mWSOp = sst::waveshapers::GetQuadWaveshaper(mWSType);
         }
     }

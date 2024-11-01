@@ -239,13 +239,13 @@ inline void Reverb1<FXConfig>::processBlock(float *__restrict dataL, float *__re
                  this->noteToPitchIgnoringTuning(12 * this->floatValue(rev1_predelay)) *
                  this->temposyncRatio(rev1_predelay);
 
-    const __m128 one4 = _mm_set1_ps(1.f);
+    const auto one4 = SIMD_MM(set1_ps)(1.f);
     float dv = this->floatValue(rev1_damping);
 
     dv = std::clamp(dv, 0.01f, 0.99f); // this is a simple one-pole damper, w * y[n] + ( 1-w )
                                        // y[n-1] so to be stable has to stay in range
-    __m128 damp4 = _mm_load1_ps(&dv);
-    __m128 damp4m1 = _mm_sub_ps(one4, damp4);
+    auto damp4 = SIMD_MM(load1_ps)(&dv);
+    auto damp4m1 = SIMD_MM(sub_ps)(one4, damp4);
 
     for (int k = 0; k < FXConfig::blockSize; k++)
     {
@@ -253,57 +253,62 @@ inline void Reverb1<FXConfig>::processBlock(float *__restrict dataL, float *__re
         {
             int dp = (delay_pos - (delay_time[t] >> 8));
             // float newa = delay[t + ((dp & (max_rev_dly-1))<<rev_tap_bits)];
-            __m128 newa = _mm_load_ss(&delay[t + ((dp & (max_rev_dly - 1)) << rev_tap_bits)]);
+            auto newa = SIMD_MM(load_ss)(&delay[t + ((dp & (max_rev_dly - 1)) << rev_tap_bits)]);
             dp = (delay_pos - (delay_time[t + 1] >> 8));
-            __m128 newb = _mm_load_ss(&delay[t + 1 + ((dp & (max_rev_dly - 1)) << rev_tap_bits)]);
+            auto newb =
+                SIMD_MM(load_ss)(&delay[t + 1 + ((dp & (max_rev_dly - 1)) << rev_tap_bits)]);
             dp = (delay_pos - (delay_time[t + 2] >> 8));
-            newa = _mm_unpacklo_ps(newa, newb); // a,b,0,0
-            __m128 newc = _mm_load_ss(&delay[t + 2 + ((dp & (max_rev_dly - 1)) << rev_tap_bits)]);
+            newa = SIMD_MM(unpacklo_ps)(newa, newb); // a,b,0,0
+            auto newc =
+                SIMD_MM(load_ss)(&delay[t + 2 + ((dp & (max_rev_dly - 1)) << rev_tap_bits)]);
             dp = (delay_pos - (delay_time[t + 3] >> 8));
-            __m128 newd = _mm_load_ss(&delay[t + 3 + ((dp & (max_rev_dly - 1)) << rev_tap_bits)]);
-            newc = _mm_unpacklo_ps(newc, newd);      // c,d,0,0
-            __m128 new4 = _mm_movelh_ps(newa, newc); // a,b,c,d
+            auto newd =
+                SIMD_MM(load_ss)(&delay[t + 3 + ((dp & (max_rev_dly - 1)) << rev_tap_bits)]);
+            newc = SIMD_MM(unpacklo_ps)(newc, newd);    // c,d,0,0
+            auto new4 = SIMD_MM(movelh_ps)(newa, newc); // a,b,c,d
 
-            __m128 out_tap4 = _mm_load_ps(&out_tap[t]);
-            out_tap4 = _mm_add_ps(_mm_mul_ps(out_tap4, damp4), _mm_mul_ps(new4, damp4m1));
-            _mm_store_ps(&out_tap[t], out_tap4);
+            auto out_tap4 = SIMD_MM(load_ps)(&out_tap[t]);
+            out_tap4 =
+                SIMD_MM(add_ps)(SIMD_MM(mul_ps)(out_tap4, damp4), SIMD_MM(mul_ps)(new4, damp4m1));
+            SIMD_MM(store_ps)(&out_tap[t], out_tap4);
             // out_tap[t] = this->floatValue(rev1_damping]*out_tap[t) + (1-
             // this->floatValue(rev1_damping))*newa;
         }
 
-        __m128 fb = _mm_add_ps(_mm_add_ps(_mm_load_ps(out_tap), _mm_load_ps(out_tap + 4)),
-                               _mm_add_ps(_mm_load_ps(out_tap + 8), _mm_load_ps(out_tap + 12)));
+        auto fb = SIMD_MM(add_ps)(
+            SIMD_MM(add_ps)(SIMD_MM(load_ps)(out_tap), SIMD_MM(load_ps)(out_tap + 4)),
+            SIMD_MM(add_ps)(SIMD_MM(load_ps)(out_tap + 8), SIMD_MM(load_ps)(out_tap + 12)));
         fb = mech::sum_ps_to_ss(fb);
         /*pd_floator(int t=0; t<rev_taps; t+=4)
         {
                 fb += out_tap[t] + out_tap[t+1] + out_tap[t+2] + out_tap[t+3];
         }*/
 
-        const __m128 ca = _mm_set_ss(((float)(-(2.f) / rev_taps)));
+        const auto ca = SIMD_MM(set_ss)(((float)(-(2.f) / rev_taps)));
         // fb =  ca * fb + predelay[(delay_pos - pdtime)&(max_rev_dly-1)];
-        fb = _mm_add_ss(_mm_mul_ss(ca, fb),
-                        _mm_load_ss(&predelay[(delay_pos - pdtime) & (max_rev_dly - 1)]));
+        fb = SIMD_MM(add_ss)(SIMD_MM(mul_ss)(ca, fb),
+                             SIMD_MM(load_ss)(&predelay[(delay_pos - pdtime) & (max_rev_dly - 1)]));
 
         delay_pos = (delay_pos + 1) & (max_rev_dly - 1);
 
         predelay[delay_pos] = 0.5f * (dataL[k] + dataR[k]);
-        //__m128 fb4 = _mm_load1_ps(&fb);
-        __m128 fb4 = _mm_shuffle_ps(fb, fb, 0);
+        // auto fb4 = SIMD_MM(load1_ps)(&fb);
+        auto fb4 = SIMD_MM(shuffle_ps)(fb, fb, 0);
 
-        __m128 L = _mm_setzero_ps(), R = _mm_setzero_ps();
+        auto L = SIMD_MM(setzero_ps)(), R = SIMD_MM(setzero_ps)();
         for (int t = 0; t < rev_taps; t += 4)
         {
-            __m128 ot = _mm_load_ps(&out_tap[t]);
-            __m128 dfb = _mm_load_ps(&delay_fb[t]);
-            __m128 a = _mm_mul_ps(dfb, _mm_add_ps(fb4, ot));
-            _mm_store_ps(&delay[(delay_pos << rev_tap_bits) + t], a);
-            L = _mm_add_ps(L, _mm_mul_ps(ot, _mm_load_ps(&delay_pan_L[t])));
-            R = _mm_add_ps(R, _mm_mul_ps(ot, _mm_load_ps(&delay_pan_R[t])));
+            auto ot = SIMD_MM(load_ps)(&out_tap[t]);
+            auto dfb = SIMD_MM(load_ps)(&delay_fb[t]);
+            auto a = SIMD_MM(mul_ps)(dfb, SIMD_MM(add_ps)(fb4, ot));
+            SIMD_MM(store_ps)(&delay[(delay_pos << rev_tap_bits) + t], a);
+            L = SIMD_MM(add_ps)(L, SIMD_MM(mul_ps)(ot, SIMD_MM(load_ps)(&delay_pan_L[t])));
+            R = SIMD_MM(add_ps)(R, SIMD_MM(mul_ps)(ot, SIMD_MM(load_ps)(&delay_pan_R[t])));
         }
         L = mech::sum_ps_to_ss(L);
         R = mech::sum_ps_to_ss(R);
-        _mm_store_ss(&wetL[k], L);
-        _mm_store_ss(&wetR[k], R);
+        SIMD_MM(store_ss)(&wetL[k], L);
+        SIMD_MM(store_ss)(&wetR[k], R);
     }
 
     if (!this->isDeactivated(rev1_lowcut))

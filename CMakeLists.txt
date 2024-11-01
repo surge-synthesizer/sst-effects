@@ -18,6 +18,15 @@ if (${SST_EFFECTS_BUILD_TESTS})
     message(STATUS "Building tests")
     include(cmake/CPM.cmake)
 
+    if (NOT TARGET simde)
+        CPMAddPackage(NAME simde
+                GITHUB_REPOSITORY simd-everywhere/simde
+                VERSION 0.7.2
+        )
+        add_library(simde INTERFACE)
+        target_include_directories(simde INTERFACE ${simde_SOURCE_DIR})
+    endif ()
+
     if (NOT TARGET sst-basic-blocks)
         CPMAddPackage(NAME sst-basic-blocks
                 GITHUB_REPOSITORY surge-synthesizer/sst-basic-blocks
@@ -53,14 +62,6 @@ if (${SST_EFFECTS_BUILD_TESTS})
         )
     endif ()
 
-    if (NOT TARGET simde)
-        CPMAddPackage(NAME simde
-                GITHUB_REPOSITORY simd-everywhere/simde
-                VERSION 0.7.2
-        )
-        add_library(simde INTERFACE)
-        target_include_directories(simde INTERFACE ${simde_SOURCE_DIR})
-    endif ()
 
     add_executable(${PROJECT_NAME}-test
             tests/sst-effects-test.cpp

@@ -75,7 +75,7 @@ template <typename VFXConfig> struct TiltEQ : core::VoiceEffectTemplateBase<VFXC
     {
         float freq = 440 * this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpFreq));
         float slope = std::clamp(this->getFloatParam(fpTilt), -18.f, 18.f) / 2.f;
-        
+
         float posGain = this->dbToLinear(slope);
         float negGain = this->dbToLinear(-1 * slope);
         float res = .07f;

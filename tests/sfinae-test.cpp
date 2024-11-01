@@ -21,7 +21,8 @@
 #include <memory>
 #include <type_traits>
 #include "catch2.hpp"
-#include "simd-test-include.h"
+
+#include "sst/basic-blocks/simd/setup.h"
 
 #include "sst/effects/EffectCore.h"
 

@@ -30,7 +30,7 @@
 
 #define DR_WAV_IMPLEMENTATION
 #include "dr_wav.h"
-#include "../tests/simd-test-include.h"
+#include "sst/basic-blocks/simd/setup.h"
 #include "sst/voice-effects/distortion/BitCrusher.h"
 #include "sst/voice-effects/utilities/VolumeAndPan.h"
 #include "sst/voice-effects/dynamics/Compressor.h"
@@ -136,9 +136,7 @@ struct ConcreteConfig
         DbToLinearProvider dbtlp;
         // It is painful that sst-filters makes us over-adapt
         // this class
-        GS(double sr) : sampleRate(sr) {
-          dbtlp.init();
-        }
+        GS(double sr) : sampleRate(sr) { dbtlp.init(); }
     };
     struct ES
     {
@@ -170,12 +168,18 @@ struct ConcreteConfig
     static inline double sampleRate(GlobalStorage *s) { return s->sampleRate; }
     static inline double sampleRateInv(GlobalStorage *s) { return 1.0 / s->sampleRate; }
     static inline float noteToPitch(GlobalStorage *s, float p) { return pow(2.0, p / 12); }
-    static inline float noteToPitchIgnoringTuning(GlobalStorage *s, float p) { return noteToPitch(s, p); }
-    static inline float noteToPitchInv(GlobalStorage *s, float p) { return 1.0 / noteToPitch(s, p); }
+    static inline float noteToPitchIgnoringTuning(GlobalStorage *s, float p)
+    {
+        return noteToPitch(s, p);
+    }
+    static inline float noteToPitchInv(GlobalStorage *s, float p)
+    {
+        return 1.0 / noteToPitch(s, p);
+    }
     static inline float dbToLinear(GlobalStorage *s, float f) { return s->dbtlp.dbToLinear(f); }
 };
 
-int writeOutfile(std::string filename, int sampleRate, uint32_t sample_count, float* samples)
+int writeOutfile(std::string filename, int sampleRate, uint32_t sample_count, float *samples)
 {
     drwav wav;
     drwav_data_format format;
@@ -196,16 +200,19 @@ int writeOutfile(std::string filename, int sampleRate, uint32_t sample_count, fl
     return 0;
 }
 
-int writeDatfile(std::string filename, uint32_t sample_count, float* samples)
+int writeDatfile(std::string filename, uint32_t sample_count, float *samples)
 {
     FILE *datFile = fopen(filename.c_str(), "w");
-    
+
     if (!datFile)
     {
         std::cout << "Datfile not open at '" << filename << "'" << std::endl;
         return 4;
-    } else {
-        for (size_t s = 0; s < sample_count; s++) {
+    }
+    else
+    {
+        for (size_t s = 0; s < sample_count; s++)
+        {
             fprintf(datFile, "%d %f %f\n", s, samples[s * 2], samples[s * 2 + 1]);
         }
         fclose(datFile);
@@ -307,9 +314,11 @@ template <typename FXT> int voiceEffectExampleHarness(const CLIArgBundle &arg)
     }
 
     int err;
-    if (err = writeOutfile(arg.outfileName, sampleRate, sample_count, outputSamples)) return err;
+    if (err = writeOutfile(arg.outfileName, sampleRate, sample_count, outputSamples))
+        return err;
 
-    if (!arg.datfileName.empty() && (err = writeDatfile(arg.datfileName, sample_count, outputSamples)))
+    if (!arg.datfileName.empty() &&
+        (err = writeDatfile(arg.datfileName, sample_count, outputSamples)))
         return err;
 
     if (arg.launchGnuplot)
@@ -348,7 +357,7 @@ template <typename FXT> int effectExampleHarness(const CLIArgBundle &arg)
 
     auto fx = std::make_unique<FXT>(&gs, &es, nullptr);
     for (int i = 0; i < FXT::numParams; ++i)
-      fx->paramStorage[i] = fx->paramAt(i).defaultVal;
+        fx->paramStorage[i] = fx->paramAt(i).defaultVal;
 
     int ai{0};
     for (const auto &f : arg.fArgs)
@@ -400,9 +409,11 @@ template <typename FXT> int effectExampleHarness(const CLIArgBundle &arg)
     }
 
     int err;
-    if (err = writeOutfile(arg.outfileName, sampleRate, sample_count, outputSamples)) return err;
+    if (err = writeOutfile(arg.outfileName, sampleRate, sample_count, outputSamples))
+        return err;
 
-    if (!arg.datfileName.empty() && (err = writeDatfile(arg.datfileName, sample_count, outputSamples)))
+    if (!arg.datfileName.empty() &&
+        (err = writeDatfile(arg.datfileName, sample_count, outputSamples)))
         return err;
 
     if (arg.launchGnuplot)
@@ -438,7 +449,7 @@ int main(int argc, char const *argv[])
     // - Add a ringout option
 
     CLI11_PARSE(app, argc, argv);
-    
+
     if (arg.launchGnuplot && arg.datfileName.empty())
     {
         std::cout << "To launch gnuplot you need to specify a datfile with -d" << std::endl;
@@ -446,21 +457,21 @@ int main(int argc, char const *argv[])
     }
 
     std::vector<std::string> types;
-#define ADD_VFX_TYPE(key, cls)                                                                          \
+#define ADD_VFX_TYPE(key, cls)                                                                     \
     {                                                                                              \
         types.push_back(std::string(key) + " -> " + #cls);                                         \
         if (fxType == std::string(key))                                                            \
-            return voiceEffectExampleHarness<sst::voice_effects::cls<SSTFX::FxConfig>>(arg);                  \
+            return voiceEffectExampleHarness<sst::voice_effects::cls<SSTFX::FxConfig>>(arg);       \
     }
-#define ADD_FX_TYPE(key, cls)                                                                          \
+#define ADD_FX_TYPE(key, cls)                                                                      \
     {                                                                                              \
         types.push_back(std::string(key) + " -> " + #cls);                                         \
         if (fxType == std::string(key))                                                            \
-            return effectExampleHarness<sst::effects::cls<ConcreteConfig>>(arg);                  \
+            return effectExampleHarness<sst::effects::cls<ConcreteConfig>>(arg);                   \
     }
     ADD_VFX_TYPE("volpan", utilities::VolumeAndPan);
     ADD_VFX_TYPE("bitcrush", distortion::BitCrusher);
-    
+
     ADD_FX_TYPE("reverb2", reverb2::Reverb2);
     ADD_FX_TYPE("floaty", floatydelay::FloatyDelay);
     ADD_FX_TYPE("bonsai", bonsai::Bonsai);

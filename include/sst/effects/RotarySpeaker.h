@@ -183,7 +183,7 @@ template <typename FXConfig> inline void RotarySpeaker<FXConfig>::setvars(bool i
         mix.instantize();
 
         for (int i = 0; i < sst::waveshapers::n_waveshaper_registers; ++i)
-            wsState.R[i] = _mm_setzero_ps();
+            wsState.R[i] = SIMD_MM(setzero_ps)();
     }
 }
 
@@ -337,10 +337,10 @@ inline void RotarySpeaker<FXConfig>::processBlock(float *__restrict dataL, float
             drive_factor = 1.f + (drive.v * drive.v * 15.f);
             if (useSSEShaper)
             {
-                auto inp = _mm_set1_ps(0.5 * (dataL[k] + dataR[k]));
-                auto wsres = wsop(&wsState, inp, _mm_set1_ps(drive_factor));
+                auto inp = SIMD_MM(set1_ps)(0.5 * (dataL[k] + dataR[k]));
+                auto wsres = wsop(&wsState, inp, SIMD_MM(set1_ps)(drive_factor));
                 float r[4];
-                _mm_store_ps(r, wsres);
+                SIMD_MM(store_ps)(r, wsres);
                 input = r[0] * gain_tweak;
             }
             else

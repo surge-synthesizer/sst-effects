@@ -19,7 +19,7 @@
  */
 
 #include "catch2.hpp"
-#include "simd-test-include.h"
+#include "sst/basic-blocks/simd/setup.h"
 
 #include "sst/voice-effects/distortion/BitCrusher.h"
 #include "sst/voice-effects/delay/Microgate.h"
@@ -190,7 +190,10 @@ TEST_CASE("Can Create Voice FX")
     {
         VTester<sst::voice_effects::generator::TiltNoise<VTestConfig>>::TestVFX();
     }
-    SECTION("Noise AM") { VTester<sst::voice_effects::modulation::NoiseAM<VTestConfig>>::TestVFX(); }
+    SECTION("Noise AM")
+    {
+        VTester<sst::voice_effects::modulation::NoiseAM<VTestConfig>>::TestVFX();
+    }
     SECTION("VolumeAndPan")
     {
         VTester<sst::voice_effects::utilities::VolumeAndPan<VTestConfig>>::TestVFX();
