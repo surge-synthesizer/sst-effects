@@ -154,8 +154,8 @@ template <typename VFXConfig> struct SSTFilters : core::VoiceEffectTemplateBase<
 
     void resetFilter(bool stereo)
     {
-        std::fill(qfus.R, &qfus.R[sst::filters::n_filter_registers], _mm_setzero_ps());
-        std::fill(qfus.C, &qfus.C[sst::filters::n_cm_coeffs], _mm_setzero_ps());
+        std::fill(qfus.R, &qfus.R[sst::filters::n_filter_registers], SIMD_MM(setzero_ps)());
+        std::fill(qfus.C, &qfus.C[sst::filters::n_cm_coeffs], SIMD_MM(setzero_ps)());
 
         auto type = (sst::filters::FilterType)this->getIntParam(ipType);
 
@@ -224,7 +224,7 @@ template <typename VFXConfig> struct SSTFilters : core::VoiceEffectTemplateBase<
         for (int f = 0; f < sst::filters::n_cm_coeffs; ++f)
         {
             float res alignas(16)[4];
-            _mm_store_ps(res, qfus.C[f]);
+            SIMD_MM(store_ps)(res, qfus.C[f]);
             coefMaker.C[f] = res[0];
         }
 
@@ -252,9 +252,9 @@ template <typename VFXConfig> struct SSTFilters : core::VoiceEffectTemplateBase<
                 r[2] = 0.f;
                 r[3] = 0.f;
 
-                auto resS = filterUnitPtr(&qfus, _mm_load_ps(r));
+                auto resS = filterUnitPtr(&qfus, SIMD_MM(load_ps)(r));
                 float res alignas(16)[4];
-                _mm_store_ps(res, resS);
+                SIMD_MM(store_ps)(res, resS);
                 dataoutL[i] = res[0];
                 dataoutR[i] = res[1];
             }
@@ -280,9 +280,9 @@ template <typename VFXConfig> struct SSTFilters : core::VoiceEffectTemplateBase<
                 r[2] = 0.f;
                 r[3] = 0.f;
 
-                auto resS = filterUnitPtr(&qfus, _mm_load_ps(r));
+                auto resS = filterUnitPtr(&qfus, SIMD_MM(load_ps)(r));
                 float res alignas(16)[4];
-                _mm_store_ps(res, resS);
+                SIMD_MM(store_ps)(res, resS);
                 dataoutL[i] = res[0];
             }
         }

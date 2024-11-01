@@ -148,21 +148,21 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
         if (phase > M_PI)
             phase -= 2 * M_PI;
 
-        const auto half = _mm_set1_ps(0.5f);
+        const auto half = SIMD_MM(set1_ps)(0.5f);
         for (int k = 0; k < bs2; k += 4)
         {
-            auto ph = _mm_load_ps(phVals + k);
-            auto s0 = _mm_load_ps(OS[0] + k);
-            auto s1 = _mm_load_ps(OS[1] + k);
-            auto w0 = sdsp::clampToPiRangeSSE(_mm_add_ps(s0, ph));
-            auto w1 = sdsp::clampToPiRangeSSE(_mm_add_ps(s1, ph));
+            auto ph = SIMD_MM(load_ps)(phVals + k);
+            auto s0 = SIMD_MM(load_ps)(OS[0] + k);
+            auto s1 = SIMD_MM(load_ps)(OS[1] + k);
+            auto w0 = sdsp::clampToPiRangeSSE(SIMD_MM(add_ps)(s0, ph));
+            auto w1 = sdsp::clampToPiRangeSSE(SIMD_MM(add_ps)(s1, ph));
             ph = sdsp::clampToPiRangeSSE(ph);
             auto sph = sdsp::fastsinSSE(ph);
 
-            auto r0 = _mm_mul_ps(half, _mm_sub_ps(sdsp::fastsinSSE(w0), sph));
-            auto r1 = _mm_mul_ps(half, _mm_sub_ps(sdsp::fastsinSSE(w1), sph));
-            _mm_store_ps(OS[0] + k, r0);
-            _mm_store_ps(OS[1] + k, r1);
+            auto r0 = SIMD_MM(mul_ps)(half, SIMD_MM(sub_ps)(sdsp::fastsinSSE(w0), sph));
+            auto r1 = SIMD_MM(mul_ps)(half, SIMD_MM(sub_ps)(sdsp::fastsinSSE(w1), sph));
+            SIMD_MM(store_ps)(OS[0] + k, r0);
+            SIMD_MM(store_ps)(OS[1] + k, r1);
         }
 
         post.process_block_D2(OS[0], OS[1], bs2, dataoutL, dataoutR);
@@ -200,17 +200,17 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
         if (phase > M_PI)
             phase -= 2 * M_PI;
 
-        const auto half = _mm_set1_ps(0.5f);
+        const auto half = SIMD_MM(set1_ps)(0.5f);
         for (int k = 0; k < bs2; k += 4)
         {
-            auto ph = _mm_load_ps(phVals + k);
-            auto s0 = _mm_load_ps(OS[0] + k);
-            auto w0 = sdsp::clampToPiRangeSSE(_mm_add_ps(s0, ph));
+            auto ph = SIMD_MM(load_ps)(phVals + k);
+            auto s0 = SIMD_MM(load_ps)(OS[0] + k);
+            auto w0 = sdsp::clampToPiRangeSSE(SIMD_MM(add_ps)(s0, ph));
             ph = sdsp::clampToPiRangeSSE(ph);
             auto sph = sdsp::fastsinSSE(ph);
 
-            auto r0 = _mm_mul_ps(half, _mm_sub_ps(sdsp::fastsinSSE(w0), sph));
-            _mm_store_ps(OS[0] + k, r0);
+            auto r0 = SIMD_MM(mul_ps)(half, SIMD_MM(sub_ps)(sdsp::fastsinSSE(w0), sph));
+            SIMD_MM(store_ps)(OS[0] + k, r0);
         }
 
         post.process_block_D2(OS[0], OS[0], bs2, dataoutL, 0);

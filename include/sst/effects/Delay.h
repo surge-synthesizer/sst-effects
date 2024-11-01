@@ -342,22 +342,24 @@ template <typename FXConfig> inline void Delay<FXConfig>::processBlock(float *da
                     std::clamp((int)(sincTable.FIRipol_M * (float(i_dtimeR + 1) - timeR.v)), 0,
                                sincTable.FIRipol_M - 1);
 
-        __m128 L, R;
-        L = _mm_mul_ps(_mm_load_ps(&sincTable.sinctable1X[sincL]), _mm_loadu_ps(&buffer[0][rpL]));
-        L = _mm_add_ps(L, _mm_mul_ps(_mm_load_ps(&sincTable.sinctable1X[sincL + 4]),
-                                     _mm_loadu_ps(&buffer[0][rpL + 4])));
-        L = _mm_add_ps(L, _mm_mul_ps(_mm_load_ps(&sincTable.sinctable1X[sincL + 8]),
-                                     _mm_loadu_ps(&buffer[0][rpL + 8])));
+        SIMD_M128 L, R;
+        L = SIMD_MM(mul_ps)(SIMD_MM(load_ps)(&sincTable.sinctable1X[sincL]),
+                            SIMD_MM(loadu_ps)(&buffer[0][rpL]));
+        L = SIMD_MM(add_ps)(L, SIMD_MM(mul_ps)(SIMD_MM(load_ps)(&sincTable.sinctable1X[sincL + 4]),
+                                               SIMD_MM(loadu_ps)(&buffer[0][rpL + 4])));
+        L = SIMD_MM(add_ps)(L, SIMD_MM(mul_ps)(SIMD_MM(load_ps)(&sincTable.sinctable1X[sincL + 8]),
+                                               SIMD_MM(loadu_ps)(&buffer[0][rpL + 8])));
         L = sst::basic_blocks::mechanics::sum_ps_to_ss(L);
-        R = _mm_mul_ps(_mm_load_ps(&sincTable.sinctable1X[sincR]), _mm_loadu_ps(&buffer[1][rpR]));
-        R = _mm_add_ps(R, _mm_mul_ps(_mm_load_ps(&sincTable.sinctable1X[sincR + 4]),
-                                     _mm_loadu_ps(&buffer[1][rpR + 4])));
-        R = _mm_add_ps(R, _mm_mul_ps(_mm_load_ps(&sincTable.sinctable1X[sincR + 8]),
-                                     _mm_loadu_ps(&buffer[1][rpR + 8])));
+        R = SIMD_MM(mul_ps)(SIMD_MM(load_ps)(&sincTable.sinctable1X[sincR]),
+                            SIMD_MM(loadu_ps)(&buffer[1][rpR]));
+        R = SIMD_MM(add_ps)(R, SIMD_MM(mul_ps)(SIMD_MM(load_ps)(&sincTable.sinctable1X[sincR + 4]),
+                                               SIMD_MM(loadu_ps)(&buffer[1][rpR + 4])));
+        R = SIMD_MM(add_ps)(R, SIMD_MM(mul_ps)(SIMD_MM(load_ps)(&sincTable.sinctable1X[sincR + 8]),
+                                               SIMD_MM(loadu_ps)(&buffer[1][rpR + 8])));
         R = sst::basic_blocks::mechanics::sum_ps_to_ss(R);
 
-        _mm_store_ss(&tbufferL[k], L);
-        _mm_store_ss(&tbufferR[k], R);
+        SIMD_MM(store_ss)(&tbufferL[k], L);
+        SIMD_MM(store_ss)(&tbufferR[k], R);
     }
 
     // negative feedback

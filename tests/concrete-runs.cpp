@@ -21,7 +21,7 @@
 #include <memory>
 
 #include "catch2.hpp"
-#include "simd-test-include.h"
+#include "sst/basic-blocks/simd/setup.h"
 
 #include "sst/effects/ConcreteConfig.h"
 
