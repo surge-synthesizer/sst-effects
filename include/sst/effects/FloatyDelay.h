@@ -131,7 +131,7 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
             return pmd().asPercent().withName("Filter Depth");
 
         case fld_HP_freq:
-            return pmd().asAudibleFrequency().withDefault(-60).withName("Highpass Cutoff");
+            return pmd().asAudibleFrequency().withDefault(-60).withName("Low Cut");
 
         case fld_mix:
             return pmd().withName("Mix").asPercent().withDefault(0.3f);
