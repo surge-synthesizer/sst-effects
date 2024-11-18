@@ -65,6 +65,7 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
         fld_warp_width,
         fld_pitch_warp_depth,
         fld_filt_warp_depth,
+        fld_HP_freq,
         fld_mix,
         fld_num_params,
     };
@@ -129,6 +130,9 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
         case fld_filt_warp_depth:
             return pmd().asPercent().withName("Filter Depth");
 
+        case fld_HP_freq:
+            return pmd().asAudibleFrequency().withDefault(-60).withName("Highpass Cutoff");
+
         case fld_mix:
             return pmd().withName("Mix").asPercent().withDefault(0.3f);
         }
@@ -159,6 +163,7 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
     sst::filters::CytomicSVF inputFilter;
     sst::filters::CytomicSVF feedbackFilter;
     sst::filters::CytomicSVF DCfilter;
+    sst::filters::CytomicSVF HPfilter;
 
     sst::basic_blocks::dsp::lipol_sse<FXConfig::blockSize, false> timeLerp, modLerpL, modLerpR,
         rateLerp, feedbackLerp, mixLerp;
@@ -177,8 +182,7 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
     }
 
     float readHeadMove{0};
-    int test{0};
-    float priorrate{1.f};
+    bool wasOne{true};
 };
 
 template <typename FXConfig> inline void FloatyDelay<FXConfig>::initialize()
@@ -189,6 +193,7 @@ template <typename FXConfig> inline void FloatyDelay<FXConfig>::initialize()
     DCfilter.init();
     DCfilter.template setCoeffForBlock<FXConfig::blockSize>(sst::filters::CytomicSVF::HP, 30.f, .5f,
                                                             sampleRateInv, 0.f);
+    HPfilter.init();
     timeLerp.instantize();
     modLerpL.instantize();
     modLerpR.instantize();
@@ -270,6 +275,10 @@ inline void FloatyDelay<FXConfig>::processBlock(float *dataL, float *dataR)
     float smooth{1.f};
     float smoothWindow = 256.f;
 
+    float HPfreq = 440 * this->noteToPitchIgnoringTuning(this->floatValue(fld_HP_freq));
+    HPfilter.template setCoeffForBlock<FXConfig::blockSize>(sst::filters::CytomicSVF::HP, HPfreq,
+                                                            .55f, sampleRateInv, 0.f);
+
     for (int i = 0; i < FXConfig::blockSize; i++)
     {
         auto absrate = std::fabs(playrate[i]);
@@ -306,18 +315,23 @@ inline void FloatyDelay<FXConfig>::processBlock(float *dataL, float *dataR)
         {
             smooth = 1.f; // no smoothing needed
 
-            if (readHeadMove > 1) // but delay time will be wrong
+            if (!wasOne)
             {
-                readHeadMove -= 1; // so wind the head back towards zero
+                if (readHeadMove > 1) // but delay time will be wrong
+                {
+                    readHeadMove -= 1; // so wind the head back towards zero
+                }
+                else if (readHeadMove < 1)
+                {
+                    readHeadMove += 1;
+                }
+                // (yeah yeah, not quite exactly zero maybe, but close enough)
+                wasOne = true;
             }
-            else if (readHeadMove < 1)
-            {
-                readHeadMove += 1;
-            }
-            // (yeah yeah -1...1 != 0 but close enough here)
         }
         else
         {
+            wasOne = false;
             if (playrate[i] < 0)
             {
                 smoothWindow = 512.f; // lengthen the window in reverse
@@ -353,6 +367,8 @@ inline void FloatyDelay<FXConfig>::processBlock(float *dataL, float *dataR)
         delayLineL.write(toLineL);
         delayLineR.write(toLineR);
     }
+
+    HPfilter.template processBlock<FXConfig::blockSize>(dBufferL, dBufferR, dBufferL, dBufferR);
 
     mixLerp.set_target(this->floatValue(fld_mix));
     mixLerp.fade_2_blocks_inplace(dataL, dBufferL, dataR, dBufferR, this->blockSize_quad);
