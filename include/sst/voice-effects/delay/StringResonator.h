@@ -258,7 +258,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
 
         auto panParamOne = std::clamp((this->getFloatParam(fpPanOne) * .5f + .5f), 0.f, 1.f);
         auto panParamTwo = std::clamp((this->getFloatParam(fpPanTwo) * .5f + .5f), 0.f, 1.f);
-        if (this->getIntParam(ipStereo) == false)
+        if (!this->getIntParam(ipStereo))
         {
             panParamOne = 0.5f;
             panParamTwo = 0.5f;
@@ -370,7 +370,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
         levelLerpOne.set_target(levelParam);
 
         auto panParam = std::clamp((this->getFloatParam(fpPanOne) * .5f + .5f), 0.f, 1.f);
-        if (this->getIntParam(ipStereo) == false)
+        if (!this->getIntParam(ipStereo))
         {
             panParam = 0.5f;
         }
@@ -663,7 +663,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
                        float *dataoutR, float pitch)
     {
-        if (this->getIntParam(ipDualString == true))
+        if (this->getIntParam(ipDualString))
         {
             if (isShort)
             {
@@ -702,7 +702,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
 
     void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
-        if (this->getIntParam(ipDualString == true))
+        if (this->getIntParam(ipDualString))
         {
             if (isShort)
             {

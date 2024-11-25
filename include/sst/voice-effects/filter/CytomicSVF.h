@@ -198,7 +198,7 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
             auto mode = (sst::filters::CytomicSVF::Mode)(iparam[0]);
 
             auto res = std::clamp(param[2], 0.f, 1.f);
-            if (iparam[2] == true)
+            if (iparam[2])
             {
                 res *= .885f; // I just checked peak heights on a spectrum analyzer.
             }
@@ -245,7 +245,7 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
     {
         calc_coeffs(pitch);
         cySvf[0].template processBlock<VFXConfig::blockSize>(datainL, datainR, dataoutL, dataoutR);
-        if (this->getIntParam(ipSlope) == true)
+        if (this->getIntParam(ipSlope))
         {
             cySvf[1].template processBlock<VFXConfig::blockSize>(dataoutL, dataoutR, dataoutL,
                                                                  dataoutR);
