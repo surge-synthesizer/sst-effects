@@ -151,7 +151,7 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
         }
         auto filterFreq = 440 * this->note_to_pitch_ignoring_tuning(cutoff);
 
-        if (priorFreq != filterFreq && filterSwitch == true)
+        if (priorFreq != filterFreq && filterSwitch)
         {
             filter.template setCoeffForBlock<VFXConfig::blockSize>(mode, filterFreq, reso,
                                                                    this->getSampleRateInv(), 0.f);
@@ -184,7 +184,7 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
             dataoutL[k] = level[0];
             dataoutR[k] = level[1];
         }
-        if (filterSwitch == true)
+        if (filterSwitch)
         {
             filter.processBlock<VFXConfig::blockSize>(dataoutL, dataoutR, dataoutL, dataoutR);
         }

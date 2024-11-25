@@ -454,7 +454,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
                        float *dataoutR, float pitch)
     {
-        if (this->getIntParam(ipHarmonic) == true)
+        if (this->getIntParam(ipHarmonic))
         {
             harmonicStereo(datainL, datainR, dataoutL, dataoutR, pitch);
         }
@@ -470,7 +470,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
     // ...this second one if incoming audio is Mono...
     void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
-        if (this->getIntParam(ipHarmonic) == true)
+        if (this->getIntParam(ipHarmonic))
         {
             harmonicMono(datainL, dataoutL, pitch);
         }
