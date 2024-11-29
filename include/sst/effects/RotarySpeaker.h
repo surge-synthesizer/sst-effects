@@ -84,7 +84,7 @@ template <typename FXConfig> struct RotarySpeaker : core::EffectTemplateBase<FXC
     void onSampleRateChanged() { initialize(); }
 
     void setvars(bool init);
-    void processControlOnly();
+    void processOnlyControl();
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
@@ -187,7 +187,7 @@ template <typename FXConfig> inline void RotarySpeaker<FXConfig>::setvars(bool i
     }
 }
 
-template <typename FXConfig> inline void RotarySpeaker<FXConfig>::processControlOnly()
+template <typename FXConfig> inline void RotarySpeaker<FXConfig>::processOnlyControl()
 {
     double frate = this->floatValue(rot_horn_rate) * this->temposyncRatio(rot_horn_rate);
 
