@@ -53,7 +53,7 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
         ipStereo,
     };
 
-    TiltNoise() : core::VoiceEffectTemplateBase<VFXConfig>() {}
+    TiltNoise() : core::VoiceEffectTemplateBase<VFXConfig>(), optFiltersL(this->getSampleRateInv()), optFiltersR(this->getSampleRateInv()) {}
     ~TiltNoise() {}
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
@@ -92,7 +92,11 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
         return pmd().asBool().withDefault(true).withName("Stereo");
     }
 
-    void initVoiceEffect() {}
+    void initVoiceEffect()
+    {
+        optFiltersL.init(rng, this->getFloatParam(fpTilt));
+        optFiltersR.init(rng, this->getFloatParam(fpTilt));
+    }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     void setCoeffs()
@@ -227,7 +231,47 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
     void processMonoToStereo(const float *const datainL, float *dataoutL, float *dataoutR,
                              float pitch)
     {
-        processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
+        float level = this->getFloatParam(fpLevel);
+        level = level * level * level;
+        levelLerp.set_target(level);
+        
+        float tilt = this->getFloatParam(fpTilt);
+        if (tilt > 0)
+        {
+            tilt *= -4.f;
+        }
+        tilt = this->dbToLinear(tilt);
+        attenLerp.set_target(tilt);
+        float atten alignas(16)[VFXConfig::blockSize];
+        attenLerp.store_block(atten);
+        
+        widthLerp.set_target(std::clamp(this->getFloatParam(fpStereoWidth), 0.f, 2.f));
+        float width alignas(16)[VFXConfig::blockSize];
+        widthLerp.store_block(width);
+        
+        
+        optFiltersL.setCoeff(tilt);
+        optFiltersR.setCoeff(tilt);
+        
+        for (int i = 0; i < VFXConfig::blockSize; i++)
+        {
+            auto noiseL = rng.unifPM1();
+            auto noiseR = rng.unifPM1();
+            
+            midSideAdjust(width[i], noiseL, noiseR, dataoutL[i], dataoutR[i]);
+            
+            optFiltersL.step(optFiltersL, dataoutL[i]);
+            optFiltersR.step(optFiltersR, dataoutR[i]);
+        }
+        
+        /*
+        optFiltersL.template setCoeffForBlock<VFXConfig::blockSize>(tilt);
+        optFiltersR.template setCoeffForBlock<VFXConfig::blockSize>(tilt);
+        optFiltersL.template processBlock<VFXConfig::blockSize>(dataoutL, dataoutL);
+        optFiltersR.template processBlock<VFXConfig::blockSize>(dataoutR, dataoutR);
+        */
+        
+        levelLerp.multiply_2_blocks(dataoutL, dataoutR);
     }
 
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
@@ -235,7 +279,9 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
   protected:
     float priorSlope = -1324.f;
     std::array<sst::filters::CytomicSVF, 11> filters;
+    sst::filters::FastTiltNoiseFilter optFiltersL, optFiltersR;
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> levelLerp, widthLerp, attenLerp;
+    bool first{true};
 
   public:
     static constexpr int16_t streamingVersion{1};
