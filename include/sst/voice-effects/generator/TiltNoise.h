@@ -53,7 +53,7 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
         ipStereo,
     };
 
-    TiltNoise() : core::VoiceEffectTemplateBase<VFXConfig>(), optFiltersL(this->getSampleRateInv()), optFiltersR(this->getSampleRateInv()) {}
+    TiltNoise() : core::VoiceEffectTemplateBase<VFXConfig>(), optFiltersL(1.f / 48000.f), optFiltersR(1.f / 48000.f) {}
     ~TiltNoise() {}
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
@@ -94,8 +94,11 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
 
     void initVoiceEffect()
     {
-        optFiltersL.init(rng, this->getFloatParam(fpTilt));
-        optFiltersR.init(rng, this->getFloatParam(fpTilt));
+        float slope = std::clamp(this->getFloatParam(fpTilt), -6.f, 6.f) / 2.f;
+        float posGain = this->dbToLinear(slope);
+        float negGain = this->dbToLinear(-1 * slope);
+        optFiltersL.init(rng, posGain, negGain);
+        optFiltersR.init(rng, posGain, negGain);
     }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
@@ -249,9 +252,12 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
         float width alignas(16)[VFXConfig::blockSize];
         widthLerp.store_block(width);
         
+        float slope = std::clamp(this->getFloatParam(fpTilt), -6.f, 6.f) / 2.f;
+        float posGain = this->dbToLinear(slope);
+        float negGain = this->dbToLinear(-1 * slope);
         
-        optFiltersL.setCoeff(tilt);
-        optFiltersR.setCoeff(tilt);
+        optFiltersL.setCoeff(posGain, negGain);
+        optFiltersR.setCoeff(posGain, negGain);
         
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
