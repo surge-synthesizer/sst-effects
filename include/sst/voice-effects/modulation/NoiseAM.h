@@ -31,6 +31,7 @@
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
 #include "sst/basic-blocks/mechanics/block-ops.h"
 #include "sst/basic-blocks/dsp/RNG.h"
+#include "sst/filters/FastTiltNoiseFilter.h"
 
 namespace sst::voice_effects::modulation
 {

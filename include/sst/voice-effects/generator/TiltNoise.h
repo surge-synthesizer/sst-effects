@@ -30,6 +30,7 @@
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/RNG.h"
 #include "sst/basic-blocks/dsp/MidSide.h"
+#include "sst/filters/FastTiltNoiseFilter.h"
 
 namespace sst::voice_effects::generator
 {
