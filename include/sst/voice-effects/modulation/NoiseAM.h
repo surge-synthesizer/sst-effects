@@ -119,7 +119,7 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
             initNoiseL[i] = rng.unifPM1();
             initNoiseR[i] = rng.unifPM1();
         }
-
+        // yup!
         FiltersL.init(initNoiseL, slope);
         FiltersR.init(initNoiseR, slope);
     }
