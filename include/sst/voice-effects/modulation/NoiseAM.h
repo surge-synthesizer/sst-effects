@@ -31,6 +31,7 @@
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
 #include "sst/basic-blocks/mechanics/block-ops.h"
 #include "sst/basic-blocks/dsp/RNG.h"
+#include "sst/filters/FastTiltNoiseFilter.h"
 
 namespace sst::voice_effects::modulation
 {
@@ -56,7 +57,7 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
         ipStereo
     };
 
-    NoiseAM() : core::VoiceEffectTemplateBase<VFXConfig>() {}
+    NoiseAM() : core::VoiceEffectTemplateBase<VFXConfig>(), FiltersL(*this), FiltersR(*this) {}
 
     ~NoiseAM() {}
 
@@ -106,91 +107,73 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
         return pmd().asInt().withName("error");
     }
 
-    void initVoiceEffect() {}
+    void initVoiceEffect()
+    {
+        float slope = std::clamp(this->getFloatParam(fpTilt), -6.f, 6.f) / 2.f;
+
+        float initNoiseL[11];
+        float initNoiseR[11];
+
+        for (int i = 0; i < 11; ++i)
+        {
+            initNoiseL[i] = rng.unifPM1();
+            initNoiseR[i] = rng.unifPM1();
+        }
+        // yup!
+        FiltersL.init(initNoiseL, slope);
+        FiltersR.init(initNoiseR, slope);
+    }
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
-    void setCoeffs()
-    {
-        float slope = std::clamp(this->getFloatParam(fpTilt), -6.f, 6.f) / 2.f;
-        float posGain = this->dbToLinear(slope);
-        float negGain = this->dbToLinear(-1 * slope);
-        float res = .07f;
-
-        if (slope != priorSlope)
-        {
-            for (int i = 0; i < 11; ++i)
-            {
-                float freq = powf(2, (i + 1.f)) * 10.f;
-                if (i < 6)
-                {
-                    filters[i].template setCoeffForBlock<VFXConfig::blockSize>(
-                        filters::CytomicSVF::Mode::LOW_SHELF, freq, res, this->getSampleRateInv(),
-                        negGain);
-                }
-                else
-                {
-                    filters[i].template setCoeffForBlock<VFXConfig::blockSize>(
-                        filters::CytomicSVF::Mode::HIGH_SHELF, freq, res, this->getSampleRateInv(),
-                        posGain);
-                }
-            }
-            priorSlope = slope;
-        }
-        else
-        {
-            for (int i = 0; i < 11; i++)
-            {
-                filters[i].template retainCoeffForBlock<VFXConfig::blockSize>();
-            }
-        }
-    }
-
     void makeNoise(float *L, float *R)
     {
-        float atten = this->getFloatParam(fpTilt);
-        if (atten > 0)
+        float tilt = this->getFloatParam(fpTilt);
+        if (tilt > 0)
         {
-            atten *= -4.f;
+            tilt *= -4.f;
         }
-        atten = this->dbToLinear(atten);
+        tilt = this->dbToLinear(tilt);
+        attenLerp.set_target(tilt);
+        float atten alignas(16)[VFXConfig::blockSize];
+        attenLerp.store_block(atten);
 
-        setCoeffs();
-
+        float noiseL[VFXConfig::blockSize]{};
+        float noiseR[VFXConfig::blockSize]{};
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
-            L[i] = rng.unifPM1();
-            R[i] = rng.unifPM1();
+            noiseL[i] = rng.unifPM1() * atten[i];
+            noiseR[i] = rng.unifPM1() * atten[i];
+        }
 
-            L[i] *= atten;
-            R[i] *= atten;
-        }
-        for (int i = 0; i < 11; ++i)
-        {
-            filters[i].template processBlock<VFXConfig::blockSize>(L, R, L, R);
-        }
+        float slope = std::clamp(this->getFloatParam(fpTilt), -6.f, 6.f) / 2.f;
+        FiltersL.template setCoeffForBlock<VFXConfig::blockSize>(slope);
+        FiltersR.template setCoeffForBlock<VFXConfig::blockSize>(slope);
+        FiltersL.template processBlock<VFXConfig::blockSize>(noiseL, L);
+        FiltersR.template processBlock<VFXConfig::blockSize>(noiseR, R);
     }
 
     void makeNoise(float *C)
     {
-        float atten = this->getFloatParam(fpTilt);
-        if (atten > 0)
+        float tilt = this->getFloatParam(fpTilt);
+        if (tilt > 0)
         {
-            atten *= -4.f;
+            tilt *= -4.f;
         }
-        atten = this->dbToLinear(atten);
+        tilt = this->dbToLinear(tilt);
+        attenLerp.set_target(tilt);
+        float atten alignas(16)[VFXConfig::blockSize];
+        attenLerp.store_block(atten);
 
-        setCoeffs();
-
+        float noise[VFXConfig::blockSize]{};
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
-            C[i] = rng.unifPM1();
-            C[i] *= atten;
+            noise[i] = rng.unifPM1() * atten[i];
         }
-        for (int i = 0; i < 11; ++i)
-        {
-            filters[i].template processBlock<VFXConfig::blockSize>(C, C);
-        }
+
+        float slope = std::clamp(this->getFloatParam(fpTilt), -6.f, 6.f) / 2.f;
+        FiltersL.template setCoeffForBlock<VFXConfig::blockSize>(slope);
+        FiltersL.template processBlock<VFXConfig::blockSize>(noise, C);
     }
 
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
@@ -327,8 +310,8 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
 
   protected:
-    float priorSlope = -1234.f;
-    std::array<sst::filters::CytomicSVF, 11> filters;
+    sst::filters::FastTiltNoiseFilter<NoiseAM> FiltersL, FiltersR;
+    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> depthLerp, attenLerp;
 
   public:
     static constexpr int16_t streamingVersion{1};
