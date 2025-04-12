@@ -61,10 +61,18 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
         ipWaveform
     };
 
+    enum Wave
+    {
+        SIN = 0,
+        SAW = 1,
+        PULSE = 2
+    };
+
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
 
+        auto ot = this->getIntParam(0);
         switch (idx)
         {
         case fpOffset:
@@ -81,13 +89,18 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
         case fpLevel:
             return pmd().asCubicDecibelAttenuation().withDefault(0.5f).withName("Level");
         case fpWidth:
-            return pmd().asPercent().withName("Pulse Width").withDefault(0.5);
+            return pmd()
+                .asPercent()
+                .withName("Pulse Width")
+                .withDefault(0.5)
+                .withEnabled(ot == Wave::PULSE);
         case fpSync:
             return pmd()
                 .asFloat()
                 .withRange(0, 96)
                 .withName("Sync")
                 .withDefault(0)
+                .withEnabled(ot == Wave::PULSE)
                 .withLinearScaleFormatting("semitones");
         case fpHighpass:
             if (keytrackOn)
@@ -97,9 +110,13 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
                     .withRange(-48, 48)
                     .withName("Highpass Offset")
                     .withDefault(-48)
+                    .withEnabled(ot == Wave::SAW)
                     .withLinearScaleFormatting("semitones");
             }
-            return pmd().asAudibleFrequency().withName("Highpass Frequency");
+            return pmd()
+                .asAudibleFrequency()
+                .withName("Highpass Frequency")
+                .withEnabled(ot == Wave::SAW);
         case fpLowpass:
             if (keytrackOn)
             {
@@ -108,9 +125,13 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
                     .withRange(-24, 96)
                     .withName("Lowpass Offset")
                     .withDefault(96)
+                    .withEnabled(ot == Wave::SAW)
                     .withLinearScaleFormatting("semitones");
             }
-            return pmd().asAudibleFrequency().withName("Lowpass Frequency");
+            return pmd()
+                .asAudibleFrequency()
+                .withName("Lowpass Frequency")
+                .withEnabled(ot == Wave::SAW);
         }
         return pmd().withName("Unknown " + std::to_string(idx)).asPercent();
     }
@@ -125,7 +146,8 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
             return pmd()
                 .asInt()
                 .withRange(0, 2)
-                .withUnorderedMapFormatting({{0, "Sine"}, {1, "Saw"}, {2, "Pulse"}})
+                .withUnorderedMapFormatting(
+                    {{Wave::SIN, "Sine"}, {Wave::SAW, "Saw"}, {Wave::PULSE, "Pulse"}})
                 .withName("Waveform");
         }
         return pmd().withName("error");
@@ -261,11 +283,11 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
     void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         int wave = this->getIntParam(ipWaveform);
-        if (wave == 0)
+        if (wave == Wave::SIN)
         {
             processSine(datainL, dataoutL, pitch);
         }
-        else if (wave == 1)
+        else if (wave == Wave::SAW)
         {
             processSaw(datainL, dataoutL, pitch);
         }
@@ -291,6 +313,7 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
     }
     bool getKeytrack() const { return keytrackOn; }
     bool getKeytrackDefault() const { return true; }
+    bool checkParameterConsistency() const { return true; }
 
   protected:
     bool keytrackOn{true};
