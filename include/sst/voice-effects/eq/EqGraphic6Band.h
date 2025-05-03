@@ -36,18 +36,17 @@ template <typename VFXConfig> struct EqGraphic6Band : core::VoiceEffectTemplateB
 {
     static constexpr const char *effectName{"EQ 6 Band"};
 
-    static constexpr int numFloatParams{6};
+    static constexpr int nBands{6};
+    static constexpr int numFloatParams{nBands};
     static constexpr int numIntParams{0};
 
     EqGraphic6Band() : core::VoiceEffectTemplateBase<VFXConfig>()
     {
         std::fill(mLastParam.begin(), mLastParam.end(), -188888.f);
-        std::fill(mParametric.begin(), mParametric.end(), this);
     }
 
     ~EqGraphic6Band() {}
 
-    static constexpr int nBands{6};
     static constexpr std::array<float, nBands> bands{100, 250, 630, 1600, 5000, 12000};
     static constexpr std::array<const char *, nBands> labels{"100Hz",  "250Hz", "630Hz",
                                                              "1.6kHz", "5kHz",  "12kHz"};
@@ -63,80 +62,100 @@ template <typename VFXConfig> struct EqGraphic6Band : core::VoiceEffectTemplateB
             .withName(labels[idx]);
     }
 
-    void initVoiceEffect() {}
+    void initVoiceEffect()
+    {
+        for (int i = 0; i < nBands; ++i)
+        {
+            mParametric[i].init();
+        }
+    }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
                        float *dataoutR, float pitch)
     {
         calc_coeffs();
-        auto *inL = datainL;
-        auto *inR = datainR;
+        sst::basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
+        sst::basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(datainR, dataoutR);
+
         for (int i = 0; i < nBands; ++i)
         {
-            mParametric[i].process_block_to(inL, inR, dataoutL, dataoutR);
-            inL = dataoutL;
-            inR = dataoutR;
+            mParametric[i].template processBlock<VFXConfig::blockSize>(dataoutL, dataoutR, dataoutL,
+                                                                       dataoutR);
         }
     }
 
     void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         calc_coeffs();
-        auto *inL = datainL;
+        sst::basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
+
         for (int i = 0; i < nBands; ++i)
         {
-            mParametric[i].process_block_to(inL, dataoutL);
-            inL = dataoutL;
+            mParametric[i].template processBlock<VFXConfig::blockSize>(dataoutL, dataoutL);
         }
     }
 
     void calc_coeffs()
     {
-        std::array<float, nBands * 3> param;
-        std::array<int, nBands> iparam;
-        bool diff{false};
-        for (int i = 0; i < nBands * 3; i++)
-        {
-            param[i] = this->getFloatParam(i);
-            diff = diff || (mLastParam[i] != param[i]);
-        }
+        using md = sst::filters::CytomicSVF::Mode;
+        md mode;
 
-        if (diff)
+        for (int i = 0; i < nBands; ++i)
         {
-            double a = M_PI_2 * this->getSampleRateInv();
-            const double bw = 3;
-            for (int i = 0; i < nBands; ++i)
-                mParametric[i].coeff_peakEQ(bands[i] * a, bw, param[i]);
+            if (mLastParam[i] != this->getFloatParam(i))
+            {
+                mLastParam[i] = this->getFloatParam(i);
 
-            mLastParam = param;
+                if (i == 0)
+                {
+                    mode = md::LOW_SHELF;
+                }
+                else if (i == nBands - 1)
+                {
+                    mode = md::HIGH_SHELF;
+                }
+                else
+                {
+                    mode = md::BELL;
+                }
+
+                mParametric[i].template setCoeffForBlock<VFXConfig::blockSize>(
+                    mode, bands[i], .0f, this->getSampleRateInv(),
+                    this->dbToLinear(this->getFloatParam(i) / 2));
+            }
+            else
+            {
+                mParametric[i].template retainCoeffForBlock<VFXConfig::blockSize>();
+            }
         }
     }
 
     float getFrequencyGraph(float f)
     {
         auto res = 1.f;
+        /*
         for (int i = 0; i < nBands; ++i)
         {
             res *= mParametric[i].plot_magnitude(f);
         }
+         */
         return res;
     }
 
     float getBandFrequencyGraph(int band, float f) { return getFrequencyGraph(f); }
 
   protected:
-    std::array<float, nBands * 3> mLastParam{};
-    std::array<typename core::VoiceEffectTemplateBase<VFXConfig>::BiquadFilterType, nBands>
-        mParametric;
+    std::array<float, nBands> mLastParam{};
+    std::array<sst::filters::CytomicSVF, nBands> mParametric;
 
   public:
     static constexpr int16_t streamingVersion{1};
     static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
                                                    int *const iparam)
     {
-        // base implementation - we have never updated streaming
-        // input is parameters from stream version
+        // We did update this one, but the original had the wrong frequencies entirely
+        // and there's not really any way to stream that.
         assert(streamedFrom == 1);
     }
 };
