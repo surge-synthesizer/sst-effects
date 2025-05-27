@@ -40,6 +40,8 @@ template <typename VFXConfig> struct EqGraphic6Band : core::VoiceEffectTemplateB
     static constexpr int numFloatParams{nBands};
     static constexpr int numIntParams{0};
 
+    static constexpr float resonance{0.2f};
+
     EqGraphic6Band() : core::VoiceEffectTemplateBase<VFXConfig>()
     {
         std::fill(mLastParam.begin(), mLastParam.end(), -188888.f);
@@ -121,7 +123,7 @@ template <typename VFXConfig> struct EqGraphic6Band : core::VoiceEffectTemplateB
                 }
 
                 mParametric[i].template setCoeffForBlock<VFXConfig::blockSize>(
-                    mode, bands[i], .0f, this->getSampleRateInv(),
+                    mode, bands[i], resonance, this->getSampleRateInv(),
                     this->dbToLinear(this->getFloatParam(i) / 2));
             }
             else
@@ -133,13 +135,30 @@ template <typename VFXConfig> struct EqGraphic6Band : core::VoiceEffectTemplateB
 
     float getFrequencyGraph(float f)
     {
+        using md = sst::filters::CytomicSVF::Mode;
+        md mode;
+
         auto res = 1.f;
-        /*
+
         for (int i = 0; i < nBands; ++i)
         {
-            res *= mParametric[i].plot_magnitude(f);
+            if (i == 0)
+            {
+                mode = md::LOW_SHELF;
+            }
+            else if (i == nBands - 1)
+            {
+                mode = md::HIGH_SHELF;
+            }
+            else
+            {
+                mode = md::BELL;
+            }
+
+            res *= sst::filters::CytomicSVFGainAt(mode, bands[i], resonance,
+                                                  this->dbToLinear(this->getFloatParam(i) / 2),
+                                                  f * this->getSampleRate());
         }
-         */
         return res;
     }
 
