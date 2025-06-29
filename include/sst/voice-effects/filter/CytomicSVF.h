@@ -83,7 +83,7 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
             {
                 return pmd()
                     .asFloat()
-                    .withRange(-48, 48)
+                    .withRange(-48, 96)
                     .withName(std::string("Offset") + (stereo ? " L" : ""))
                     .withDefault(0)
                     .withLinearScaleFormatting("semitones");
@@ -98,7 +98,7 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
             {
                 return pmd()
                     .asFloat()
-                    .withRange(-48, 48)
+                    .withRange(-48, 96)
                     .withName(!stereo ? std::string() : "Offset R")
                     .withDefault(0)
                     .withLinearScaleFormatting("semitones");

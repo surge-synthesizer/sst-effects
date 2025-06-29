@@ -86,7 +86,7 @@ template <typename VFXConfig> struct SSTFilters : core::VoiceEffectTemplateBase<
             {
                 return pmd()
                     .asFloat()
-                    .withRange(-48, 48)
+                    .withRange(-48, 96)
                     .withName("Offset")
                     .withDefault(0)
                     .withLinearScaleFormatting("semitones");

@@ -101,7 +101,7 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
             {
                 return pmd()
                     .asFloat()
-                    .withRange(-48, 48)
+                    .withRange(-48, 96)
                     .withName(std::string("Offset L") + (stereo ? " L" : ""))
                     .withDefault(0)
                     .withLinearScaleFormatting("semitones");
@@ -116,7 +116,7 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
             {
                 return pmd()
                     .asFloat()
-                    .withRange(-48, 48)
+                    .withRange(-48, 96)
                     .withName(!stereo ? std::string() : "Offset R")
                     .withDefault(0)
                     .withLinearScaleFormatting("semitones");
@@ -130,7 +130,7 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
         case fpSpacing:
             return pmd()
                 .asFloat()
-                .withRange(-48, 48)
+                .withRange(-48, 96)
                 .withDefault(12)
                 .withName("Spacing")
                 .withLinearScaleFormatting("semitones");

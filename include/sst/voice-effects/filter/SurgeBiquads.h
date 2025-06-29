@@ -72,7 +72,7 @@ template <typename VFXConfig> struct SurgeBiquads : core::VoiceEffectTemplateBas
             {
                 return pmd()
                     .asFloat()
-                    .withRange(-48, 48)
+                    .withRange(-48, 96)
                     .withName("Offset")
                     .withDefault(0)
                     .withLinearScaleFormatting("semitones");
