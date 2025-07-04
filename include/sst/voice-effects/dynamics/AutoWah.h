@@ -91,7 +91,7 @@ template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFX
             {
                 return pmd()
                     .asFloat()
-                    .withRange(-48, 48)
+                    .withRange(-48, 96)
                     .withName("Freq Offset")
                     .withDefault(0)
                     .withLinearScaleFormatting("semitones");
