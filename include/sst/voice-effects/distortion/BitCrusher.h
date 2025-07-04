@@ -82,7 +82,7 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
             {
                 return pmd()
                     .asFloat()
-                    .withRange(0, 96)
+                    .withRange(-48, 96)
                     .withName("Cutoff Offset")
                     .withDefault(96)
                     .withLinearScaleFormatting("semitones");
