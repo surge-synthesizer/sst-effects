@@ -117,7 +117,7 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
         case 3:
             return pmd()
                 .asDecibelNarrow()
-                .withRange(-12, 12)
+                .withRange(-24, 24)
                 .withName(!gain ? std::string() : "Gain")
                 .withDefault(0);
         }
@@ -203,7 +203,8 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
                 res *= .885f; // I just checked peak heights on a spectrum analyzer.
             }
 
-            auto shelf = this->dbToLinear(param[3]);
+            // Andy uses a 40db decibel definition and we use a 20 so
+            auto shelf = this->dbToLinear(param[3] * 0.5);
 
             if (this->getIntParam(ipStereo))
             {
