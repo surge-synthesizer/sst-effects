@@ -120,7 +120,7 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
         switch (idx)
         {
         case ipStereo:
-            return pmd().asBool().withDefault(false).withName("Stereo");
+            return pmd().asStereoSwitch().withDefault(false);
         case ipShape:
             return pmd()
                 .asInt()

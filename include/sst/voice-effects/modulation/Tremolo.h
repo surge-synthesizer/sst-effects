@@ -100,7 +100,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         switch (idx)
         {
         case ipStereo:
-            return pmd().asBool().withDefault(false).withName("Stereo");
+            return pmd().asStereoSwitch().withDefault(false);
         case ipShape:
             return pmd()
                 .asInt()
@@ -117,7 +117,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
                 .withDefault(0)
                 .withName("LFO shape");
         case ipHarmonic:
-            return pmd().asBool().withDefault(false).withName("Harmonic");
+            return pmd().asOnOffBool().withDefault(false).withName("Harmonic");
         }
         return pmd().asInt().withName("Error");
     }

@@ -127,7 +127,7 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
     basic_blocks::params::ParamMetaData intParamAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
-        return pmd().asBool().withDefault(true).withName("Stereo");
+        return pmd().asStereoSwitch().withDefault(true);
     }
 
     void initVoiceEffect()

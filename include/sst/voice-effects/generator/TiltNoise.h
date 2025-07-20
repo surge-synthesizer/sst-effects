@@ -92,7 +92,7 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
     {
         using pmd = basic_blocks::params::ParamMetaData;
 
-        return pmd().asBool().withDefault(true).withName("Stereo");
+        return pmd().asStereoSwitch().withDefault(true);
     }
 
     void initVoiceEffect()

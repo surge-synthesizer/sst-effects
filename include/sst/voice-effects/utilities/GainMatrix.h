@@ -61,13 +61,13 @@ template <typename VFXConfig> struct GainMatrix : core::VoiceEffectTemplateBase<
         switch (idx)
         {
         case fpLeftToLeft:
-            return pmd().withDefault(1.f).withRange(-1.f, 1.f).withName("L -> L");
+            return pmd().asPercentBipolar().withDefault(1.f).withName("L -> L");
         case fpLeftToRight:
-            return pmd().withDefault(0.f).withRange(-1.f, 1.f).withName("L -> R");
+            return pmd().asPercentBipolar().withDefault(0.f).withName("L -> R");
         case fpRightToLeft:
-            return pmd().withDefault(0.f).withRange(-1.f, 1.f).withName("R -> L");
+            return pmd().asPercentBipolar().withDefault(0.f).withName("R -> L");
         case fpRightToRight:
-            return pmd().withDefault(1.f).withRange(-1.f, 1.f).withName("R -> R");
+            return pmd().asPercentBipolar().withDefault(1.f).withName("R -> R");
         }
         return pmd().asFloat().withName("Error");
     }

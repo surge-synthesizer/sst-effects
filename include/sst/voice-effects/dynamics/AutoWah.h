@@ -75,9 +75,9 @@ template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFX
         switch (idx)
         {
         case fpSens:
-            return pmd().asFloat().withRange(0.f, 1.f).withDefault(.5f).withName("Sensitivity");
+            return pmd().asPercent().withRange(0.f, 1.f).withDefault(.5f).withName("Sensitivity");
         case fpDepth:
-            return pmd().asFloat().withRange(0.f, 1.f).withDefault(.3f).withName("Depth");
+            return pmd().asPercent().withRange(0.f, 1.f).withDefault(.3f).withName("Depth");
         case fpSpeed:
             return pmd()
                 .asFloat()
@@ -98,7 +98,12 @@ template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFX
             }
             return pmd().asAudibleFrequency().withName("Center Freq");
         case fpRes:
-            return pmd().asFloat().withRange(0.f, 1.f).withDefault(0.7f).withName("Resonance");
+            return pmd()
+                .asFloat()
+                .withRange(0.f, 1.f)
+                .withDefault(0.7f)
+                .withName("Resonance")
+                .withDimensionlessFormatting();
         }
         return pmd().asFloat().withName("Error");
     }
