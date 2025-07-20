@@ -91,9 +91,19 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
         switch (idx)
         {
         case ipNum:
-            return pmd().asInt().withRange(1, 16).withDefault(1).withName("Numerator");
+            return pmd()
+                .asInt()
+                .withRange(1, 16)
+                .withDefault(1)
+                .withName("Numerator")
+                .withDimensionlessFormatting();
         case ipDenom:
-            return pmd().asInt().withRange(1, 16).withDefault(1).withName("Denominator");
+            return pmd()
+                .asInt()
+                .withRange(1, 16)
+                .withDefault(1)
+                .withName("Denominator")
+                .withDimensionlessFormatting();
         }
 
         return pmd().withName("Error");

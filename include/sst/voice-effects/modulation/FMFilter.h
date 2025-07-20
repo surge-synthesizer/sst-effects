@@ -89,9 +89,14 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
             }
             return pmd().asAudibleFrequency().withName(!stereo ? std::string() : "Frequency R");
         case fpDepth:
-            return pmd().asFloat().withRange(0.f, 1.f).withDefault(0.f).withName("FM Depth");
+            return pmd().asPercent().withRange(0.f, 1.f).withDefault(0.f).withName("FM Depth");
         case fpRes:
-            return pmd().asFloat().withRange(0.f, 1.f).withDefault(0.7f).withName("Resonance");
+            return pmd()
+                .asFloat()
+                .withRange(0.f, 1.f)
+                .withDefault(0.7f)
+                .withName("Resonance")
+                .withDimensionlessFormatting();
         }
         return pmd().withName("error ");
     }
@@ -105,7 +110,7 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
         switch (idx)
         {
         case ipStereo:
-            return pmd().asBool().withDefault(false).withName("Stereo");
+            return pmd().asStereoSwitch().withDefault(false);
 
         case ipMode:
             return pmd()
@@ -121,9 +126,19 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
                 })
                 .withDefault(md::LP);
         case ipNum:
-            return pmd().asInt().withRange(1, 16).withDefault(1).withName("Numerator");
+            return pmd()
+                .asInt()
+                .withRange(1, 16)
+                .withDefault(1)
+                .withName("Numerator")
+                .withDimensionlessFormatting();
         case ipDenom:
-            return pmd().asInt().withRange(1, 16).withDefault(1).withName("Denominator");
+            return pmd()
+                .asInt()
+                .withRange(1, 16)
+                .withDefault(1)
+                .withName("Denominator")
+                .withDimensionlessFormatting();
         }
         return pmd().withName("error");
     }

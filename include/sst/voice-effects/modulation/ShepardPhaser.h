@@ -85,9 +85,15 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
         switch (idx)
         {
         case ipStereo:
-            return pmd().asBool().withDefault(false).withName("Stereo");
+            return pmd().asStereoSwitch().withDefault(false);
         case ipPeaks:
-            return pmd().asInt().withRange(4, 12).withDefault(8).withName("Peaks");
+            return pmd()
+                .asInt()
+                .withRange(4, 12)
+                .withDefault(8)
+                .withName("Peaks")
+                .withLinearScaleFormatting("peaks");
+            ;
         }
         return pmd().asInt().withName("Error");
     }

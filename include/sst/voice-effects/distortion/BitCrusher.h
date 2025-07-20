@@ -103,7 +103,7 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
         switch (idx)
         {
         case ipFilterSwitch:
-            return pmd().asBool().withName("Filter Engage");
+            return pmd().asOnOffBool().withName("Filter Engage");
             break;
         case ipFilterMode:
             return pmd()

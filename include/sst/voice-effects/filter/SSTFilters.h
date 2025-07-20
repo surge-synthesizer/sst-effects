@@ -142,7 +142,12 @@ template <typename VFXConfig> struct SSTFilters : core::VoiceEffectTemplateBase<
             }
             else
             {
-                return pmd().asInt().withRange(0, 0).withName("SubType").withDefault(0);
+                return pmd()
+                    .asInt()
+                    .withRange(0, 0)
+                    .withName("SubType")
+                    .withDefault(0)
+                    .withDimensionlessFormatting();
             }
         }
 

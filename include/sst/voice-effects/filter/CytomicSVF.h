@@ -150,7 +150,7 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
                 })
                 .withDefault(md::LP);
         case ipStereo:
-            return pmd().asBool().withDefault(false).withName("Stereo");
+            return pmd().asStereoSwitch().withDefault(false);
         case ipSlope:
             return pmd()
                 .asBool()

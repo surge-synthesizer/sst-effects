@@ -98,7 +98,7 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
 
     basic_blocks::params::ParamMetaData intParamAt(int idx) const
     {
-        return basic_blocks::params::ParamMetaData().asBool().withDefault(true).withName(
+        return basic_blocks::params::ParamMetaData().asOnOffBool().withDefault(true).withName(
             "Stereo Noise");
     }
 

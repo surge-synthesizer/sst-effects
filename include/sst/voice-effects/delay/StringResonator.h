@@ -175,9 +175,9 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
         switch (idx)
         {
         case ipStereo:
-            return pmd().asBool().withDefault(true).withName("Stereo)");
+            return pmd().asStereoSwitch().withDefault(true);
         case ipDualString:
-            return pmd().asBool().withDefault(true).withName("Dual String");
+            return pmd().asOnOffBool().withDefault(true).withName("Dual String");
         }
         return pmd().withName("Error");
     }
