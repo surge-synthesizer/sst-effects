@@ -67,7 +67,8 @@ struct TreemonsterCore : public BaseClass
     TreemonsterCore(Args &&...args) : BaseClass(std::forward<Args>(args)...)
     {
         rm.set_blocksize(FXConfig::blockSize);
-        width.set_blocksize(FXConfig::blockSize);
+        widthS.set_blocksize(FXConfig::blockSize);
+        widthM.set_blocksize(FXConfig::blockSize);
         mix.set_blocksize(FXConfig::blockSize);
     }
 
@@ -76,14 +77,14 @@ struct TreemonsterCore : public BaseClass
 
     void processWithMixAndWidth(float *dataL, float *dataR)
     {
-        this->setWidthTarget(width, tm_width);
+        this->setWidthTarget(widthS, widthM, tm_width);
         mix.set_target_smoothed(this->floatValue(tm_mix));
 
         float wetL alignas(16)[FXConfig::blockSize], wetR alignas(16)[FXConfig::blockSize];
 
         processWithoutMixOrWith(dataL, dataR, wetL, wetR);
 
-        this->applyWidth(wetL, wetR, width);
+        this->applyWidth(wetL, wetR, widthS, widthM);
         mix.fade_2_blocks_inplace(dataL, wetL, dataR, wetR);
     }
 
@@ -93,7 +94,8 @@ struct TreemonsterCore : public BaseClass
     // the main processing loop. The Rack module does this.
     float smoothedPitch[2][FXConfig::blockSize], envelopeOut[2][FXConfig::blockSize];
 
-    sdsp::lipol_sse<FXConfig::blockSize, false> rm alignas(16), width alignas(16), mix alignas(16);
+    sdsp::lipol_sse<FXConfig::blockSize, false>
+        rm alignas(16), widthS alignas(16), widthM alignas(16), mix alignas(16);
 
     using quadr_osc = sst::basic_blocks::dsp::SurgeQuadrOsc<float>;
     quadr_osc oscL alignas(16), oscR alignas(16);
@@ -143,11 +145,13 @@ inline void TreemonsterCore<BaseClass, BiquadType, addHPLP>::setvars(bool init)
         oscR.set_rate(0.f);
 
         rm.set_target(1.f);
-        width.set_target(0.f);
+        widthS.set_target(0.f);
+        widthM.set_target(0.f);
         mix.set_target(1.f);
 
         rm.instantize();
-        width.instantize();
+        widthS.instantize();
+        widthM.instantize();
         mix.instantize();
 
         // envelope follower times: 5 ms attack, 500 ms release

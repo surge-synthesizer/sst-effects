@@ -32,10 +32,14 @@
 
 #include "sst/basic-blocks/mechanics/block-ops.h"
 #include "sst/basic-blocks/dsp/RNG.h"
+#include "sst/effects-shared/WidthProvider.h"
 
 namespace sst::voice_effects::generator
 {
-template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTemplateBase<VFXConfig>
+template <typename VFXConfig>
+struct GenCorrelatedNoise
+    : core::VoiceEffectTemplateBase<VFXConfig>,
+      effects_shared::WidthProvider<GenCorrelatedNoise<VFXConfig>, VFXConfig::blockSize, true>
 {
     static constexpr const char *effectName{"Correlated Noise"};
 
@@ -83,12 +87,7 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
         case FloatParams::fpLevel:
             return pmd().asCubicDecibelAttenuation().withDefault(0.5f).withName("Level");
         case FloatParams::fpStereoWidth:
-            return pmd()
-                .asFloat()
-                .withRange(0.f, 2.f)
-                .withDefault(1.f)
-                .withLinearScaleFormatting("%", 100)
-                .withName(!stereo ? std::string() : "Stereo Width");
+            return this->getWidthParam().withName(!stereo ? std::string() : "Width");
         default:
             break;
         }
@@ -104,20 +103,6 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
 
     void initVoiceEffect() {}
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
-
-    void midSideAdjust(float width, float leftIn, float rightIn, float &leftOut, float &rightOut)
-    {
-        float midIn = 0.f, sideIn = 0.f, midOut = 0.f, sideOut = 0.f;
-
-        midIn = (leftIn + rightIn) / 2;
-        sideIn = (leftIn - rightIn) / 2;
-
-        sideIn *= width;
-
-        // TODO: loudness compensation...
-        leftOut = midIn + sideIn;
-        rightOut = midIn - sideIn;
-    }
 
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
                        float *dataoutR, float pitch)
@@ -135,21 +120,14 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
         mLevelLerp.set_target(levT);
         mColorLerp.newValue(col);
 
-        auto widthParam = std::clamp(this->getFloatParam(fpStereoWidth), 0.f, 2.f);
-
         // remember getOversamplingRatio is constexpr so the compiler
         // will get a good shot at this loop
         for (int k = 0; k < VFXConfig::blockSize; k += this->getOversamplingRatio())
         {
-            auto runLeft = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
+            dataoutL[k] = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
                 mPrior[0][0], mPrior[0][1], mColorLerp.v, rng.unifPM1());
-            auto runRight = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
+            dataoutR[k] = sst::basic_blocks::dsp::correlated_noise_o2mk2_supplied_value(
                 mPrior[1][0], mPrior[1][1], mColorLerp.v, rng.unifPM1());
-
-            if (isStereo)
-            {
-                midSideAdjust(widthParam, runLeft, runRight, dataoutL[k], dataoutR[k]);
-            }
 
             for (auto kk = 1; kk < this->getOversamplingRatio(); ++kk)
             {
@@ -158,6 +136,12 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
 
                 mColorLerp.process(); // inside since LERP is at OS
             }
+        }
+
+        if (isStereo)
+        {
+            this->setWidthTarget(mWidthS, mWidthM, FloatParams::fpStereoWidth);
+            this->applyWidth(dataoutL, dataoutR, mWidthS, mWidthM);
         }
         mLevelLerp.multiply_2_blocks(dataoutL, dataoutR);
     }
@@ -196,7 +180,7 @@ template <typename VFXConfig> struct GenCorrelatedNoise : core::VoiceEffectTempl
   protected:
     float mPrior[2][2]{{0.f, 0.f}, {0.f, 0.f}};
 
-    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> mLevelLerp;
+    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> mLevelLerp, mWidthS, mWidthM;
     sst::basic_blocks::dsp::lipol<float, VFXConfig::blockSize, true> mColorLerp;
 
   public:

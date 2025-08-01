@@ -226,7 +226,7 @@ template <typename FXConfig> struct Reverb2 : core::EffectTemplateBase<FXConfig>
     quadr_osc _lfo;
     float last_decay_time = -1.0;
 
-    sdsp::lipol_sse<FXConfig::blockSize, false> width, mix;
+    sdsp::lipol_sse<FXConfig::blockSize, false> widthS, widthM, mix;
 
     inline int msToSamples(float ms, float scale, float samplerate)
     {
@@ -415,7 +415,7 @@ template <typename FXConfig> void Reverb2<FXConfig>::processBlock(float *dataL, 
     _lf_damp_coefficent.newValue(0.2 * this->floatValue(rev2_lf_damping));
     _modulation.newValue(this->floatValue(rev2_modulation) * this->sampleRate() * 0.001f * 5.f);
 
-    this->setWidthTarget(width, rev2_width);
+    this->setWidthTarget(widthS, widthM, rev2_width);
 
     mix.set_target_smoothed(this->floatValue(rev2_mix));
 
@@ -481,7 +481,7 @@ template <typename FXConfig> void Reverb2<FXConfig>::processBlock(float *dataL, 
     }
 
     // scale width
-    this->applyWidth(wetL, wetR, width);
+    this->applyWidth(wetL, wetR, widthS, widthM);
 
     mix.fade_2_blocks_inplace(dataL, wetL, dataR, wetR);
 }

@@ -65,8 +65,8 @@ template <typename FXConfig> struct RotarySpeaker : core::EffectTemplateBase<FXC
     static constexpr int numParams{rot_num_params};
     static constexpr const char *effectName{"rotaryspeaker"};
 
-    typename core::EffectTemplateBase<FXConfig>::lipol_ps_blocksz width alignas(16), mix
-        alignas(16);
+    typename core::EffectTemplateBase<FXConfig>::lipol_ps_blocksz widthS alignas(16),
+        widthM alignas(16), mix alignas(16);
     sst::waveshapers::QuadWaveshaperState wsState alignas(16);
 
     RotarySpeaker(typename FXConfig::GlobalStorage *s, typename FXConfig::EffectStorage *e,
@@ -74,7 +74,8 @@ template <typename FXConfig> struct RotarySpeaker : core::EffectTemplateBase<FXC
         : core::EffectTemplateBase<FXConfig>(s, e, p), xover(s), lowbass(s)
     {
         mix.set_blocksize(FXConfig::blockSize);
-        width.set_blocksize(FXConfig::blockSize);
+        widthS.set_blocksize(FXConfig::blockSize);
+        widthM.set_blocksize(FXConfig::blockSize);
     }
     void initialize();
     void processBlock(float *__restrict L, float *__restrict R);
@@ -173,13 +174,14 @@ template <typename FXConfig> inline void RotarySpeaker<FXConfig>::initialize()
 template <typename FXConfig> inline void RotarySpeaker<FXConfig>::setvars(bool init)
 {
     drive.newValue(this->floatValue(rot_drive));
-    width.set_target_smoothed(this->dbToLinear(this->floatValue(rot_width)));
+    this->setWidthTarget(widthS, widthM, rot_width);
     mix.set_target_smoothed(this->floatValue(rot_mix));
 
     if (init)
     {
         drive.instantize();
-        width.instantize();
+        widthS.instantize();
+        widthM.instantize();
         mix.instantize();
 
         for (int i = 0; i < sst::waveshapers::n_waveshaper_registers; ++i)
@@ -419,7 +421,7 @@ inline void RotarySpeaker<FXConfig>::processBlock(float *__restrict dataL, float
     }
 
     // scale width
-    this->applyWidth(wbL, wbR, width);
+    this->applyWidth(wbL, wbR, widthS, widthM);
 
     mix.fade_2_blocks_inplace(dataL, wbL, dataR, wbR, FXConfig::blockSize >> 2);
 

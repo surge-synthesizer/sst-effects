@@ -128,7 +128,7 @@ template <typename FXConfig> struct Reverb1 : core::EffectTemplateBase<FXConfig>
     float out_tap alignas(16)[rev_taps];
     float predelay alignas(16)[max_rev_dly];
     int delay_time alignas(16)[rev_taps];
-    typename core::EffectTemplateBase<FXConfig>::lipol_ps_blocksz mix, width;
+    typename core::EffectTemplateBase<FXConfig>::lipol_ps_blocksz mix, widthS, widthM;
 
     void update_rtime();
     void update_rsize() { loadpreset(shape); }
@@ -192,8 +192,9 @@ template <typename FXConfig> inline void Reverb1<FXConfig>::initialize()
     mix.set_target(1.f); // Should be the smoothest
     mix.instantize();
 
-    width.set_target(1.f); // Should be the smoothest
-    width.instantize();
+    widthS.set_target(1.f); // Should be the smoothest
+    widthM.set_target(1.f);
+    widthS.instantize();
 
     for (int t = 0; t < rev_taps; t++)
     {
@@ -233,7 +234,7 @@ inline void Reverb1<FXConfig>::processBlock(float *__restrict dataL, float *__re
     b = (b + 1) & 31;
 
     mix.set_target_smoothed(this->floatValue(rev1_mix));
-    this->setWidthTarget(width, rev1_width);
+    this->setWidthTarget(widthS, widthM, rev1_width);
 
     int pdtime = (int)(float)this->sampleRate() *
                  this->noteToPitchIgnoringTuning(12 * this->floatValue(rev1_predelay)) *
@@ -324,7 +325,7 @@ inline void Reverb1<FXConfig>::processBlock(float *__restrict dataL, float *__re
     }
 
     // scale width
-    this->applyWidth(wetL, wetR, width);
+    this->applyWidth(wetL, wetR, widthS, widthM);
 
     mix.fade_2_blocks_inplace(dataL, wetL, dataR, wetR, this->blockSize_quad);
 }

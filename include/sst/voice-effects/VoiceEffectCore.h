@@ -181,6 +181,11 @@ template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig:
         }
     }
 
+    static constexpr bool useLinearWidth()
+    {
+        return true; // all voice effects use new style width
+    }
+
 #define HASMEM(M, GetSig, DVAL, PARENS)                                                            \
     template <typename T, typename = void> struct has_##M : std::false_type                        \
     {                                                                                              \
