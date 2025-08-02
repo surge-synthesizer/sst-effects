@@ -23,26 +23,28 @@
 
 #include "../VoiceEffectCore.h"
 
-#include <iostream>
-
 #include "sst/basic-blocks/params/ParamMetadata.h"
+#include "sst/effects-shared/WidthProvider.h"
 #include "sst/basic-blocks/dsp/PanLaws.h"
 
 namespace sst::voice_effects::utilities
 {
-template <typename VFXConfig> struct StereoTool : core::VoiceEffectTemplateBase<VFXConfig>
+template <typename VFXConfig>
+struct StereoTool : core::VoiceEffectTemplateBase<VFXConfig>,
+                    effects_shared::WidthProvider<StereoTool<VFXConfig>, VFXConfig::blockSize, true>
 {
     static constexpr const char *effectName{"Stereo Tool"};
 
     static constexpr int numFloatParams{4};
     static constexpr int numIntParams{0};
+    static constexpr float halfPi{1.5707963};
 
     enum FloatParams
     {
+        fpInputPan,
         fpRotation,
         fpWidth,
-        fpMidSide,
-        fpLeftRight
+        fpOutputBalance
     };
 
     StereoTool() : core::VoiceEffectTemplateBase<VFXConfig>() {}
@@ -55,21 +57,27 @@ template <typename VFXConfig> struct StereoTool : core::VoiceEffectTemplateBase<
 
         switch (idx)
         {
+        case fpInputPan:
+            return pmd().asPan().withName("Input Pan");
         case fpRotation:
             return pmd()
                 .asFloat()
-                .withRange(-90.f, 90.f)
+                .withRange(-halfPi, halfPi)
                 .withDefault(0.f)
                 .withName("Rotation")
-                .withLinearScaleFormatting("º");
+                .withLinearScaleFormatting("º", 90 / halfPi);
         case fpWidth:
-            return pmd().asPercent().withDefault(1.f).withRange(0.f, 2.f).withName("Width");
-        case fpMidSide:
-            return pmd().asPercent().withDefault(0.f).withRange(-1.f, 1.f).withName("Mid|Side");
-        case fpLeftRight:
-            return pmd().asPercent().withDefault(0.f).withRange(-1.f, 1.f).withName("Left|Right");
+            return this->getWidthParam().withName("Width");
+        case fpOutputBalance:
+            return pmd().asPan().withName("Output Balance");
         }
         return pmd().asFloat().withName("Error");
+    }
+
+    basic_blocks::params::ParamMetaData intParamAt(int idx) const
+    {
+        using pmd = basic_blocks::params::ParamMetaData;
+        return pmd().asInt().withName("Error");
     }
 
     void initVoiceEffect() {}
@@ -79,79 +87,49 @@ template <typename VFXConfig> struct StereoTool : core::VoiceEffectTemplateBase<
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
                        float *dataoutR, float pitch)
     {
+        namespace mech = basic_blocks::mechanics;
+        namespace pan = basic_blocks::dsp::pan_laws;
 
-        rotLerp.set_target(this->getFloatParam(fpRotation));
-        float rot alignas(16)[VFXConfig::blockSize];
-        rotLerp.store_block(rot);
+        mech::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
+        mech::copy_from_to<VFXConfig::blockSize>(datainR, dataoutR);
 
-        widthLerp.set_target(this->getFloatParam(fpWidth));
-        float w alignas(16)[VFXConfig::blockSize];
-        widthLerp.store_block(w);
+        pan::stereoEqualPower((this->getFloatParam(fpInputPan) + 1) / 2, preMatrix);
+        preLerpL.set_target(preMatrix[0]);
+        preLerpR.set_target(preMatrix[1]);
+        preLerpL.multiply_block(dataoutL);
+        preLerpR.multiply_block(dataoutR);
 
-        msLerp.set_target(this->getFloatParam(fpMidSide));
-        float ms alignas(16)[VFXConfig::blockSize];
-        msLerp.store_block(ms);
+        sinLerp.set_target(sin(this->getFloatParam(fpRotation)));
+        float s alignas(16)[VFXConfig::blockSize];
+        sinLerp.store_block(s);
 
-        lrLerp.set_target(this->getFloatParam(fpLeftRight));
-        float lr alignas(16)[VFXConfig::blockSize];
-        lrLerp.store_block(lr);
+        cosLerp.set_target(cos(this->getFloatParam(fpRotation)));
+        float c alignas(16)[VFXConfig::blockSize];
+        cosLerp.store_block(c);
 
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
-            auto rotRadians = rot[i] * 0.017453292; // degrees * PI/180
-            auto width = w[i] / 2.f;
-            auto side = std::min(ms[i] + 1, 1.f);
-            auto center = 1 - ms[i];
-            auto left = -std::min(lr[i], 0.f);
-            auto left1 = -std::max(lr[i] - 1, -1.f);
-            auto right = std::max(lr[i], 0.f);
-            auto right1 = std::min(1 + lr[i], 1.f);
-
-            auto sL = datainL[i];
-            auto sR = datainR[i];
-
-            // Rotation
-            auto signL = sL >= 0 ? 1 : -1;
-            auto signR = sR >= 0 ? 1 : -1;
-
-            auto angle = atan(sL / sR);
-            if ((signL == 1 && signR == -1) || (signL == -1 && signR == -1))
-                angle += 3.141592654;
-            if (signL == -1 && signR == 1)
-                angle += 6.283185307;
-            if (sR == 0)
-            {
-                if (sL > 0)
-                    angle = 1.570796327;
-                else
-                    angle = 4.71238898;
-            }
-            if (sL == 0)
-            {
-                if (sR > 0)
-                    angle = 0;
-                else
-                    angle = 3.141592654;
-            }
-            angle -= rotRadians;
-            auto radius = sqrt(sL * sL + sR * sR);
-            sL = sin(angle) * radius;
-            sR = cos(angle) * radius;
-
-            // 3 Way Balancer + Enhancer
-            auto mono = (sL + sR) / 2 * center;
-            auto stereo = (sL - sR) * side;
-            sL = (mono + (stereo * left1 - stereo * right) * width) / std::max(width, 1.f);
-            sR = (mono + (-stereo * right1 + stereo * left) * width) / std::max(width, 1.f);
-
-            dataoutL[i] = sL;
-            dataoutR[i] = sR;
+            auto inL = dataoutL[i];
+            dataoutL[i] = inL * c[i] - dataoutR[i] * s[i];
+            dataoutR[i] = inL * s[i] + dataoutR[i] * c[i];
         }
+
+        this->setWidthTarget(widthLerpS, widthLerpM, fpWidth);
+        this->applyWidth(dataoutL, dataoutR, widthLerpS, widthLerpM);
+
+        pan::stereoEqualPower((this->getFloatParam(fpOutputBalance) + 1) / 2, postMatrix);
+        postLerpL.set_target(postMatrix[0]);
+        postLerpR.set_target(postMatrix[1]);
+        postLerpL.multiply_block(dataoutL);
+        postLerpR.multiply_block(dataoutR);
     }
 
   protected:
-    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> rotLerp, widthLerp, msLerp,
-        lrLerp;
+    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> sinLerp, cosLerp, widthLerpS,
+        widthLerpM, preLerpL, preLerpR, postLerpL, postLerpR;
+
+    basic_blocks::dsp::pan_laws::panmatrix_t preMatrix{1, 1, 0, 0};
+    basic_blocks::dsp::pan_laws::panmatrix_t postMatrix{1, 1, 0, 0};
 
   public:
     static constexpr int16_t streamingVersion{1};
