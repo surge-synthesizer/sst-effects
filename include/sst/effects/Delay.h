@@ -181,7 +181,7 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
     // Still don't have it here.
     static constexpr int max_delay_length{1 << 18};
     typename core::EffectTemplateBase<FXConfig>::lipol_ps_blocksz feedback, crossfeed, aligpan, pan,
-        mix, width;
+        mix, widthS, widthM;
     float buffer alignas(
         16)[2][max_delay_length + sst::basic_blocks::tables::SurgeSincTableProvider::FIRipol_N];
 
@@ -290,7 +290,7 @@ template <typename FXConfig> inline void Delay<FXConfig>::setvars(bool init)
     }
 
     mix.set_target_smoothed(this->floatValue(dly_mix));
-    this->setWidthTarget(width, dly_width);
+    this->setWidthTarget(widthS, widthM, dly_width);
     pan.set_target_smoothed(std::clamp(this->floatValue(dly_input_channel), -1.f, 1.f));
 
     lp.coeff_LP2B(lp.calc_omega(this->floatValue(dly_highcut) / 12.0), 0.707);
@@ -303,7 +303,8 @@ template <typename FXConfig> inline void Delay<FXConfig>::setvars(bool init)
         feedback.instantize();
         crossfeed.instantize();
         mix.instantize();
-        width.instantize();
+        widthS.instantize();
+        widthM.instantize();
         pan.instantize();
         lp.coeff_instantize();
         hp.coeff_instantize();
@@ -433,7 +434,7 @@ template <typename FXConfig> inline void Delay<FXConfig>::processBlock(float *da
     }
 
     // scale width
-    this->applyWidth(tbufferL, tbufferR, width);
+    this->applyWidth(tbufferL, tbufferR, widthS, widthM);
 
     mix.fade_2_blocks_inplace(dataL, tbufferL, dataR, tbufferR, this->blockSize_quad);
 

@@ -194,7 +194,7 @@ template <typename FXConfig> struct Flanger : core::EffectTemplateBase<FXConfig>
     float lfosandhtarget[2][COMBS_PER_CHANNEL];
     float vweights[2][COMBS_PER_CHANNEL];
 
-    sdsp::lipol_sse<FXConfig::blockSize, false> width;
+    sdsp::lipol_sse<FXConfig::blockSize, false> widthS, widthM;
     bool haveProcessed{false};
 
     const static int LFO_TABLE_SIZE = 8192;
@@ -599,8 +599,8 @@ inline void Flanger<FXConfig>::processBlock(float *__restrict dataL, float *__re
         voices.process();
     }
 
-    this->setWidthTarget(width, fl_width, 1.0 / 3.0);
-    this->applyWidth(dataL, dataR, width);
+    this->setWidthTarget(widthS, widthM, fl_width, 1.0 / 3.0);
+    this->applyWidth(dataL, dataR, widthS, widthM);
 }
 
 } // namespace sst::effects::flanger

@@ -71,7 +71,8 @@ template <typename FXConfig> struct Phaser : core::EffectTemplateBase<FXConfig>
         n_bq_units_initialised = n_bq_units;
         feedback.setBlockSize(FXConfig::blockSize * this->slowrate);
         tone.setBlockSize(FXConfig::blockSize);
-        width.set_blocksize(FXConfig::blockSize);
+        widthS.set_blocksize(FXConfig::blockSize);
+        widthM.set_blocksize(FXConfig::blockSize);
         lp.setBlockSize(FXConfig::blockSize);
         hp.setBlockSize(FXConfig::blockSize);
         mix.set_blocksize(FXConfig::blockSize);
@@ -101,7 +102,8 @@ template <typename FXConfig> struct Phaser : core::EffectTemplateBase<FXConfig>
         mix.set_target(1.f);
 
         tone.instantize();
-        width.instantize();
+        widthS.instantize();
+        widthM.instantize();
         mix.instantize();
 
         modLFOL.setSampleRate(this->sampleRate());
@@ -230,7 +232,7 @@ template <typename FXConfig> struct Phaser : core::EffectTemplateBase<FXConfig>
         feedback.newValue(0.95f * this->floatValue(ph_feedback));
         tone.newValue(std::clamp(this->floatValue(ph_tone), -1.f, 1.f));
 
-        this->setWidthTarget(width, ph_width);
+        this->setWidthTarget(widthS, widthM, ph_width);
 
         // lowpass range is from MIDI note 136 down to 57 (~21.1 kHz down to 220 Hz)
         // highpass range is from MIDI note 34 to 136(~61 Hz to ~21.1 kHz)
@@ -289,7 +291,7 @@ template <typename FXConfig> struct Phaser : core::EffectTemplateBase<FXConfig>
             hp.process_block(L, R);
         }
 
-        this->applyWidth(L, R, width);
+        this->applyWidth(L, R, widthS, widthM);
 
         mix.set_target_smoothed(std::clamp(this->floatValue(ph_mix), 0.f, 1.f));
         mix.fade_2_blocks_inplace(dataL, L, dataR, R, this->blockSize_quad);
@@ -359,8 +361,7 @@ fxdata->p[ph_mod_rate].deactivated = false;
         return pmd().withName("Unknown " + std::to_string(idx));
     }
 
-    sst::basic_blocks::dsp::lipol_sse<FXConfig::blockSize, false> width alignas(16), mix
-        alignas(16);
+    sst::basic_blocks::dsp::lipol_sse<FXConfig::blockSize, false> widthS, widthM, mix;
 
     float L alignas(16)[FXConfig::blockSize], R alignas(16)[FXConfig::blockSize];
 

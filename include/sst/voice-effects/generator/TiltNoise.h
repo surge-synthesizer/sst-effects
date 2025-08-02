@@ -31,10 +31,13 @@
 #include "sst/basic-blocks/dsp/RNG.h"
 #include "sst/basic-blocks/dsp/MidSide.h"
 #include "sst/filters/FastTiltNoiseFilter.h"
+#include "sst/effects-shared/WidthProvider.h"
 
 namespace sst::voice_effects::generator
 {
-template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<VFXConfig>
+template <typename VFXConfig>
+struct TiltNoise : core::VoiceEffectTemplateBase<VFXConfig>,
+                   effects_shared::WidthProvider<TiltNoise<VFXConfig>, VFXConfig::blockSize, true>
 {
     static constexpr const char *effectName{"Tilt Noise"};
 
@@ -78,12 +81,7 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
                 .withCustomMaxDisplay("Violet")
                 .withDefault(0);
         case fpStereoWidth:
-            return pmd()
-                .asFloat()
-                .withRange(0.f, 2.f)
-                .withDefault(1.f)
-                .withLinearScaleFormatting("%", 100)
-                .withName(!stereo ? std::string() : "Stereo Width");
+            return this->getWidthParam().withName(!stereo ? std::string() : "Width");
         }
         return pmd().asFloat().withName("Error");
     }
@@ -132,9 +130,7 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
         level = level * level * level;
         levelLerp.set_target(level);
 
-        widthLerp.set_target(std::clamp(this->getFloatParam(fpStereoWidth), 0.f, 2.f));
-        float width alignas(16)[VFXConfig::blockSize];
-        widthLerp.store_block(width);
+        this->setWidthTarget(widthLerpS, widthLerpM, fpStereoWidth);
 
         float noiseL[VFXConfig::blockSize]{};
         float noiseR[VFXConfig::blockSize]{};
@@ -146,12 +142,7 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
 
         if (stereo)
         {
-            float noiseM[VFXConfig::blockSize]{};
-            float noiseS[VFXConfig::blockSize]{};
-            sst::basic_blocks::dsp::encodeMS<VFXConfig::blockSize>(noiseL, noiseR, noiseM, noiseS);
-            // TODO: Loudness compensation
-            widthLerp.multiply_block(noiseS);
-            sst::basic_blocks::dsp::decodeMS<VFXConfig::blockSize>(noiseM, noiseS, noiseL, noiseR);
+            this->applyWidth(noiseL, noiseR, widthLerpS, widthLerpM);
         }
 
         float slope = std::clamp(this->getFloatParam(fpTilt), -6.f, 6.f) / 2.f;
@@ -210,9 +201,7 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
         float atten alignas(16)[VFXConfig::blockSize];
         attenLerp.store_block(atten);
 
-        widthLerp.set_target(std::clamp(this->getFloatParam(fpStereoWidth), 0.f, 2.f));
-        float width alignas(16)[VFXConfig::blockSize];
-        widthLerp.store_block(width);
+        this->setWidthTarget(widthLerpS, widthLerpM, fpStereoWidth);
 
         float noiseL[VFXConfig::blockSize]{};
         float noiseR[VFXConfig::blockSize]{};
@@ -222,12 +211,7 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
             noiseR[i] = rng.unifPM1() * atten[i];
         }
 
-        float noiseM[VFXConfig::blockSize]{};
-        float noiseS[VFXConfig::blockSize]{};
-        sst::basic_blocks::dsp::encodeMS<VFXConfig::blockSize>(noiseL, noiseR, noiseM, noiseS);
-        // TODO: Loudness compensation
-        widthLerp.multiply_block(noiseS);
-        sst::basic_blocks::dsp::decodeMS<VFXConfig::blockSize>(noiseM, noiseS, noiseL, noiseR);
+        this->applyWidth(noiseL, noiseR, widthLerpS, widthLerpM);
 
         float slope = std::clamp(this->getFloatParam(fpTilt), -6.f, 6.f) / 2.f;
         FiltersL.template setCoeffForBlock<VFXConfig::blockSize>(slope);
@@ -242,7 +226,8 @@ template <typename VFXConfig> struct TiltNoise : core::VoiceEffectTemplateBase<V
 
   protected:
     sst::filters::FastTiltNoiseFilter<TiltNoise> FiltersL, FiltersR;
-    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> levelLerp, widthLerp, attenLerp;
+    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> levelLerp, widthLerpS, widthLerpM,
+        attenLerp;
 
   public:
     static constexpr int16_t streamingVersion{1};
