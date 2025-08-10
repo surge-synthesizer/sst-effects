@@ -52,7 +52,7 @@ template <typename VFXConfig> struct SinePlus : core::VoiceEffectTemplateBase<VF
         ipQuantB,
     };
 
-    SinePlus() : core::VoiceEffectTemplateBase<VFXConfig>(){}
+    SinePlus() : core::VoiceEffectTemplateBase<VFXConfig>() {}
 
     ~SinePlus() {}
 
@@ -80,12 +80,12 @@ template <typename VFXConfig> struct SinePlus : core::VoiceEffectTemplateBase<VF
             if (quantA)
             {
                 return pmd()
-                .asFloat()
-                .withName("Offset A")
-                .withRange(2,24)
-                .withDefault(2)
-                .withQuantizedStepCount(22)
-                .withLinearScaleFormatting("Harmonic");
+                    .asFloat()
+                    .withName("Offset A")
+                    .withRange(2, 24)
+                    .withDefault(2)
+                    .withQuantizedStepCount(22)
+                    .withLinearScaleFormatting("Harmonic");
             }
             return pmd()
                 .asFloat()
@@ -97,12 +97,12 @@ template <typename VFXConfig> struct SinePlus : core::VoiceEffectTemplateBase<VF
             if (quantB)
             {
                 return pmd()
-                .asFloat()
-                .withName("Offset B")
-                .withRange(2,24)
-                .withDefault(3)
-                .withQuantizedStepCount(22)
-                .withLinearScaleFormatting("Harmonic");
+                    .asFloat()
+                    .withName("Offset B")
+                    .withRange(2, 24)
+                    .withDefault(3)
+                    .withQuantizedStepCount(22)
+                    .withLinearScaleFormatting("Harmonic");
             }
             return pmd()
                 .asFloat()
@@ -111,14 +111,9 @@ template <typename VFXConfig> struct SinePlus : core::VoiceEffectTemplateBase<VF
                 .withDefault(19)
                 .withLinearScaleFormatting("semitones");
         case fpMainBalance:
-            return pmd()
-                .asPercentBipolar()
-                .withName("Main Balance");
+            return pmd().asPercentBipolar().withName("Main Balance");
         case fpBalanceAB:
-            return pmd()
-                .asPercentBipolar()
-                .withName("Balance AB");
-
+            return pmd().asPercentBipolar().withName("Balance AB");
         }
 
         return pmd().withName("Error");
@@ -132,22 +127,16 @@ template <typename VFXConfig> struct SinePlus : core::VoiceEffectTemplateBase<VF
         {
         case ipQuantA:
             return pmd()
-            .asBool()
-            .withUnorderedMapFormatting({
-                {false, "Off"},
-                {true, "On"}
-            })
-            .withDefault(true)
-            .withName("Harmonic Quantize A");
+                .asBool()
+                .withUnorderedMapFormatting({{false, "Off"}, {true, "On"}})
+                .withDefault(true)
+                .withName("Harmonic Quantize A");
         case ipQuantB:
             return pmd()
-            .asBool()
-            .withUnorderedMapFormatting({
-                {false, "Off"},
-                {true, "On"}
-            })
-            .withDefault(true)
-            .withName("Harmonic Quantize B");
+                .asBool()
+                .withUnorderedMapFormatting({{false, "Off"}, {true, "On"}})
+                .withDefault(true)
+                .withName("Harmonic Quantize B");
         }
 
         return pmd().withName("Error");
@@ -165,8 +154,9 @@ template <typename VFXConfig> struct SinePlus : core::VoiceEffectTemplateBase<VF
 
     void processMonoToMono(const float *const datain, float *dataout, float pitch)
     {
-        auto freq= this->getFloatParam(fpBaseFrequency);
-        if (keytrackOn) freq += pitch;
+        auto freq = this->getFloatParam(fpBaseFrequency);
+        if (keytrackOn)
+            freq += pitch;
 
         float refA{440};
         float refB{440};
@@ -191,14 +181,14 @@ template <typename VFXConfig> struct SinePlus : core::VoiceEffectTemplateBase<VF
             freqB += this->getFloatParam(fpOffsetB);
         }
 
-        sineOsc1.setRate(440.0 * 2 * M_PI *
-                this->note_to_pitch_ignoring_tuning(freq) * this->getSampleRateInv());
+        sineOsc1.setRate(440.0 * 2 * M_PI * this->note_to_pitch_ignoring_tuning(freq) *
+                         this->getSampleRateInv());
 
-        sineOsc2.setRate(refA * 2 * M_PI *
-            this->note_to_pitch_ignoring_tuning(freqA) * this->getSampleRateInv());
+        sineOsc2.setRate(refA * 2 * M_PI * this->note_to_pitch_ignoring_tuning(freqA) *
+                         this->getSampleRateInv());
 
-        sineOsc3.setRate(refB * 2 * M_PI *
-            this->note_to_pitch_ignoring_tuning(freqB) * this->getSampleRateInv());
+        sineOsc3.setRate(refB * 2 * M_PI * this->note_to_pitch_ignoring_tuning(freqB) *
+                         this->getSampleRateInv());
 
         namespace pan = basic_blocks::dsp::pan_laws;
 

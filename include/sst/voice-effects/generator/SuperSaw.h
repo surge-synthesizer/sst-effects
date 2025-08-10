@@ -25,7 +25,6 @@
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
 #include "sst/basic-blocks/dsp/DPWSawPulseOscillator.h"
 
-
 #include "../VoiceEffectCore.h"
 
 #include <iostream>
@@ -36,8 +35,9 @@
 
 namespace sst::voice_effects::generator
 {
-template <typename VFXConfig> struct SuperSaw : core::VoiceEffectTemplateBase<VFXConfig>,
-                                                effects_shared::WidthProvider<SuperSaw<VFXConfig>, VFXConfig::blockSize, true>
+template <typename VFXConfig>
+struct SuperSaw : core::VoiceEffectTemplateBase<VFXConfig>,
+                  effects_shared::WidthProvider<SuperSaw<VFXConfig>, VFXConfig::blockSize, true>
 {
     static constexpr const char *effectName{"VA Oscillator"};
 
@@ -84,21 +84,17 @@ template <typename VFXConfig> struct SuperSaw : core::VoiceEffectTemplateBase<VF
             return pmd().asCubicDecibelAttenuation().withDefault(0.5f).withName("Level");
         case fpDetune:
             return pmd()
-            .asFloat()
-            .withRange(0.f,1.f)
-            .withDefault(.1)
-            .withLinearScaleFormatting( "cents", 100)
-            .withName("Detune");
+                .asFloat()
+                .withRange(0.f, 1.f)
+                .withDefault(.1)
+                .withLinearScaleFormatting("cents", 100)
+                .withName("Detune");
         case fpDrift:
-            return pmd()
-            .asPercent()
-            .withDefault(0.f)
-            .withName("Drift");
+            return pmd().asPercent().withDefault(0.f).withName("Drift");
         case fpStereoWidth:
             return this->getWidthParam()
-            .withName(!stereo ? std::string() : "Width")
-            .withRange(0.f, 2.f);
-
+                .withName(!stereo ? std::string() : "Width")
+                .withRange(0.f, 2.f);
         }
         return pmd().withName("Unknown " + std::to_string(idx)).asPercent();
     }
@@ -111,11 +107,11 @@ template <typename VFXConfig> struct SuperSaw : core::VoiceEffectTemplateBase<VF
         {
         case ipUnisonVoices:
             return pmd()
-            .asInt()
-            .withRange(1, maxVoices)
-            .withDefault(3)
-            .withLinearScaleFormatting("voices")
-            .withName("Unison");
+                .asInt()
+                .withRange(1, maxVoices)
+                .withDefault(3)
+                .withLinearScaleFormatting("voices")
+                .withName("Unison");
         case ipStereo:
             return pmd().asStereoSwitch().withDefault(false);
         }
@@ -139,7 +135,8 @@ template <typename VFXConfig> struct SuperSaw : core::VoiceEffectTemplateBase<VF
     void calcUnison(bool init = false)
     {
         int voices = this->getIntParam(ipUnisonVoices);
-        if (init) voices = maxVoices;
+        if (init)
+            voices = maxVoices;
         basic_blocks::dsp::UnisonSetup<float> uniSet(voices);
 
         for (int v = 0; v < voices; v++)
@@ -160,7 +157,8 @@ template <typename VFXConfig> struct SuperSaw : core::VoiceEffectTemplateBase<VF
         }
 
         auto tune = this->getFloatParam(fpOffset);
-        if (keytrackOn) tune += pitch;
+        if (keytrackOn)
+            tune += pitch;
 
         for (int v = 0; v < voiceCount; v++)
         {
@@ -169,7 +167,6 @@ template <typename VFXConfig> struct SuperSaw : core::VoiceEffectTemplateBase<VF
             auto voiceFreq = 440 * this->note_to_pitch_ignoring_tuning(tune + vDrift + vDet);
             sawOscillators[v].setFrequency(voiceFreq, this->getSampleRateInv());
         }
-
 
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
@@ -181,7 +178,8 @@ template <typename VFXConfig> struct SuperSaw : core::VoiceEffectTemplateBase<VF
             }
         }
         levelLerp.set_target(this->getFloatParam(fpLevel));
-        levelLerp.multiply_block(dataoutL);;
+        levelLerp.multiply_block(dataoutL);
+        ;
     }
 
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
@@ -195,7 +193,8 @@ template <typename VFXConfig> struct SuperSaw : core::VoiceEffectTemplateBase<VF
         }
 
         auto tune = this->getFloatParam(fpOffset);
-        if (keytrackOn) tune += pitch;
+        if (keytrackOn)
+            tune += pitch;
 
         for (int v = 0; v < voiceCount; v++)
         {
@@ -204,7 +203,6 @@ template <typename VFXConfig> struct SuperSaw : core::VoiceEffectTemplateBase<VF
             auto voiceFreq = 440 * this->note_to_pitch_ignoring_tuning(tune + vDrift + vDet);
             sawOscillators[v].setFrequency(voiceFreq, this->getSampleRateInv());
         }
-
 
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
@@ -220,7 +218,8 @@ template <typename VFXConfig> struct SuperSaw : core::VoiceEffectTemplateBase<VF
         }
 
         levelLerp.set_target(this->getFloatParam(fpLevel));
-        levelLerp.multiply_2_blocks(dataoutL, dataoutR);;
+        levelLerp.multiply_2_blocks(dataoutL, dataoutR);
+        ;
 
         if (this->getIntParam(ipStereo))
         {
@@ -230,7 +229,7 @@ template <typename VFXConfig> struct SuperSaw : core::VoiceEffectTemplateBase<VF
     }
 
     void processMonoToStereo(const float *const datainL, float *dataoutL, float *dataoutR,
-                            float pitch)
+                             float pitch)
     {
         processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
     }
@@ -253,14 +252,15 @@ template <typename VFXConfig> struct SuperSaw : core::VoiceEffectTemplateBase<VF
     float priorVoiceCount{-1};
 
     std::array<basic_blocks::dsp::DPWSawOscillator<
-        basic_blocks::dsp::BlockInterpSmoothingStrategy<VFXConfig::blockSize>>, maxVoices> sawOscillators;
+                   basic_blocks::dsp::BlockInterpSmoothingStrategy<VFXConfig::blockSize>>,
+               maxVoices>
+        sawOscillators;
     std::array<basic_blocks::dsp::DriftLFO, maxVoices> driftLfos;
     std::array<float, maxVoices> panL;
     std::array<float, maxVoices> panR;
     std::array<float, maxVoices> voiceDetune;
 
     basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> levelLerp, widthLerpS, widthLerpM;
-
 
   public:
     static constexpr int16_t streamingVersion{1};

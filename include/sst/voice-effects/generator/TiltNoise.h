@@ -81,7 +81,9 @@ struct TiltNoise : core::VoiceEffectTemplateBase<VFXConfig>,
                 .withCustomMaxDisplay("Violet")
                 .withDefault(0);
         case fpStereoWidth:
-            return this->getWidthParam().withName(!stereo ? std::string() : "Width").withRange(0.f, 2.f);
+            return this->getWidthParam()
+                .withName(!stereo ? std::string() : "Width")
+                .withRange(0.f, 2.f);
         }
         return pmd().asFloat().withName("Error");
     }
