@@ -47,6 +47,7 @@
 #include "sst/voice-effects/modulation/Phaser.h"
 #include "sst/voice-effects/modulation/FMFilter.h"
 #include "sst/voice-effects/generator/TiltNoise.h"
+#include "sst/voice-effects/generator/EllipticBlepWaveforms.h"
 #include "sst/voice-effects/modulation/NoiseAM.h"
 #include "sst/voice-effects/utilities/StereoTool.h"
 #include "sst/voice-effects/utilities/VolumeAndPan.h"
@@ -189,6 +190,11 @@ TEST_CASE("Can Create Voice FX")
     SECTION("Tilt Noise")
     {
         VTester<sst::voice_effects::generator::TiltNoise<VTestConfig>>::TestVFX();
+    }
+
+    SECTION("Elliptic Blep Waveforms")
+    {
+        VTester<sst::voice_effects::generator::EllipticBlepWaveforms<VTestConfig>>::TestVFX();
     }
     SECTION("Noise AM")
     {
