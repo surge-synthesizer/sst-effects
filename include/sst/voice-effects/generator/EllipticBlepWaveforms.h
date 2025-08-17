@@ -26,8 +26,6 @@
 
 #include "../VoiceEffectCore.h"
 
-#include <iostream>
-
 #include "sst/basic-blocks/mechanics/block-ops.h"
 #include "sst/basic-blocks/dsp/OscillatorDriftUnisonCharacter.h"
 #include "sst/basic-blocks/dsp/PanLaws.h"
@@ -47,7 +45,7 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
     {
         fpOffset,
         fpSync,
-        fpWidth,
+        fpPulseWidth,
         fpUniDetune,
         fpUniWidth,
         fpDrift,
@@ -95,7 +93,7 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
                 .withDefault(0)
                 .withLinearScaleFormatting("semitones")
                 .withName("Sync");
-        case fpWidth:
+        case fpPulseWidth:
             return pmd().asPercent().withDefault(0.5).withName("Width");
         case fpUniDetune:
             return pmd()
@@ -147,7 +145,14 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
 
     ~EllipticBlepWaveforms() = default;
 
-    void initVoiceEffect() { drift.init(true); }
+    void initVoiceEffect()
+    {
+        auto uc = this->getIntParam(ipUnisonVoices) * 2 + 1;
+        for (int i = 0; i < uc; ++i)
+        {
+            driftLFOs[i].init(true);
+        }
+    }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     template <bool toStereo, typename T>
@@ -168,12 +173,15 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
             uniPanValid = false;
             lastUniPanWidth = upw;
         }
-        auto tune = this->getFloatParam(fpOffset);
+        auto tp = this->getFloatParam(fpOffset);
+        double tune[maxUnison]{{tp}, {tp}, {tp}, {tp}, {tp}, {tp}, {tp}};
         auto sr = this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpSync));
 
         // Drift I just normalized by ear here
-        auto driftAmt = drift.next() * this->getFloatParam(fpDrift) * 0.5;
-        tune += driftAmt;
+        for (int i = 0; i < uc; ++i)
+        {
+            tune[i] += driftLFOs[i].next() * this->getFloatParam(fpDrift) * 0.5;
+        }
 
         // dt is 0->1 mapping to 0->100 cents
         auto dt = this->getFloatParam(fpUniDetune) * (ue ? 12 : 1);
@@ -197,8 +205,8 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
         for (int u = 0; u < uc; ++u)
         {
             auto baseFreq = 440.0 * this->note_to_pitch_ignoring_tuning(
-                                        (keytrackOn) ? tune + pitch + dt * uni.detune(u)
-                                                     : tune + dt * uni.detune(u));
+                                        (keytrackOn) ? tune[u] + pitch + dt * uni.detune(u)
+                                                     : tune[u] + dt * uni.detune(u));
             t[u].setFrequency(baseFreq, this->getSampleRateInv());
             t[u].setSyncRatio(sr);
             if (toStereo)
@@ -240,6 +248,7 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
 
     template <bool toStereo> void processTo(float *dataoutL, float *dataoutR, float pitch)
     {
+        auto uc = this->getIntParam(ipUnisonVoices) * 2 + 1;
         int wave = this->getIntParam(ipWaveform);
         switch ((Wave)wave)
         {
@@ -247,7 +256,10 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
             genericProcess<toStereo>(sawOscs, dataoutL, dataoutR, pitch);
             break;
         case Wave::PULSE:
-            pulseOscs[0].setWidth(std::clamp(this->getFloatParam(fpWidth), 0.01f, 0.99f));
+            for (int i = 0; i < uc; ++i)
+            {
+                pulseOscs[i].setWidth(std::clamp(this->getFloatParam(fpPulseWidth), 0.01f, 0.99f));
+            }
             genericProcess<toStereo>(pulseOscs, dataoutL, dataoutR, pitch);
             break;
         case Wave::NEARSIN:
@@ -262,7 +274,14 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
         levT = levT * levT * levT;
         sLevelLerp.set_target(levT);
 
-        sLevelLerp.multiply_block(dataoutL);
+        if constexpr (!toStereo)
+        {
+            sLevelLerp.multiply_block(dataoutL);
+        }
+        else
+        {
+            sLevelLerp.multiply_2_blocks(dataoutL, dataoutR);
+        }
     }
 
     void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
@@ -310,7 +329,7 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
     std::array<sin_t, maxUnison> sinOscs;
     std::array<sst::basic_blocks::dsp::pan_laws::panmatrix_t, maxUnison> uniPans;
 
-    sst::basic_blocks::dsp::DriftLFO drift;
+    std::array<sst::basic_blocks::dsp::DriftLFO, maxUnison> driftLFOs;
     sst::basic_blocks::dsp::UnisonSetup<float> uni;
     int lastUnison{1};
     float lastUniPanWidth{-10000.f};
