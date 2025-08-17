@@ -18,8 +18,8 @@
  * https://github.com/surge-synthesizer/sst-effects
  */
 
-#ifndef INCLUDE_SST_VOICE_EFFECTS_CATEGORY_SINEPLUS_H
-#define INCLUDE_SST_VOICE_EFFECTS_CATEGORY_SINEPLUS_H
+#ifndef INCLUDE_SST_VOICE_EFFECTS_GENERATOR_SINEPLUS_H
+#define INCLUDE_SST_VOICE_EFFECTS_GENERATOR_SINEPLUS_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
