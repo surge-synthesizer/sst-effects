@@ -146,6 +146,13 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
 
     void initVoiceEffect()
     {
+        for (int i = 0; i < maxUnison; ++i)
+        {
+            sawOscs[i].setSampleRate(this->getSampleRate());
+            sinOscs[i].setSampleRate(this->getSampleRate());
+            triOscs[i].setSampleRate(this->getSampleRate());
+            pulseOscs[i].setSampleRate(this->getSampleRate());
+        }
         if (this->getIntParam(ipRandomPhaseAtOutset))
         {
             auto sr = this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpSync));
@@ -216,7 +223,7 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
             auto baseFreq = 440.0 * this->note_to_pitch_ignoring_tuning(
                                         (keytrackOn) ? tune + driftVal + pitch + dt * uni.detune(u)
                                                      : tune + driftVal + dt * uni.detune(u));
-            t[u].setFrequency(baseFreq, this->getSampleRateInv());
+            t[u].setFrequency(baseFreq);
             t[u].setSyncRatio(sr);
             if (toStereo)
             {
