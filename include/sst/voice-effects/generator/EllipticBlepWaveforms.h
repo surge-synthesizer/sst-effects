@@ -38,7 +38,7 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
     static constexpr const char *effectName{"Waveform Oscillator"};
 
     static constexpr int numFloatParams{7};
-    static constexpr int numIntParams{4};
+    static constexpr int numIntParams{5};
     static constexpr int maxUnison{7};
 
     enum FloatParams
@@ -57,7 +57,8 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
         ipWaveform,
         ipUnisonVoices,
         ipUnisonExtend,
-        ipStereo
+        ipStereo,
+        ipRandomPhaseAtOutset
     };
 
     enum Wave
@@ -128,27 +129,36 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
                                              {Wave::PULSE, "Pulse"}})
                 .withName("Wave");
         case ipUnisonVoices:
-            return pmd()
-                .asInt()
-                .withRange(0, 3)
-                .withUnorderedMapFormatting({{0, "1"}, {1, "3"}, {2, "5"}, {3, "7"}})
-                .withName("Uni");
+            return pmd().asInt().withRange(1, 7).withLinearScaleFormatting("").withName(
+                "Unison Count");
         case ipUnisonExtend:
-            return pmd().asBool().withOnOffFormatting().withName("Extend Unison");
+            return pmd().asOnOffBool().withDefault(false).withName("Extend Unison");
         case ipStereo:
             return pmd().asStereoSwitch().withDefault(true);
+        case ipRandomPhaseAtOutset:
+            return pmd().asOnOffBool().withDefault(false).withName("Randomize Phase");
         }
         return pmd().withName("error");
     }
 
     EllipticBlepWaveforms() : core::VoiceEffectTemplateBase<VFXConfig>(), uni(1) {}
-
     ~EllipticBlepWaveforms() = default;
 
     void initVoiceEffect()
     {
-        auto uc = this->getIntParam(ipUnisonVoices) * 2 + 1;
-        for (int i = 0; i < uc; ++i)
+        if (this->getIntParam(ipRandomPhaseAtOutset))
+        {
+            auto sr = this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpSync));
+
+            for (int i = 0; i < maxUnison; ++i)
+            {
+                sawOscs[i].setInitialPhase(rng.unif01(), sr);
+                sinOscs[i].setInitialPhase(rng.unif01(), sr);
+                triOscs[i].setInitialPhase(rng.unif01(), sr);
+                pulseOscs[i].setInitialPhase(rng.unif01(), sr);
+            }
+        }
+        for (int i = 0; i < maxUnison; ++i)
         {
             driftLFOs[i].init(true);
         }
@@ -158,7 +168,7 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
     template <bool toStereo, typename T>
     void genericProcess(std::array<T, maxUnison> &t, float *dataoutL, float *dataoutR, float pitch)
     {
-        auto uc = this->getIntParam(ipUnisonVoices) * 2 + 1;
+        auto uc = std::max(this->getIntParam(ipUnisonVoices), 1);
         auto ue = this->getIntParam(ipUnisonExtend);
         auto upw = this->getFloatParam(fpUniWidth);
 
@@ -173,15 +183,11 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
             uniPanValid = false;
             lastUniPanWidth = upw;
         }
-        auto tp = this->getFloatParam(fpOffset);
-        double tune[maxUnison]{{tp}, {tp}, {tp}, {tp}, {tp}, {tp}, {tp}};
+        float tune = this->getFloatParam(fpOffset);
+
         auto sr = this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpSync));
 
         // Drift I just normalized by ear here
-        for (int i = 0; i < uc; ++i)
-        {
-            tune[i] += driftLFOs[i].next() * this->getFloatParam(fpDrift) * 0.5;
-        }
 
         // dt is 0->1 mapping to 0->100 cents
         auto dt = this->getFloatParam(fpUniDetune) * (ue ? 12 : 1);
@@ -202,11 +208,14 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
             }
         }
 
+        auto driftLevel = this->getFloatParam(fpDrift);
         for (int u = 0; u < uc; ++u)
         {
+            auto driftVal = driftLFOs[u].next() * driftLevel * 0.5;
+
             auto baseFreq = 440.0 * this->note_to_pitch_ignoring_tuning(
-                                        (keytrackOn) ? tune[u] + pitch + dt * uni.detune(u)
-                                                     : tune[u] + dt * uni.detune(u));
+                                        (keytrackOn) ? tune + driftVal + pitch + dt * uni.detune(u)
+                                                     : tune + driftVal + dt * uni.detune(u));
             t[u].setFrequency(baseFreq, this->getSampleRateInv());
             t[u].setSyncRatio(sr);
             if (toStereo)
@@ -248,7 +257,6 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
 
     template <bool toStereo> void processTo(float *dataoutL, float *dataoutR, float pitch)
     {
-        auto uc = this->getIntParam(ipUnisonVoices) * 2 + 1;
         int wave = this->getIntParam(ipWaveform);
         switch ((Wave)wave)
         {
@@ -256,12 +264,16 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
             genericProcess<toStereo>(sawOscs, dataoutL, dataoutR, pitch);
             break;
         case Wave::PULSE:
+        {
+            auto uc = this->getIntParam(ipUnisonVoices);
+            auto pw = std::clamp(this->getFloatParam(fpPulseWidth), 0.01f, 0.99f);
             for (int i = 0; i < uc; ++i)
             {
-                pulseOscs[i].setWidth(std::clamp(this->getFloatParam(fpPulseWidth), 0.01f, 0.99f));
+                pulseOscs[i].setWidth(pw);
             }
             genericProcess<toStereo>(pulseOscs, dataoutL, dataoutR, pitch);
-            break;
+        }
+        break;
         case Wave::NEARSIN:
             genericProcess<toStereo>(sinOscs, dataoutL, dataoutR, pitch);
             break;
@@ -334,6 +346,8 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
     int lastUnison{1};
     float lastUniPanWidth{-10000.f};
     bool uniPanValid{false};
+
+    sst::basic_blocks::dsp::RNG rng;
 
   public:
     static constexpr int16_t streamingVersion{1};
