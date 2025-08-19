@@ -64,9 +64,10 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
     enum Wave
     {
         SAW = 0,
-        PULSE = 1,
-        TRI = 2,
-        NEARSIN = 3
+        SEMISIN = 1,
+        PULSE = 2,
+        TRI = 3,
+        NEARSIN = 4
     };
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
@@ -122,15 +123,22 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
         case ipWaveform:
             return pmd()
                 .asInt()
-                .withRange(0, 3)
-                .withUnorderedMapFormatting({{Wave::TRI, "Triangle"},
-                                             {Wave::NEARSIN, "Sine"},
-                                             {Wave::SAW, "Saw"},
-                                             {Wave::PULSE, "Pulse"}})
+                .withRange(0, 4)
+                .withUnorderedMapFormatting({
+                    {Wave::SAW, "Saw"},
+                    {Wave::SEMISIN, "Semisine"},
+                    {Wave::PULSE, "Pulse"},
+                    {Wave::TRI, "Triangle"},
+                    {Wave::NEARSIN, "Sine"},
+                })
                 .withName("Wave");
         case ipUnisonVoices:
-            return pmd().asInt().withRange(1, 7).withLinearScaleFormatting("").withName(
-                "Unison Count");
+            return pmd()
+                .asInt()
+                .withRange(1, 7)
+                .withDefault(1)
+                .withLinearScaleFormatting("")
+                .withName("Unison Count");
         case ipUnisonExtend:
             return pmd().asOnOffBool().withDefault(false).withName("Extend Unison");
         case ipStereo:
@@ -149,6 +157,7 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
         for (int i = 0; i < maxUnison; ++i)
         {
             sawOscs[i].setSampleRate(this->getSampleRate());
+            semisinOscs[i].setSampleRate(this->getSampleRate());
             sinOscs[i].setSampleRate(this->getSampleRate());
             triOscs[i].setSampleRate(this->getSampleRate());
             pulseOscs[i].setSampleRate(this->getSampleRate());
@@ -160,6 +169,7 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
             for (int i = 0; i < maxUnison; ++i)
             {
                 sawOscs[i].setInitialPhase(rng.unif01(), sr);
+                semisinOscs[i].setInitialPhase(rng.unif01(), sr);
                 sinOscs[i].setInitialPhase(rng.unif01(), sr);
                 triOscs[i].setInitialPhase(rng.unif01(), sr);
                 pulseOscs[i].setInitialPhase(rng.unif01(), sr);
@@ -270,6 +280,9 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
         case Wave::SAW:
             genericProcess<toStereo>(sawOscs, dataoutL, dataoutR, pitch);
             break;
+        case Wave::SEMISIN:
+            genericProcess<toStereo>(semisinOscs, dataoutL, dataoutR, pitch);
+            break;
         case Wave::PULSE:
         {
             auto uc = this->getIntParam(ipUnisonVoices);
@@ -338,11 +351,13 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
 
     using bpi_t = sst::basic_blocks::dsp::BlockInterpSmoothingStrategy<VFXConfig::blockSize>;
     using saw_t = sst::basic_blocks::dsp::EBSaw<bpi_t>;
+    using semisin_t = sst::basic_blocks::dsp::EBApproxSemiSin<bpi_t>;
     using pulse_t = sst::basic_blocks::dsp::EBPulse<bpi_t>;
     using tri_t = sst::basic_blocks::dsp::EBTri<bpi_t>;
     using sin_t = sst::basic_blocks::dsp::EBApproxSin<bpi_t>;
 
     std::array<saw_t, maxUnison> sawOscs;
+    std::array<semisin_t, maxUnison> semisinOscs;
     std::array<pulse_t, maxUnison> pulseOscs;
     std::array<tri_t, maxUnison> triOscs;
     std::array<sin_t, maxUnison> sinOscs;
