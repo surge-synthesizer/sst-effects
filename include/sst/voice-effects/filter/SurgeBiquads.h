@@ -105,14 +105,14 @@ template <typename VFXConfig> struct SurgeBiquads : core::VoiceEffectTemplateBas
             .withName("Mode")
             .withUnorderedMapFormatting({
 
-                {Modes::LP, "Low Pass"},
-                {Modes::LP2B, "Low Pass 2B"},
-                {Modes::HP, "High Pass"},
-                {Modes::BP, "Band Pass"},
-                {Modes::BP2A, "Band Pass 2A"},
-                {Modes::PKA, "PKA"},
+                {Modes::LP, "Lowpass"},
+                {Modes::LP2B, "Lowpass 2B"},
+                {Modes::HP, "Highpass"},
+                {Modes::BP, "Bandpass"},
+                {Modes::BP2A, "Bandpass 2A"},
+                {Modes::PKA, "Peak"},
                 {Modes::NOTCH, "Notch"},
-                {Modes::ALL, "All Pass"}})
+                {Modes::ALL, "Allpass"}})
             .withDefault(Modes::LP2B);
     }
 

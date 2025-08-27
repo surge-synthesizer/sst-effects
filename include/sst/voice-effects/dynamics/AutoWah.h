@@ -165,11 +165,13 @@ template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFX
         speedLimiter.setParams(speed, 1.f, samplerate);
 
         bool modeSwitch = this->getIntParam(ipMode);
-        sst::filters::CytomicSVF::Mode mode = sst::filters::CytomicSVF::Mode::LP;
+        sst::filters::CytomicSVF::Mode mode = sst::filters::CytomicSVF::Mode::Lowpass;
+
         if (modeSwitch)
         {
-            mode = sst::filters::CytomicSVF::Mode::BP;
+            mode = sst::filters::CytomicSVF::Mode::Bandpass;
         }
+
         auto centerFreqParam = this->getFloatParam(fpCenterFreq);
         auto centerFreq = (keytrackOn) ? centerFreqParam + pitch : centerFreqParam;
         auto res = this->getFloatParam(fpRes);
@@ -182,8 +184,8 @@ template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFX
             filter[0].init();
             filter[1].init();
             DCfilter.template setCoeffForBlock<VFXConfig::blockSize>(
-                sst::filters::CytomicSVF::Mode::HP, 10.f, 0.5f, VFXConfig::getSampleRateInv(this),
-                0.f);
+                sst::filters::CytomicSVF::Mode::Highpass, 10.f, 0.5f,
+                VFXConfig::getSampleRateInv(this), 0.f);
             first = false;
         }
         else

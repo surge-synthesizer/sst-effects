@@ -185,7 +185,8 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
         if (hpFreq != hpFreqPrior)
         {
             filters[0].template setCoeffForBlock<VFXConfig::blockSize>(
-                sst::filters::CytomicSVF::HP, hpFreq, 0.5f, VFXConfig::getSampleRateInv(this), 0.f);
+                sst::filters::CytomicSVF::Mode::Highpass, hpFreq, 0.5f,
+                VFXConfig::getSampleRateInv(this), 0.f);
             hpFreqPrior = hpFreq;
         }
         else
@@ -203,7 +204,8 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
         if (lpFreq != lpFreqPrior)
         {
             filters[1].template setCoeffForBlock<VFXConfig::blockSize>(
-                sst::filters::CytomicSVF::LP, lpFreq, 0.5f, VFXConfig::getSampleRateInv(this), 0.f);
+                sst::filters::CytomicSVF::Mode::Lowpass, lpFreq, 0.5f,
+                VFXConfig::getSampleRateInv(this), 0.f);
             lpFreqPrior = lpFreq;
         }
         else

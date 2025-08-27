@@ -123,22 +123,26 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
         bool filterSwitch = this->getIntParam(ipFilterSwitch);
         int filtMode = this->getIntParam(ipFilterMode);
         sst::filters::CytomicSVF::Mode mode{};
+
         switch (filtMode)
         {
         case 1:
-            mode = sst::filters::CytomicSVF::HP;
+            mode = sst::filters::CytomicSVF::Mode::Highpass;
             break;
         case 2:
-            mode = sst::filters::CytomicSVF::BP;
+            mode = sst::filters::CytomicSVF::Mode::Bandpass;
             break;
         default:
-            mode = sst::filters::CytomicSVF::LP;
+            mode = sst::filters::CytomicSVF::Mode::Lowpass;
         }
+
         float sRate = this->getFloatParam(fpSamplerate);
+
         if (keytrackOn)
         {
             sRate += pitch;
         }
+
         float t = this->getSampleRateInv() * 440 * this->equalNoteToPitch(sRate);
         float bd = 16.f * std::min(1.f, std::max(0.f, this->getFloatParam(fpBitdepth)));
         float b = powf(2, bd), b_inv = 1.f / b;

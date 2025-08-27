@@ -257,10 +257,10 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         if (crossover != priorCrossover)
         {
             filters[0].template setCoeffForBlock<VFXConfig::blockSize>(
-                filters::CytomicSVF::LP, crossover, crossover, .5f, .5f,
+                filters::CytomicSVF::Mode::Lowpass, crossover, crossover, .5f, .5f,
                 VFXConfig::getSampleRateInv(this), 0.f, 0.f);
             filters[1].template setCoeffForBlock<VFXConfig::blockSize>(
-                filters::CytomicSVF::HP, crossover, crossover, .5f, .5f,
+                filters::CytomicSVF::Mode::Highpass, crossover, crossover, .5f, .5f,
                 VFXConfig::getSampleRateInv(this), 0.f, 0.f);
             priorCrossover = crossover;
         }
@@ -391,9 +391,11 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
         if (crossover != priorCrossover)
         {
             filters[0].template setCoeffForBlock<VFXConfig::blockSize>(
-                filters::CytomicSVF::LP, crossover, .5f, VFXConfig::getSampleRateInv(this), 0.f);
+                filters::CytomicSVF::Mode::Lowpass, crossover, .5f,
+                VFXConfig::getSampleRateInv(this), 0.f);
             filters[1].template setCoeffForBlock<VFXConfig::blockSize>(
-                filters::CytomicSVF::HP, crossover, .5f, VFXConfig::getSampleRateInv(this), 0.f);
+                filters::CytomicSVF::Mode::Highpass, crossover, .5f,
+                VFXConfig::getSampleRateInv(this), 0.f);
             priorCrossover = crossover;
         }
         else

@@ -191,8 +191,8 @@ template <typename FXConfig> inline void FloatyDelay<FXConfig>::initialize()
     inputFilter.init();
     feedbackFilter.init();
     DCfilter.init();
-    DCfilter.template setCoeffForBlock<FXConfig::blockSize>(sst::filters::CytomicSVF::HP, 30.f, .5f,
-                                                            sampleRateInv, 0.f);
+    DCfilter.template setCoeffForBlock<FXConfig::blockSize>(
+        sst::filters::CytomicSVF::Mode::Highpass, 30.f, .5f, sampleRateInv, 0.f);
     HPfilter.init();
     timeLerp.instantize();
     modLerpL.instantize();
@@ -236,9 +236,10 @@ inline void FloatyDelay<FXConfig>::processBlock(float *dataL, float *dataR)
     auto freqFB = 440 * this->noteToPitchIgnoringTuning(this->floatValue(fld_cutoff) + 31.02f);
     auto res = this->floatValue(fld_resonance);
     inputFilter.template setCoeffForBlock<FXConfig::blockSize>(
-        sst::filters::CytomicSVF::LP, freqL, freqR, res, res, sampleRateInv, 0.f, 0.f);
+        sst::filters::CytomicSVF::Mode::Lowpass, freqL, freqR, res, res, sampleRateInv, 0.f, 0.f);
     feedbackFilter.template setCoeffForBlock<FXConfig::blockSize>(
-        sst::filters::CytomicSVF::LP, freqFB, freqFB, .55f, .55f, sampleRateInv, 0.f, 0.f);
+        sst::filters::CytomicSVF::Mode::Lowpass, freqFB, freqFB, .55f, .55f, sampleRateInv, 0.f,
+        0.f);
     DCfilter.template retainCoeffForBlock<FXConfig::blockSize>();
 
     float baseTime =
@@ -276,8 +277,8 @@ inline void FloatyDelay<FXConfig>::processBlock(float *dataL, float *dataR)
     float smoothWindow = 256.f;
 
     float HPfreq = 440 * this->noteToPitchIgnoringTuning(this->floatValue(fld_HP_freq));
-    HPfilter.template setCoeffForBlock<FXConfig::blockSize>(sst::filters::CytomicSVF::HP, HPfreq,
-                                                            .55f, sampleRateInv, 0.f);
+    HPfilter.template setCoeffForBlock<FXConfig::blockSize>(
+        sst::filters::CytomicSVF::Mode::Highpass, HPfreq, .55f, sampleRateInv, 0.f);
 
     for (int i = 0; i < FXConfig::blockSize; i++)
     {
