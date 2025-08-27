@@ -118,13 +118,13 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
                 .withRange(0, 4)
                 .withName("Mode")
                 .withUnorderedMapFormatting({
-                    {md::Lowpass, "Lowpass"},
-                    {md::Highpass, "Highpass"},
-                    {md::Bandpass, "Bandpass"},
-                    {md::Notch, "Notch"},
-                    {md::Allpass, "Allpass"},
+                    {(int)md::Lowpass, "Lowpass"},
+                    {(int)md::Highpass, "Highpass"},
+                    {(int)md::Bandpass, "Bandpass"},
+                    {(int)md::Notch, "Notch"},
+                    {(int)md::Allpass, "Allpass"},
                 })
-                .withDefault(md::Lowpass);
+                .withDefault((int)md::Lowpass);
         case ipNum:
             return pmd()
                 .asInt()
@@ -338,7 +338,7 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
     sst::basic_blocks::dsp::QuadratureOscillator<float> mSinOsc;
     bool isFirst = true;
 
-    sst::filters::CytomicSVF::Mode mode{filters::CytomicSVF::Lowpass};
+    sst::filters::CytomicSVF::Mode mode{filters::CytomicSVF::Mode::Lowpass};
     int priorMode{-1};
     int priorNum{-1};
     int priorDenom{-1};

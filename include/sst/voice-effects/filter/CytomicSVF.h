@@ -139,17 +139,17 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
                 .withRange(0, 8)
                 .withName("Mode")
                 .withUnorderedMapFormatting({
-                    {md::Lowpass, "Lowpass"},
-                    {md::Highpass, "Highpass"},
-                    {md::Bandpass, "Bandpass"},
-                    {md::Notch, "Notch"},
-                    {md::Peak, "Peak"},
-                    {md::Allpass, "Allpass"},
-                    {md::Bell, "Bell"},
-                    {md::LowShelf, "Low Shelf"},
-                    {md::HighShelf, "High Shelf"},
+                    {(int)md::Lowpass, "Lowpass"},
+                    {(int)md::Highpass, "Highpass"},
+                    {(int)md::Bandpass, "Bandpass"},
+                    {(int)md::Notch, "Notch"},
+                    {(int)md::Peak, "Peak"},
+                    {(int)md::Allpass, "Allpass"},
+                    {(int)md::Bell, "Bell"},
+                    {(int)md::LowShelf, "Low Shelf"},
+                    {(int)md::HighShelf, "High Shelf"},
                 })
-                .withDefault(md::Lowpass);
+                .withDefault((int)md::Lowpass);
         case ipStereo:
             return pmd().asStereoSwitch().withDefault(false);
         case ipSlope:
