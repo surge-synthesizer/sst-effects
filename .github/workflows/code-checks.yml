@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        path: [ 'tests', 'include', 'examples'' ]
+        path: [ 'tests', 'include', 'examples' ]
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
