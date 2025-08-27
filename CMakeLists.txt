@@ -37,7 +37,7 @@ if (${SST_EFFECTS_BUILD_TESTS})
     if (NOT TARGET sst-filters)
         CPMAddPackage(NAME sst-filters
                 GITHUB_REPOSITORY surge-synthesizer/sst-filters
-                GIT_TAG moar-renames
+                GIT_TAG main
                 )
     endif ()
 
