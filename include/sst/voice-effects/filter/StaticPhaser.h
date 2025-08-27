@@ -248,7 +248,7 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
                     apfs[i].init();
                 }
             }
-            auto mode = sst::filters::CytomicSVF::Mode::ALL;
+            auto mode = sst::filters::CytomicSVF::Mode::Allpass;
             auto spread{0.f};
             auto baseL{param[fpCenterFrequencyL]}, baseR{baseL};
             if (iparam[ipStereo])

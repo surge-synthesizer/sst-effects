@@ -211,9 +211,11 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
         mSawOsc.setFrequency(baseFreq, this->getSampleRateInv());
 
         filters[0].template setCoeffForBlock<VFXConfig::blockSize>(
-            sst::filters::CytomicSVF::LP, lpFreq, 0.5f, VFXConfig::getSampleRateInv(this), 0.f);
+            sst::filters::CytomicSVF::Mode::Lowpass, lpFreq, 0.5f,
+            VFXConfig::getSampleRateInv(this), 0.f);
         filters[1].template setCoeffForBlock<VFXConfig::blockSize>(
-            sst::filters::CytomicSVF::HP, hpFreq, 0.5f, VFXConfig::getSampleRateInv(this), 0.f);
+            sst::filters::CytomicSVF::Mode::Highpass, hpFreq, 0.5f,
+            VFXConfig::getSampleRateInv(this), 0.f);
 
         auto levT = std::clamp(this->getFloatParam(fpLevel), 0.f, 1.f);
         levT = levT * levT * levT;

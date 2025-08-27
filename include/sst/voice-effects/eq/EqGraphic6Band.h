@@ -111,15 +111,15 @@ template <typename VFXConfig> struct EqGraphic6Band : core::VoiceEffectTemplateB
 
                 if (i == 0)
                 {
-                    mode = md::LOW_SHELF;
+                    mode = md::LowShelf;
                 }
                 else if (i == nBands - 1)
                 {
-                    mode = md::HIGH_SHELF;
+                    mode = md::HighShelf;
                 }
                 else
                 {
-                    mode = md::BELL;
+                    mode = md::Bell;
                 }
 
                 mParametric[i].template setCoeffForBlock<VFXConfig::blockSize>(
@@ -144,15 +144,15 @@ template <typename VFXConfig> struct EqGraphic6Band : core::VoiceEffectTemplateB
         {
             if (i == 0)
             {
-                mode = md::LOW_SHELF;
+                mode = md::LowShelf;
             }
             else if (i == nBands - 1)
             {
-                mode = md::HIGH_SHELF;
+                mode = md::HighShelf;
             }
             else
             {
-                mode = md::BELL;
+                mode = md::Bell;
             }
 
             res *= sst::filters::CytomicSVFGainAt(mode, bands[i], resonance,

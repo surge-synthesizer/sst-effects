@@ -80,7 +80,6 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
     basic_blocks::params::ParamMetaData intParamAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
-        using md = sst::filters::CytomicSVF::Mode;
 
         switch (idx)
         {
@@ -199,7 +198,7 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
                                          this->getFloatParam(fpStartFreq) + (range * iPhaseR));
 
                 filters[i].template setCoeffForBlock<VFXConfig::blockSize>(
-                    sst::filters::CytomicSVF::Mode::BP, freqL, freqR, res, res,
+                    sst::filters::CytomicSVF::Mode::Bandpass, freqL, freqR, res, res,
                     this->getSampleRateInv(), 1.f, 1.f);
 
                 float tmpL alignas(16)[VFXConfig::blockSize];
@@ -241,7 +240,7 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
                                         this->getFloatParam(fpStartFreq) + (range * iPhase));
 
                 filters[i].template setCoeffForBlock<VFXConfig::blockSize>(
-                    sst::filters::CytomicSVF::Mode::BP, freq, freq, res, res,
+                    sst::filters::CytomicSVF::Mode::Bandpass, freq, freq, res, res,
                     this->getSampleRateInv(), 1.f, 1.f);
 
                 float tmpL alignas(16)[VFXConfig::blockSize];
@@ -310,7 +309,7 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
             auto freqMod = this->getFloatParam(fpStartFreq) + (range * iPhase);
             auto freq = 440.f * this->note_to_pitch_ignoring_tuning(freqMod);
             filters[i].template setCoeffForBlock<VFXConfig::blockSize>(
-                sst::filters::CytomicSVF::Mode::BP, freq, res, this->getSampleRateInv(), 1.f);
+                sst::filters::CytomicSVF::Mode::Bandpass, freq, res, this->getSampleRateInv(), 1.f);
 
             float tmp alignas(16)[VFXConfig::blockSize];
             mech::copy_from_to<VFXConfig::blockSize>(datainL, tmp);

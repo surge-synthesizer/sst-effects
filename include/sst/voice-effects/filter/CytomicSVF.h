@@ -71,7 +71,8 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
         bool gain{false};
         using md = sst::filters::CytomicSVF::Mode;
         auto mode = (md)this->getIntParam(ipMode);
-        if (mode == md::BELL || mode == md::HIGH_SHELF || mode == md::LOW_SHELF)
+
+        if (mode == md::Bell || mode == md::HighShelf || mode == md::LowShelf)
         {
             gain = true;
         }
@@ -138,17 +139,17 @@ template <typename VFXConfig> struct CytomicSVF : core::VoiceEffectTemplateBase<
                 .withRange(0, 8)
                 .withName("Mode")
                 .withUnorderedMapFormatting({
-                    {md::LP, "Low Pass"},
-                    {md::HP, "High Pass"},
-                    {md::BP, "Band Pass"},
-                    {md::NOTCH, "Notch"},
-                    {md::PEAK, "Peak"},
-                    {md::ALL, "All Pass"},
-                    {md::BELL, "Bell"},
-                    {md::LOW_SHELF, "Low Shelf"},
-                    {md::HIGH_SHELF, "High Shelf"},
+                    {(int)md::Lowpass, "Lowpass"},
+                    {(int)md::Highpass, "Highpass"},
+                    {(int)md::Bandpass, "Bandpass"},
+                    {(int)md::Notch, "Notch"},
+                    {(int)md::Peak, "Peak"},
+                    {(int)md::Allpass, "Allpass"},
+                    {(int)md::Bell, "Bell"},
+                    {(int)md::LowShelf, "Low Shelf"},
+                    {(int)md::HighShelf, "High Shelf"},
                 })
-                .withDefault(md::LP);
+                .withDefault((int)md::Lowpass);
         case ipStereo:
             return pmd().asStereoSwitch().withDefault(false);
         case ipSlope:

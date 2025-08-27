@@ -299,7 +299,7 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
         }
 
         auto spread{0.f};
-        auto mode = sst::filters::CytomicSVF::Mode::ALL;
+        auto mode = sst::filters::CytomicSVF::Mode::Allpass;
         auto stereo = this->getIntParam(ipStereo);
 
         if (isFirst)

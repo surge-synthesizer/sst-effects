@@ -118,13 +118,13 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
                 .withRange(0, 4)
                 .withName("Mode")
                 .withUnorderedMapFormatting({
-                    {0, "Lowpass"},
-                    {1, "Highpass"},
-                    {2, "Bandpass"},
-                    {3, "Notch"},
-                    {4, "Allpass"},
+                    {(int)md::Lowpass, "Lowpass"},
+                    {(int)md::Highpass, "Highpass"},
+                    {(int)md::Bandpass, "Bandpass"},
+                    {(int)md::Notch, "Notch"},
+                    {(int)md::Allpass, "Allpass"},
                 })
-                .withDefault(md::LP);
+                .withDefault((int)md::Lowpass);
         case ipNum:
             return pmd()
                 .asInt()
@@ -167,19 +167,19 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
         switch (this->getIntParam(ipMode))
         {
         case 0:
-            mode = sst::filters::CytomicSVF::Mode::LP;
+            mode = sst::filters::CytomicSVF::Mode::Lowpass;
             break;
         case 1:
-            mode = sst::filters::CytomicSVF::Mode::HP;
+            mode = sst::filters::CytomicSVF::Mode::Highpass;
             break;
         case 2:
-            mode = sst::filters::CytomicSVF::Mode::BP;
+            mode = sst::filters::CytomicSVF::Mode::Bandpass;
             break;
         case 3:
-            mode = sst::filters::CytomicSVF::Mode::NOTCH;
+            mode = sst::filters::CytomicSVF::Mode::Notch;
             break;
         case 4:
-            mode = sst::filters::CytomicSVF::Mode::ALL;
+            mode = sst::filters::CytomicSVF::Mode::Allpass;
             break;
         }
     }
@@ -190,7 +190,7 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
         if (isFirst)
         {
             DCfilter.template setCoeffForBlock<VFXConfig::blockSize>(
-                sst::filters::CytomicSVF::Mode::HP, 18.f, 18.f, 0.5f, 0.5f,
+                sst::filters::CytomicSVF::Mode::Highpass, 18.f, 18.f, 0.5f, 0.5f,
                 VFXConfig::getSampleRateInv(this), 0.f, 0.f);
             isFirst = false;
         }
@@ -260,8 +260,8 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
         if (isFirst)
         {
             DCfilter.template setCoeffForBlock<VFXConfig::blockSize>(
-                sst::filters::CytomicSVF::Mode::HP, 18.f, 0.5f, VFXConfig::getSampleRateInv(this),
-                0.f);
+                sst::filters::CytomicSVF::Mode::Highpass, 18.f, 0.5f,
+                VFXConfig::getSampleRateInv(this), 0.f);
             isFirst = false;
         }
         else
@@ -338,7 +338,7 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
     sst::basic_blocks::dsp::QuadratureOscillator<float> mSinOsc;
     bool isFirst = true;
 
-    sst::filters::CytomicSVF::Mode mode{filters::CytomicSVF::LP};
+    sst::filters::CytomicSVF::Mode mode{filters::CytomicSVF::Mode::Lowpass};
     int priorMode{-1};
     int priorNum{-1};
     int priorDenom{-1};

@@ -83,8 +83,8 @@ if (${SST_EFFECTS_BUILD_TESTS})
     target_compile_definitions(${PROJECT_NAME}-test PUBLIC _USE_MATH_DEFINES=1)
     target_compile_definitions(${PROJECT_NAME}-test PRIVATE CATCH_CONFIG_DISABLE_EXCEPTIONS=1)
     target_include_directories(${PROJECT_NAME}-test PRIVATE libs/catch2)
-    
-    
+
+
     if(${SST_EFFECTS_BUILD_EXAMPLES})
         message(STATUS "Building Examples / CLI Driver")
         if (NOT TARGET dr_libs)
@@ -100,13 +100,13 @@ if (${SST_EFFECTS_BUILD_TESTS})
                     GIT_TAG main)
 
         endif ()
-        
+
         add_executable(CLIExample
             examples/CLIExample.cpp
         )
         target_link_libraries(CLIExample PUBLIC dr_libs CLI11::CLI11 simde sst-basic-blocks sst-filters sst-waveshapers fmt ${PROJECT_NAME})
         target_compile_definitions(CLIExample PUBLIC _USE_MATH_DEFINES=1)
-        
+
     endif()
 
 endif ()

@@ -90,10 +90,9 @@ template <typename VFXConfig> struct TiltEQ : core::VoiceEffectTemplateBase<VFXC
         else
         {
             filters[0].template setCoeffForBlock<VFXConfig::blockSize>(
-                filters::CytomicSVF::Mode::LOW_SHELF, freq, res, this->getSampleRateInv(), negGain);
+                filters::CytomicSVF::Mode::LowShelf, freq, res, this->getSampleRateInv(), negGain);
             filters[1].template setCoeffForBlock<VFXConfig::blockSize>(
-                filters::CytomicSVF::Mode::HIGH_SHELF, freq, res, this->getSampleRateInv(),
-                posGain);
+                filters::CytomicSVF::Mode::HighShelf, freq, res, this->getSampleRateInv(), posGain);
             priorSlope = slope;
             priorFreq = freq;
         }
