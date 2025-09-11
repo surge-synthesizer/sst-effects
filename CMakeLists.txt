@@ -4,7 +4,7 @@ project(sst-effects VERSION 0.5 LANGUAGES C CXX)
 option(SST_EFFECTS_BUILD_EXAMPLES "Build the example drivers (which will also acivate tests)" OFF)
 option(SST_EFFECTS_BUILD_TESTS "Build the test harness" OFF)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 add_library(${PROJECT_NAME} INTERFACE)
 target_include_directories(${PROJECT_NAME} INTERFACE include)
