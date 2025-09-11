@@ -83,6 +83,8 @@
 
 #include <type_traits>
 
+static_assert(__cplusplus >= 202002L, "Surge team libraries have moved to C++ 20");
+
 namespace sst::effects::core
 {
 // Todo: as we port consider this FXConfig::BaseClass being a bit more configurable.
