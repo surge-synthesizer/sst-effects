@@ -101,11 +101,13 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
         }
         if constexpr (Model == fmd::VintageLadder)
         {
-            num_submodels = 2;
+            num_submodels = 4;
 
             passbands[0] = 0x04;
             submodels[0] = 0x22;
             submodels[1] = 0x26;
+            submodels[2] = 0x20;
+            submodels[3] = 0x24;
 
             subName = "Method";
         }
@@ -121,14 +123,16 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
             passbands[3] = 0x10;
             passbands[4] = 0x18;
 
-            drives[0] = 0x60;
-            drives[1] = 0x61;
-            drives[2] = 0x62;
-            drives[3] = 0x63;
+            drives[0] = 0x40;
+            drives[1] = 0x42;
+            drives[2] = 0x44;
 
-            submodels[0] = 0x40;
-            submodels[1] = 0x42;
-            submodels[2] = 0x44;
+            submodels[0] = 0x60;
+            submodels[1] = 0x61;
+            submodels[2] = 0x62;
+            submodels[3] = 0x63;
+
+            subName = "Stages";
         }
         if constexpr (Model == fmd::ResonanceWarp)
         {
@@ -142,15 +146,15 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
             passbands[3] = 0x10;
             passbands[4] = 0x18;
 
-            drives[0] = 0x60;
-            drives[1] = 0x61;
-            drives[2] = 0x62;
-            drives[3] = 0x63;
+            drives[0] = 0x40;
+            drives[1] = 0x42;
 
-            submodels[0] = 0x40;
-            submodels[1] = 0x42;
+            submodels[0] = 0x60;
+            submodels[1] = 0x61;
+            submodels[2] = 0x62;
+            submodels[3] = 0x63;
 
-            extraName = "Waveshaper";
+            subName = "Stages";
         }
         if constexpr (Model == fmd::TriPole)
         {
@@ -286,20 +290,21 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
     void initVoiceEffect()
     {
         filter.setSampleRateAndBlockSize(this->getSampleRate(), VFXConfig::blockSize);
-        setupFilter(true);
+        setupFilter();
     }
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
-    void setupFilter(bool first)
+    void setupFilter()
     {
-        if (first)
-            filter.reset();
         filter.setModelConfiguration(configFilter());
         if (!filter.prepareInstance())
         {
             filter.setFilterModel(filtersplusplus::FilterModel::CytomicSVF);
-            filter.setPassband(filtersplusplus::Passband::LP);
+            namespace fpp = filtersplusplus;
+            fpp::ModelConfig cfg{};
+            cfg.pt = fpp::Passband::LP;
+            filter.setModelConfiguration(cfg);
             std::cout << " Invalid filter config, defaulting to " << filter.displayName()
                       << std::endl;
         }
@@ -307,18 +312,17 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
 
     template <bool stereo, bool stereoCoeff> void setCoeffs(float pitch)
     {
-        /* std::array<float, numFloatParams> fp;
+        std::array<float, numFloatParams> fp;
         std::array<int, numIntParams> ip;
-        bool fDiff{false}, iDiff{false}
+        bool fDiff{false}, iDiff{false};
 
-        for (int i = 0; i < numFloatParams; ++i)
+        for (int i = numFloatParams - 1; i >= 0; --i)
         {
             fp[i] = this->getFloatParam(i);
             if (i < 2 && keytrackOn)
             {
                 fp[i] += pitch;
             }
-
             fDiff = fDiff || fp[i] != priorFP[i];
             priorFP[i] = fp[i];
         }
@@ -334,36 +338,42 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
         {
             setupFilter();
         }
-        */
-        // wrapping this next stuff in if (fDiff || iDiff)
-        // sounds horrible. I'm not sure why
 
-        auto reso = std::clamp(this->getFloatParam(fpResonance), 0.f, 1.f);
-        auto morph = std::clamp(this->getFloatParam(fpExtra), 0.f, 1.f);
-
-        auto freqL = this->getFloatParam(fpCutoffL);
-        if (keytrackOn)
-            freqL += pitch;
-
-        if constexpr (!stereo)
+        if (fDiff || iDiff)
         {
-            filter.setMono();
+            auto reso = std::clamp(this->getFloatParam(fpResonance), 0.f, 1.f);
+            auto morph = std::clamp(this->getFloatParam(fpExtra), 0.f, 1.f);
+
+            auto freqL = this->getFloatParam(fpCutoffL);
+            if (keytrackOn)
+                freqL += pitch;
+
+            if constexpr (!stereo)
+            {
+                filter.setMono();
+                filter.makeCoefficients(0, freqL, reso, morph);
+                return;
+            }
+
+            filter.setStereo();
             filter.makeCoefficients(0, freqL, reso, morph);
-            return;
-        }
+            if constexpr (!stereoCoeff)
+            {
+                filter.copyCoefficientsFromVoiceToVoice(0, 1);
+                return;
+            }
 
-        filter.setStereo();
-        filter.makeCoefficients(0, freqL, reso, morph);
-        if constexpr (!stereoCoeff)
+            auto freqR = this->getFloatParam(fpCutoffR);
+            if (keytrackOn)
+                freqR += pitch;
+            filter.makeCoefficients(1, freqR, reso, morph);
+        }
+        else
         {
-            filter.copyCoefficientsFromVoiceToVoice(0, 1);
-            return;
+            filter.freezeCoefficientsFor(0);
+            if constexpr (stereo)
+                filter.freezeCoefficientsFor(1);
         }
-
-        auto freqR = this->getFloatParam(fpCutoffR);
-        if (keytrackOn)
-            freqR += pitch;
-        filter.makeCoefficients(1, freqR, reso, morph);
     }
 
     void processMonoToMono(const float *const datain, float *dataout, float pitch)
@@ -422,7 +432,7 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
     uint32_t passbands[5] = {0, 0, 0, 0, 0};
     uint32_t slopes[4] = {0, 0, 0, 0};
     uint32_t drives[4] = {0, 0, 0, 0};
-    uint32_t submodels[3] = {0, 0, 0};
+    uint32_t submodels[4] = {0, 0, 0, 0};
 
     filtersplusplus::ModelConfig configFilter()
     {
