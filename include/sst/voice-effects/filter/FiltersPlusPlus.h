@@ -66,6 +66,7 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
 
         using fmd = filtersplusplus::FilterModel;
 
+        // FIXME: This solution is not good
         if constexpr (Model == fmd::VemberClassic)
         {
             num_passbands = 4;
