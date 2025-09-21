@@ -65,7 +65,7 @@ struct StereoTool : core::VoiceEffectTemplateBase<VFXConfig>,
                 .withRange(-halfPi, halfPi)
                 .withDefault(0.f)
                 .withName("Rotation")
-                .withLinearScaleFormatting("º", 90 / halfPi);
+                .withLinearScaleFormatting("°", 90 / halfPi);
         case fpWidth:
             return this->getWidthParam().withName("Width");
         case fpOutputBalance:
