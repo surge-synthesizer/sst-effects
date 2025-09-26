@@ -65,6 +65,10 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
         filter.setFilterModel(Model);
 
         using fmd = filtersplusplus::FilterModel;
+        using fpb = filtersplusplus::Passband;
+        using fsl = filtersplusplus::Slope;
+        using fdr = filtersplusplus::DriveMode;
+        using fsm = filtersplusplus::FilterSubModel;
 
         // FIXME: This solution is not good
         if constexpr (Model == fmd::VemberClassic)
@@ -73,30 +77,30 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
             num_slopes = 2;
             num_drives = 3;
 
-            passbands[0] = 0x04;
-            passbands[1] = 0x08;
-            passbands[2] = 0x0C;
-            passbands[3] = 0x10;
-            slopes[0] = 0x12;
-            slopes[1] = 0x24;
-            drives[0] = 0x10;
-            drives[1] = 0x14;
-            drives[2] = 0x18;
+            passbands[0] = fpb::LP;
+            passbands[1] = fpb::HP;
+            passbands[2] = fpb::BP;
+            passbands[3] = fpb::Notch;
+            slopes[0] = fsl::Slope_12dB;
+            slopes[1] = fsl::Slope_24dB;
+            drives[0] = fdr::Standard;
+            drives[1] = fdr::Driven;
+            drives[2] = fdr::NotchMild;
         }
         if constexpr (Model == fmd::K35)
         {
             num_passbands = 2;
 
-            passbands[0] = 0x04;
-            passbands[1] = 0x08;
-            drives[0] = 0x39;
+            passbands[0] = fpb::LP;
+            passbands[1] = fpb::HP;
+            drives[0] = fdr::K35_Continuous;
 
             extraName = "Drive";
         }
         if constexpr (Model == fmd::OBXD_4Pole)
         {
-            passbands[0] = 0x04;
-            slopes[0] = 0x40;
+            passbands[0] = fpb::LP;
+            slopes[0] = fsl::Slope_Morph;
 
             extraName = "Slope";
         }
@@ -104,56 +108,56 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
         {
             num_submodels = 4;
 
-            passbands[0] = 0x04;
-            submodels[0] = 0x22;
-            submodels[1] = 0x26;
-            submodels[2] = 0x20;
-            submodels[3] = 0x24;
+            passbands[0] = fpb::LP;
+            submodels[0] = fsm::RungeKuttaCompensated;
+            submodels[1] = fsm::HuovCompensated;
+            submodels[2] = fsm::RungeKutta;
+            submodels[3] = fsm::Huov;
 
             subName = "Method";
         }
         if constexpr (Model == fmd::CutoffWarp)
         {
             num_passbands = 5;
-            num_drives = 4;
-            num_submodels = 3;
+            num_drives = 3;
+            num_submodels = 4;
 
-            passbands[0] = 0x04;
-            passbands[1] = 0x08;
-            passbands[2] = 0x0C;
-            passbands[3] = 0x10;
-            passbands[4] = 0x18;
+            passbands[0] = fpb::LP;
+            passbands[1] = fpb::HP;
+            passbands[2] = fpb::BP;
+            passbands[3] = fpb::Notch;
+            passbands[4] = fpb::Allpass;
 
-            drives[0] = 0x40;
-            drives[1] = 0x42;
-            drives[2] = 0x44;
+            drives[0] = fdr::Tanh;
+            drives[1] = fdr::SoftClip;
+            drives[2] = fdr::OJD;
 
-            submodels[0] = 0x60;
-            submodels[1] = 0x61;
-            submodels[2] = 0x62;
-            submodels[3] = 0x63;
+            submodels[0] = fsm::Warp_1Stage;
+            submodels[1] = fsm::Warp_2Stage;
+            submodels[2] = fsm::Warp_3Stage;
+            submodels[3] = fsm::Warp_4Stage;
 
             subName = "Stages";
         }
         if constexpr (Model == fmd::ResonanceWarp)
         {
             num_passbands = 5;
-            num_drives = 4;
-            num_submodels = 2;
+            num_drives = 2;
+            num_submodels = 4;
 
-            passbands[0] = 0x04;
-            passbands[1] = 0x08;
-            passbands[2] = 0x0C;
-            passbands[3] = 0x10;
-            passbands[4] = 0x18;
+            passbands[0] = fpb::LP;
+            passbands[1] = fpb::HP;
+            passbands[2] = fpb::BP;
+            passbands[3] = fpb::Notch;
+            passbands[4] = fpb::Allpass;
 
-            drives[0] = 0x40;
-            drives[1] = 0x42;
+            drives[0] = fdr::Tanh;
+            drives[1] = fdr::SoftClip;
 
-            submodels[0] = 0x60;
-            submodels[1] = 0x61;
-            submodels[2] = 0x62;
-            submodels[3] = 0x63;
+            submodels[0] = fsm::Warp_1Stage;
+            submodels[1] = fsm::Warp_2Stage;
+            submodels[2] = fsm::Warp_3Stage;
+            submodels[3] = fsm::Warp_4Stage;
 
             subName = "Stages";
         }
@@ -162,14 +166,14 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
             num_passbands = 4;
             num_submodels = 3;
 
-            passbands[0] = 0x30 + 0b000;
-            passbands[1] = 0x30 + 0b010;
-            passbands[2] = 0x30 + 0b101;
-            passbands[3] = 0x30 + 0b111;
+            passbands[0] = fpb::LowLowLow;
+            passbands[1] = fpb::LowHighLow;
+            passbands[2] = fpb::HighLowHigh;
+            passbands[3] = fpb::HighHighHigh;
 
-            submodels[0] = 0x31;
-            submodels[1] = 0x32;
-            submodels[2] = 0x33;
+            submodels[0] = fsm::First_output;
+            submodels[1] = fsm::Second_output;
+            submodels[2] = fsm::Third_output;
 
             subName = "Output";
         }
@@ -233,11 +237,11 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
             return pmd().asStereoSwitch().withDefault(true);
         case ipPassband:
             if (num_passbands < 2)
-                return pmd().withName("");
+                return pmd().withLinearScaleFormatting("").withName("");
 
             for (int i = 0; i < num_passbands; ++i)
             {
-                pbm.insert({i, fpp::toString((fpp::Passband)passbands[i])});
+                pbm.insert({i, fpp::toString(passbands[i])});
             }
             return pmd()
                 .asInt()
@@ -246,11 +250,11 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
                 .withName("Passband");
         case ipSlope:
             if (num_slopes < 2)
-                return pmd().withName("");
+                return pmd().withLinearScaleFormatting("").withName("");
 
             for (int i = 0; i < num_slopes; ++i)
             {
-                slm.insert({i, fpp::toString((fpp::Slope)slopes[i])});
+                slm.insert({i, fpp::toString(slopes[i])});
             }
             return pmd()
                 .asInt()
@@ -259,11 +263,11 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
                 .withName("Slope");
         case ipDrive:
             if (num_drives < 2)
-                return pmd().withName("");
+                return pmd().withLinearScaleFormatting("").withName("");
 
             for (int i = 0; i < num_drives; ++i)
             {
-                drm.insert({i, fpp::toString((fpp::DriveMode)drives[i])});
+                drm.insert({i, fpp::toString(drives[i])});
             }
             return pmd()
                 .asInt()
@@ -272,11 +276,11 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
                 .withName("Drive");
         case ipSubmodel:
             if (num_submodels < 2)
-                return pmd().withName("");
+                return pmd().withLinearScaleFormatting("").withName("");
 
             for (int i = 0; i < num_submodels; ++i)
             {
-                smm.insert({i, fpp::toString((fpp::FilterSubModel)submodels[i])});
+                smm.insert({i, fpp::toString(submodels[i])});
             }
             return pmd()
                 .asInt()
@@ -302,10 +306,7 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
         if (!filter.prepareInstance())
         {
             filter.setFilterModel(filtersplusplus::FilterModel::CytomicSVF);
-            namespace fpp = filtersplusplus;
-            fpp::ModelConfig cfg{};
-            cfg.pt = fpp::Passband::LP;
-            filter.setModelConfiguration(cfg);
+            filter.setPassband(filtersplusplus::Passband::LP);
             std::cout << " Invalid filter config, defaulting to " << filter.displayName()
                       << std::endl;
         }
@@ -430,10 +431,29 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
     int num_slopes{1}, num_passbands{1}, num_drives{1}, num_submodels{1};
     std::string driveName{"Drive"}, extraName{""}, subName{""};
 
-    uint32_t passbands[5] = {0, 0, 0, 0, 0};
-    uint32_t slopes[4] = {0, 0, 0, 0};
-    uint32_t drives[4] = {0, 0, 0, 0};
-    uint32_t submodels[4] = {0, 0, 0, 0};
+    filtersplusplus::Passband passbands[5] = {
+        filtersplusplus::Passband::UNSUPPORTED, filtersplusplus::Passband::UNSUPPORTED,
+        filtersplusplus::Passband::UNSUPPORTED, filtersplusplus::Passband::UNSUPPORTED,
+        filtersplusplus::Passband::UNSUPPORTED,
+    };
+    filtersplusplus::Slope slopes[4] = {
+        filtersplusplus::Slope::UNSUPPORTED,
+        filtersplusplus::Slope::UNSUPPORTED,
+        filtersplusplus::Slope::UNSUPPORTED,
+        filtersplusplus::Slope::UNSUPPORTED,
+    };
+    filtersplusplus::DriveMode drives[4] = {
+        filtersplusplus::DriveMode::UNSUPPORTED,
+        filtersplusplus::DriveMode::UNSUPPORTED,
+        filtersplusplus::DriveMode::UNSUPPORTED,
+        filtersplusplus::DriveMode::UNSUPPORTED,
+    };
+    filtersplusplus::FilterSubModel submodels[4] = {
+        filtersplusplus::FilterSubModel::UNSUPPORTED,
+        filtersplusplus::FilterSubModel::UNSUPPORTED,
+        filtersplusplus::FilterSubModel::UNSUPPORTED,
+        filtersplusplus::FilterSubModel::UNSUPPORTED,
+    };
 
     filtersplusplus::ModelConfig configFilter()
     {
@@ -445,31 +465,31 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
         {
             pid = std::clamp(this->getIntParam(ipPassband), 0, num_passbands - 1);
         }
-        cfg.pt = (fpp::Passband)passbands[pid];
+        cfg.pt = passbands[pid];
 
         if (num_slopes > 1)
         {
             sid = std::clamp(this->getIntParam(ipSlope), 0, num_slopes - 1);
         }
-        cfg.st = (fpp::Slope)slopes[sid];
+        cfg.st = slopes[sid];
 
         if (num_drives > 1)
         {
             did = std::clamp(this->getIntParam(ipDrive), 0, num_drives - 1);
         }
-        if constexpr (Model == filtersplusplus::FilterModel::VemberClassic)
+        if constexpr (Model == fpp::FilterModel::VemberClassic)
         {
             // in vember classic notch the second drive mode is different
             if (pid == 3 && did == 1)
                 did += 1;
         }
-        cfg.dt = (fpp::DriveMode)drives[did];
+        cfg.dt = drives[did];
 
         if (num_submodels > 1)
         {
             mid = std::clamp(this->getIntParam(ipSubmodel), 0, num_submodels - 1);
         }
-        cfg.mt = (fpp::FilterSubModel)submodels[mid];
+        cfg.mt = submodels[mid];
 
         return cfg;
     }
