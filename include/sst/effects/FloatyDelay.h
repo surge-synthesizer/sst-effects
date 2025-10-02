@@ -97,8 +97,8 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
         case fld_time:
             return pmd()
                 .asEnvelopeTime()
-                .withRange(-5.64386f, 3.f) // 20ms to 8s
-                .withDefault(-1.73697f)    // 300ms
+                .withRange(-5.64386f, 3.f) // 20 ms to 8 s
+                .withDefault(-1.73697f)    // 300 ms
                 .withName("Time");
 
         case fld_playrate:
@@ -107,6 +107,7 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
                 .withRange(-5, 5)
                 .withName("Playrate")
                 .withDefault(1)
+                .withFeature(pmd::Features::ALLOW_FRACTIONAL_TYPEINS)
                 .withLinearScaleFormatting("x");
 
         case fld_feedback:
