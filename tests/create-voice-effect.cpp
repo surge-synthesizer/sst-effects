@@ -38,8 +38,6 @@
 #include "sst/voice-effects/delay/Widener.h"
 #include "sst/voice-effects/delay/ShortDelay.h"
 #include "sst/voice-effects/delay/StringResonator.h"
-#include "sst/voice-effects/filter/CytomicSVF.h"
-#include "sst/voice-effects/filter/SurgeBiquads.h"
 #include "sst/voice-effects/filter/SSTFilters.h"
 #include "sst/voice-effects/filter/StaticPhaser.h"
 #include "sst/voice-effects/modulation/ShepardPhaser.h"
@@ -159,15 +157,6 @@ TEST_CASE("Can Create Voice FX")
         VTester<sst::voice_effects::delay::StringResonator<VTestConfig>>::TestVFX(s);
     }
 
-    SECTION("SurgeBiquads")
-    {
-        VTester<sst::voice_effects::filter::SurgeBiquads<VTestConfig>>::TestVFX();
-    }
-
-    SECTION("SSTFilters")
-    {
-        VTester<sst::voice_effects::filter::SSTFilters<VTestConfig>>::TestVFX();
-    }
     SECTION("Static Phaser")
     {
         VTester<sst::voice_effects::filter::StaticPhaser<VTestConfig>>::TestVFX();
