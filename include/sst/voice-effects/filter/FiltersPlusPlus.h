@@ -232,9 +232,8 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
                 return pmd().withLinearScaleFormatting("").withName("");
             if constexpr (Model == fpp::FilterModel::VemberClassic)
             {
-
                 drm.insert({0, fpp::toString(drives[0])});
-                drm.insert({1, this->getIntParam(ipPassband < 3) ? fpp::toString(drives[1])
+                drm.insert({1, this->getIntParam(ipPassband) < 3 ? fpp::toString(drives[1])
                                                                  : fpp::toString(drives[2])});
                 drsi = 1;
             }
