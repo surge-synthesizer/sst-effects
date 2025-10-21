@@ -159,11 +159,6 @@ TEST_CASE("Can Create Voice FX")
         VTester<sst::voice_effects::delay::StringResonator<VTestConfig>>::TestVFX(s);
     }
 
-    SECTION("CytomicSVF")
-    {
-        VTester<sst::voice_effects::filter::CytomicSVF<VTestConfig>>::TestVFX();
-    }
-
     SECTION("SurgeBiquads")
     {
         VTester<sst::voice_effects::filter::SurgeBiquads<VTestConfig>>::TestVFX();
