@@ -27,7 +27,7 @@
 
 #include "../VoiceEffectCore.h"
 
-#include <iostream>
+#include <vector>
 
 namespace sst::voice_effects::filter
 {
@@ -108,39 +108,27 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
         {
             subName = "Output";
         }
+        if constexpr (Model == fmd::CytomicSVF)
+        {
+            extraName = "Gain";
+        }
 
-        // For most of them we just use what this returns
+        // For most of them just use everything. That bool must be true or we explode
         if (passbands.empty())
         {
-            passbands = filtersplusplus::potentialValuesFor<fpb>(Model);
-            if (passbands.empty())
-            {
-                passbands.emplace_back(fpb::UNSUPPORTED);
-            }
+            passbands = filtersplusplus::potentialValuesFor<fpb>(Model, true);
         }
         if (slopes.empty())
         {
-            slopes = filtersplusplus::potentialValuesFor<fsl>(Model);
-            if (slopes.empty())
-            {
-                slopes.emplace_back(fsl::UNSUPPORTED);
-            }
+            slopes = filtersplusplus::potentialValuesFor<fsl>(Model, true);
         }
         if (drives.empty())
         {
-            drives = filtersplusplus::potentialValuesFor<fdr>(Model);
-            if (drives.empty())
-            {
-                drives.emplace_back(fdr::UNSUPPORTED);
-            }
+            drives = filtersplusplus::potentialValuesFor<fdr>(Model, true);
         }
         if (submodels.empty())
         {
-            submodels = filtersplusplus::potentialValuesFor<fsm>(Model);
-            if (submodels.empty())
-            {
-                submodels.emplace_back(fsm::UNSUPPORTED);
-            }
+            submodels = filtersplusplus::potentialValuesFor<fsm>(Model, true);
         }
     }
 
@@ -184,6 +172,10 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
         case fpResonance:
             return pmd().asPercent().withName("Resonance").withDefault(0.f);
         case fpExtra:
+            if constexpr (Model == filtersplusplus::FilterModel::CytomicSVF)
+            {
+                return pmd().asPercentBipolar().withName(extraName).withDefault(0.f);
+            }
             return pmd().asPercent().withName(extraName).withDefault(0.f);
         }
 
