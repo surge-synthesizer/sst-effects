@@ -260,6 +260,9 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
 
     void initVoiceEffect()
     {
+        std::fill(priorFP.begin(), priorFP.end(), -1000.f);
+        std::fill(priorIP.begin(), priorIP.end(), -1);
+
         filter.setSampleRateAndBlockSize(this->getSampleRate(), VFXConfig::blockSize);
         setupFilter();
     }
