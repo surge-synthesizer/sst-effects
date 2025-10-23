@@ -202,6 +202,8 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
     }
     bool getKeytrack() const { return keytrackOn; }
 
+    bool checkParameterConsistency() const { return true; }
+
   protected:
     float time[2]{0.f, 0.f}, level[2]{0.f, 0.f};
     bool keytrackOn{false};
