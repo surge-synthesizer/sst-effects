@@ -192,7 +192,7 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
         switch (idx)
         {
         case ipStereo:
-            return pmd().asStereoSwitch().withDefault(true);
+            return pmd().asStereoSwitch().withDefault(false);
         case ipPassband:
             if (passbands.size() < 2)
                 return pmd().withLinearScaleFormatting("").withName("");
