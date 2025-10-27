@@ -89,7 +89,7 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
             {
                 return pmd()
                     .asFloat()
-                    .withRange(-48, 48)
+                    .withRange(-48, 96)
                     .withName("LP Off")
                     .withDefault(48)
                     .withLinearScaleFormatting("semitones")
