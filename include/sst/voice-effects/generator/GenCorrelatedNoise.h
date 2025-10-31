@@ -97,8 +97,7 @@ struct GenCorrelatedNoise
 
     basic_blocks::params::ParamMetaData intParamAt(int idx) const
     {
-        return basic_blocks::params::ParamMetaData().asOnOffBool().withDefault(true).withName(
-            "Stereo Noise");
+        return basic_blocks::params::ParamMetaData().asStereoSwitch().withDefault(false);
     }
 
     void initVoiceEffect() {}
