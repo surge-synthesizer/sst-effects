@@ -152,7 +152,6 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
         DCfilter.template setCoeffForBlock<VFXConfig::blockSize>(
             sst::filters::CytomicSVF::Mode::Highpass, 18.f, 18.f, 0.5f, 0.5f,
             VFXConfig::getSampleRateInv(this), 0.f, 0.f);
-        isFirst = false;
     }
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
@@ -324,7 +323,6 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
     sst::filters::CytomicSVF filter;
     sst::filters::CytomicSVF DCfilter;
     sst::basic_blocks::dsp::QuadratureOscillator<float> mSinOsc;
-    bool isFirst = true;
 
     sst::filters::CytomicSVF::Mode mode{filters::CytomicSVF::Mode::Lowpass};
     int priorMode{-1};
