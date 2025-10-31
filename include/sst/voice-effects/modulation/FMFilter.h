@@ -118,11 +118,11 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
                 .withRange(0, 4)
                 .withName("Mode")
                 .withUnorderedMapFormatting({
-                    {(int)md::Lowpass, "Lowpass"},
-                    {(int)md::Highpass, "Highpass"},
-                    {(int)md::Bandpass, "Bandpass"},
-                    {(int)md::Notch, "Notch"},
-                    {(int)md::Allpass, "Allpass"},
+                    {0, "Lowpass"},
+                    {1, "Highpass"},
+                    {2, "Bandpass"},
+                    {3, "Notch"},
+                    {4, "Allpass"},
                 })
                 .withDefault((int)md::Lowpass);
         case ipNum:
@@ -147,7 +147,12 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
 
     ~FMFilter() {}
 
-    void initVoiceEffect() {}
+    void initVoiceEffect()
+    {
+        DCfilter.template setCoeffForBlock<VFXConfig::blockSize>(
+            sst::filters::CytomicSVF::Mode::Highpass, 18.f, 18.f, 0.5f, 0.5f,
+            VFXConfig::getSampleRateInv(this), 0.f, 0.f);
+    }
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
@@ -187,17 +192,8 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
                        float *dataoutR, float pitch)
     {
-        if (isFirst)
-        {
-            DCfilter.template setCoeffForBlock<VFXConfig::blockSize>(
-                sst::filters::CytomicSVF::Mode::Highpass, 18.f, 18.f, 0.5f, 0.5f,
-                VFXConfig::getSampleRateInv(this), 0.f, 0.f);
-            isFirst = false;
-        }
-        else
-        {
-            DCfilter.retainCoeffForBlock<VFXConfig::blockSize>();
-        }
+        DCfilter.retainCoeffForBlock<VFXConfig::blockSize>();
+
         auto res = std::clamp(this->getFloatParam(fpRes), 0.f, 1.f);
         bool stereo = this->getIntParam(ipStereo);
         auto depth = this->getFloatParam(fpDepth);
@@ -257,17 +253,8 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
 
     void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
-        if (isFirst)
-        {
-            DCfilter.template setCoeffForBlock<VFXConfig::blockSize>(
-                sst::filters::CytomicSVF::Mode::Highpass, 18.f, 0.5f,
-                VFXConfig::getSampleRateInv(this), 0.f);
-            isFirst = false;
-        }
-        else
-        {
-            DCfilter.retainCoeffForBlock<VFXConfig::blockSize>();
-        }
+        DCfilter.retainCoeffForBlock<VFXConfig::blockSize>();
+
         auto res = std::clamp(this->getFloatParam(fpRes), 0.f, 1.f);
         auto depth = std::clamp(this->getFloatParam(fpDepth), 0.f, 1.f);
 
@@ -336,7 +323,6 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
     sst::filters::CytomicSVF filter;
     sst::filters::CytomicSVF DCfilter;
     sst::basic_blocks::dsp::QuadratureOscillator<float> mSinOsc;
-    bool isFirst = true;
 
     sst::filters::CytomicSVF::Mode mode{filters::CytomicSVF::Mode::Lowpass};
     int priorMode{-1};
