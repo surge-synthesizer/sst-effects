@@ -98,11 +98,7 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
                 .withUnorderedMapFormatting({{false, "One"}, {true, "Two"}})
                 .withName("Mode");
         case ipStereo:
-            return pmd()
-                .asBool()
-                .withDefault(true)
-                .withUnorderedMapFormatting({{false, "Mono"}, {true, "Stereo"}})
-                .withName("Stereo");
+            return pmd().asStereoSwitch().withDefault(false);
         }
         return pmd().asInt().withName("error");
     }

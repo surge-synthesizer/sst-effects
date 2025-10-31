@@ -80,7 +80,7 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
                 .withLinearScaleFormatting("Stage")
                 .withDefault(4);
         case ipStereo:
-            return pmd().asStereoSwitch().withDefault(true);
+            return pmd().asStereoSwitch().withDefault(false);
 
         default:
             break;

@@ -142,7 +142,7 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
         case ipUnisonExtend:
             return pmd().asOnOffBool().withDefault(false).withName("Extend Unison");
         case ipStereo:
-            return pmd().asStereoSwitch().withDefault(true);
+            return pmd().asStereoSwitch().withDefault(false);
         case ipRandomPhaseAtOutset:
             return pmd().asOnOffBool().withDefault(false).withName("Randomize Phase");
         }
