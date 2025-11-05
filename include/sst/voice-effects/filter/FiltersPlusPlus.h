@@ -22,12 +22,14 @@
 #define INCLUDE_SST_VOICE_EFFECTS_FILTERSPLUSPLUS_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
-
 #include "sst/filters++.h"
+#include "sst/basic-blocks/dsp/PanLaws.h"
+#include "sst/basic-blocks/simd/setup.h"
 
 #include "../VoiceEffectCore.h"
 
 #include <vector>
+#include <cmath>
 
 namespace sst::voice_effects::filter
 {
@@ -38,6 +40,9 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
 
     static constexpr int numFloatParams{4};
     static constexpr int numIntParams{5};
+
+    static constexpr int lineSize{4108}; // MAX_FB_COMB + FIRIPOL_N
+    static constexpr int bufferSize = lineSize * 4 * sizeof(float);
 
     enum FloatParams
     {
@@ -56,6 +61,12 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
         ipSubmodel
     };
 
+    using fmd = filtersplusplus::FilterModel;
+    using fpb = filtersplusplus::Passband;
+    using fsl = filtersplusplus::Slope;
+    using fdr = filtersplusplus::DriveMode;
+    using fsm = filtersplusplus::FilterSubModel;
+
     FiltersPlusPlus() : core::VoiceEffectTemplateBase<VFXConfig>()
     {
         std::fill(priorFP.begin(), priorFP.end(), -1000.f);
@@ -63,12 +74,8 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
 
         filter.init();
         filter.setFilterModel(Model);
-
-        using fmd = filtersplusplus::FilterModel;
-        using fpb = filtersplusplus::Passband;
-        using fsl = filtersplusplus::Slope;
-        using fdr = filtersplusplus::DriveMode;
-        using fsm = filtersplusplus::FilterSubModel;
+        filter.setActive(2, false);
+        filter.setActive(3, false);
 
         // For some models we omit or reorder options, or set a custom param name
         if constexpr (Model == fmd::VemberClassic)
@@ -112,8 +119,17 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
         {
             extraName = "Gain";
         }
+        if constexpr (Model == fmd::Comb)
+        {
+            filter.setQuad();
+            slopes.emplace_back(fsl::Comb_Bipolar_ContinuousMix);
+            extraName = "+/- blend";
 
-        // For most of them just use everything. That bool must be true or we explode
+            this->preReservePool(bufferSize);
+            this->enableKeytrack(true);
+        }
+
+        // For most of them just use everything. ReturnUnsupported must be true or we explode
         if (passbands.empty())
         {
             passbands = filtersplusplus::potentialValuesFor<fpb>(Model, true);
@@ -132,12 +148,26 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
         }
     }
 
-    ~FiltersPlusPlus() {}
+    ~FiltersPlusPlus()
+    {
+        if constexpr (Model == fmd::Comb)
+        {
+            if (buffer[0])
+            {
+                VFXConfig::returnBlock(this, (uint8_t *)buffer[0], bufferSize);
+                for (int i = 0; i < 4; i++)
+                {
+                    buffer[i] = nullptr;
+                }
+            }
+        }
+    }
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
         bool stereo = this->getIntParam(ipStereo) > 0;
+        auto defres = 0.f;
 
         switch (idx)
         {
@@ -170,11 +200,22 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
                 .withName(!stereo ? std::string() : std::string("Cutoff R"))
                 .withDefault(0);
         case fpResonance:
-            return pmd().asPercent().withName("Resonance").withDefault(0.f);
+            if constexpr (Model == fmd::Comb)
+                defres = .95f;
+            return pmd().asPercent().withName("Resonance").withDefault(defres);
         case fpExtra:
-            if constexpr (Model == filtersplusplus::FilterModel::CytomicSVF)
+            if constexpr (Model == fmd::CytomicSVF)
             {
-                return pmd().asPercentBipolar().withName(extraName).withDefault(0.f);
+                return pmd().asDecibelWithRange(-24, 24).withName(extraName).withDefault(0.f);
+            }
+            if constexpr (Model == fmd::Comb)
+            {
+                return pmd()
+                    .asPercentBipolar()
+                    .withCustomMinDisplay("-")
+                    .withCustomMaxDisplay("+")
+                    .withName(extraName)
+                    .withDefault(1.f);
             }
             return pmd().asPercent().withName(extraName).withDefault(0.f);
         }
@@ -222,7 +263,7 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
         case ipDrive:
             if (drives.size() < 2)
                 return pmd().withLinearScaleFormatting("").withName("");
-            if constexpr (Model == fpp::FilterModel::VemberClassic)
+            if constexpr (Model == fmd::VemberClassic)
             {
                 drm.insert({0, fpp::toString(drives[0])});
                 drm.insert({1, this->getIntParam(ipPassband) < 3 ? fpp::toString(drives[1])
@@ -263,6 +304,22 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
         std::fill(priorFP.begin(), priorFP.end(), -1000.f);
         std::fill(priorIP.begin(), priorIP.end(), -1);
 
+        if constexpr (Model == fmd::Comb)
+        {
+            plusLerp.instantize();
+            minusLerp.instantize();
+            if (!buffer[0])
+            {
+                auto block = VFXConfig::checkoutBlock(this, bufferSize);
+                memset(block, 0, bufferSize);
+                for (int i = 0; i < 4; ++i)
+                {
+                    buffer[i] = (float *)block + i * lineSize * sizeof(float);
+                    filter.provideDelayLine(i, buffer[i]);
+                }
+            }
+        }
+
         filter.setSampleRateAndBlockSize(this->getSampleRate(), VFXConfig::blockSize);
         setupFilter();
     }
@@ -274,14 +331,30 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
         filter.setModelConfiguration(configFilter());
         if (!filter.prepareInstance())
         {
-            filter.setFilterModel(filtersplusplus::FilterModel::CytomicSVF);
-            filter.setPassband(filtersplusplus::Passband::LP);
+            std::cout << "something's wrong" << std::endl;
+            filter.setFilterModel(fmd::CytomicSVF);
+            filter.setPassband(fpb::LP);
             std::cout << " Invalid filter config, defaulting to " << filter.displayName()
                       << std::endl;
         }
+        if constexpr (Model == fmd::CytomicSVF)
+        {
+            extraBounds[0] = -24.f;
+            extraBounds[1] = 24.f;
+        }
+        else if (filter.coefficientsExtraIsBipolar(Model, filter.getModelConfiguration(), 0))
+        {
+            extraBounds[0] = -1.f;
+            extraBounds[1] = 1.f;
+        }
+        else
+        {
+            extraBounds[0] = 0.f;
+            extraBounds[1] = 1.f;
+        }
     }
 
-    template <bool stereo, bool stereoCoeff> void setCoeffs(float pitch)
+    template <bool mono, bool monoCoeff> void setCoeffs(float pitch)
     {
         std::array<float, numFloatParams> fp;
         std::array<int, numIntParams> ip;
@@ -313,48 +386,120 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
         if (fDiff || iDiff)
         {
             auto reso = std::clamp(this->getFloatParam(fpResonance), 0.f, 1.f);
-            auto morph = std::clamp(this->getFloatParam(fpExtra), 0.f, 1.f);
+            auto extra = std::clamp(this->getFloatParam(fpExtra), extraBounds[0], extraBounds[1]);
+
+            if constexpr (Model == fmd::CytomicSVF)
+            {
+                // Andy assumes A = pow(10, dB/40), our converter uses dB/20, hence the * .5f
+                extra = this->dbToLinear(extra * 0.5f);
+            }
 
             auto freqL = this->getFloatParam(fpCutoffL);
             if (keytrackOn)
                 freqL += pitch;
 
-            if constexpr (!stereo)
+            if constexpr (Model == fmd::Comb)
             {
-                filter.setMono();
-                filter.makeCoefficients(0, freqL, reso, morph);
-                return;
-            }
+                reso = std::pow(reso, .25);
+                if constexpr (mono)
+                {
+                    // in comb we use voice 0 and 1 in mono to get neg/pos feedback in parallel
+                    filter.setStereo();
+                    filter.makeCoefficients(0, freqL, reso, -1.f);
+                    filter.makeCoefficients(1, freqL, reso, 1.f);
+                    return;
+                }
+                // And in stereo that's the left and 2 & 3 do the same on the right
+                filter.setQuad();
+                filter.makeCoefficients(0, freqL, reso, -1.f);
+                filter.makeCoefficients(1, freqL, reso, 1.f);
+                if constexpr (monoCoeff)
+                {
+                    filter.copyCoefficientsFromVoiceToVoice(0, 2);
+                    filter.copyCoefficientsFromVoiceToVoice(1, 3);
+                    return;
+                }
 
-            filter.setStereo();
-            filter.makeCoefficients(0, freqL, reso, morph);
-            if constexpr (!stereoCoeff)
+                auto freqR = this->getFloatParam(fpCutoffR);
+                if (keytrackOn)
+                    freqR += pitch;
+                filter.makeCoefficients(2, freqR, reso, -1.f);
+                filter.makeCoefficients(3, freqR, reso, 1.f);
+            }
+            else
             {
-                filter.copyCoefficientsFromVoiceToVoice(0, 1);
-                return;
-            }
+                // all the others we only use voice 0 and 1
+                if constexpr (mono)
+                {
+                    filter.setMono();
+                    filter.makeCoefficients(0, freqL, reso, extra);
+                    return;
+                }
 
-            auto freqR = this->getFloatParam(fpCutoffR);
-            if (keytrackOn)
-                freqR += pitch;
-            filter.makeCoefficients(1, freqR, reso, morph);
+                filter.setStereo();
+                filter.makeCoefficients(0, freqL, reso, extra);
+                if constexpr (monoCoeff)
+                {
+                    filter.copyCoefficientsFromVoiceToVoice(0, 1);
+                    return;
+                }
+
+                auto freqR = this->getFloatParam(fpCutoffR);
+                if (keytrackOn)
+                    freqR += pitch;
+                filter.makeCoefficients(1, freqR, reso, extra);
+            }
         }
         else
         {
-            filter.freezeCoefficientsFor(0);
-            if constexpr (stereo)
+            if constexpr (Model == fmd::Comb)
+            {
+                filter.freezeCoefficientsFor(0);
                 filter.freezeCoefficientsFor(1);
+                if constexpr (!mono)
+                {
+                    filter.freezeCoefficientsFor(2);
+                    filter.freezeCoefficientsFor(3);
+                }
+            }
+            else
+            {
+                filter.freezeCoefficientsFor(0);
+                if constexpr (!mono)
+                    filter.freezeCoefficientsFor(1);
+            }
         }
     }
 
     void processMonoToMono(const float *const datain, float *dataout, float pitch)
     {
-        setCoeffs<false, false>(pitch);
+        setCoeffs<true, true>(pitch);
 
         filter.prepareBlock();
-        for (int i = 0; i < VFXConfig::blockSize; ++i)
+        if constexpr (Model == fmd::Comb)
         {
-            dataout[i] = filter.processMonoSample(datain[i]);
+            auto b = (this->getFloatParam(fpExtra) + 1) * .5f;
+            epBlend(std::clamp(b, 0.f, 1.f), blendMatrix);
+            minusLerp.set_target(blendMatrix[0]);
+            plusLerp.set_target(blendMatrix[1]);
+            float minus alignas(16)[VFXConfig::blockSize];
+            float plus alignas(16)[VFXConfig::blockSize];
+            minusLerp.store_block(minus);
+            plusLerp.store_block(plus);
+
+            for (int i = 0; i < VFXConfig::blockSize; ++i)
+            {
+                auto p{0.f}, m{0.f};
+                filter.processStereoSample(datain[i], datain[i], m, p);
+                dataout[i] = m * minus[i] + p * plus[i];
+            }
+        }
+        else
+        {
+            for (int i = 0; i < VFXConfig::blockSize; ++i)
+            {
+                dataout[i] = filter.processMonoSample(datain[i]);
+            }
         }
         filter.concludeBlock();
     }
@@ -363,14 +508,40 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
                        float *dataoutR, float pitch)
     {
         if (this->getIntParam(ipStereo) > 0)
-            setCoeffs<true, true>(pitch);
+            setCoeffs<false, false>(pitch);
         else
-            setCoeffs<true, false>(pitch);
+            setCoeffs<false, true>(pitch);
 
         filter.prepareBlock();
-        for (int i = 0; i < VFXConfig::blockSize; ++i)
+        if constexpr (Model == fmd::Comb)
         {
-            filter.processStereoSample(datainL[i], datainR[i], dataoutL[i], dataoutR[i]);
+            auto b = (this->getFloatParam(fpExtra) + 1) * .5f;
+            epBlend(std::clamp(b, 0.f, 1.f), blendMatrix);
+            minusLerp.set_target(blendMatrix[0]);
+            plusLerp.set_target(blendMatrix[1]);
+            float minus alignas(16)[VFXConfig::blockSize];
+            float plus alignas(16)[VFXConfig::blockSize];
+            minusLerp.store_block(minus);
+            plusLerp.store_block(plus);
+
+            for (int i = 0; i < VFXConfig::blockSize; ++i)
+            {
+                auto in = SIMD_MM(set_ps)(datainL[i], datainL[i], datainR[i], datainR[i]);
+                auto proc = filter.processSample(in);
+                auto blm = SIMD_MM(set_ps)(plus[i], minus[i], plus[i], minus[i]);
+                proc = SIMD_MM(mul_ps(proc, blm));
+                float res alignas(16)[4];
+                SIMD_MM(store_ps)(res, proc);
+                dataoutL[i] = res[0] + res[1];
+                dataoutR[i] = res[2] + res[3];
+            }
+        }
+        else
+        {
+            for (int i = 0; i < VFXConfig::blockSize; ++i)
+            {
+                filter.processStereoSample(datainL[i], datainR[i], dataoutL[i], dataoutR[i]);
+            }
         }
         filter.concludeBlock();
     }
@@ -395,6 +566,15 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
     bool keytrackOn{false};
     std::array<float, numFloatParams> priorFP;
     std::array<int, numIntParams> priorIP;
+    float *buffer[4]{nullptr, nullptr, nullptr, nullptr};
+    float extraBounds[2]{0.f, 1.f};
+
+    basic_blocks::dsp::pan_laws::panmatrix_t blendMatrix;
+    void epBlend(float blend, basic_blocks::dsp::pan_laws::panmatrix_t &res)
+    {
+        basic_blocks::dsp::pan_laws::stereoEqualPower(blend, res);
+    }
+    basic_blocks::dsp::lipol_sse<VFXConfig::blockSize> plusLerp, minusLerp;
 
     filtersplusplus::Filter filter = filtersplusplus::Filter();
     std::string extraName{""}, subName{""};
