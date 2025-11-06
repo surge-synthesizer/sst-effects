@@ -30,6 +30,7 @@
 
 #include <vector>
 #include <cmath>
+#include <cassert>
 
 namespace sst::voice_effects::filter
 {
@@ -310,11 +311,12 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
             minusLerp.instantize();
             if (!buffer[0])
             {
+                assert(filter.requiredDelayLinesSizes(Model, configFilter()) <= lineSize);
                 auto block = VFXConfig::checkoutBlock(this, bufferSize);
                 memset(block, 0, bufferSize);
                 for (int i = 0; i < 4; ++i)
                 {
-                    buffer[i] = (float *)block + i * lineSize * sizeof(float);
+                    buffer[i] = (float *)(block + i * lineSize * sizeof(float));
                     filter.provideDelayLine(i, buffer[i]);
                 }
             }
