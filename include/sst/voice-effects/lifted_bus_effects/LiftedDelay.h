@@ -71,6 +71,22 @@ template <typename VFXConfig> struct LiftedDelay : core::VoiceEffectTemplateBase
         return -1;
         // return helper.busFX->getRingoutDecay() * VFXConfig::blockSize;
     }
+    float silentSamplesLastCheck{-100000.f};
+    size_t silentSamplesVal{0};
+    size_t silentSamplesLength()
+    {
+        auto t1 = std::max(this->getFloatParam(delay_t::dly_time_left),
+                           this->getFloatParam(delay_t::dly_time_right));
+        if (t1 != silentSamplesLastCheck)
+        {
+            auto t = pow(2.f, t1);
+            if (this->getIsTemposync())
+                t *= this->temposyncratio;
+            this->silentSamplesVal = (size_t)(1.1 * t * this->getSampleRate());
+            this->silentSamplesLastCheck = t1;
+        }
+        return silentSamplesVal;
+    }
 
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
                        float *dataoutR, float pitch)

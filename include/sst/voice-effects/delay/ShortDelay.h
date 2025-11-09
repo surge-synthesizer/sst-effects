@@ -395,6 +395,12 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
         return tm * (fbVals[ct] + 1);
     }
 
+    size_t silentSamplesLength() const
+    {
+        // max time is 1 second so
+        return this->getSampleRate() * 1.5;
+    }
+
     std::array<details::DelayLineSupport, 2> lineSupport;
     bool isShort{true};
 
