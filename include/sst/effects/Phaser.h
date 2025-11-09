@@ -150,6 +150,7 @@ template <typename FXConfig> struct Phaser : core::EffectTemplateBase<FXConfig>
 
         return 1000;
     }
+    size_t silentSamplesLength() const { return 10; }
 
     void init_stages()
     {

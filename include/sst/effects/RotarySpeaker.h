@@ -82,6 +82,7 @@ template <typename FXConfig> struct RotarySpeaker : core::EffectTemplateBase<FXC
 
     void suspendProcessing() { initialize(); }
     int getRingoutDecay() const { return 1000; }
+    size_t silentSamplesLength() const { return 10; }
     void onSampleRateChanged() { initialize(); }
 
     void setvars(bool init);

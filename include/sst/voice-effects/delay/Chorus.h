@@ -388,6 +388,8 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
 
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
 
+    size_t silentSamplesLength() const { return 10; }
+
   protected:
     std::array<details::DelayLineSupport, 2> lineSupport;
     bool isShort{true};

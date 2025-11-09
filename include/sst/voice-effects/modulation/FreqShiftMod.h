@@ -128,6 +128,8 @@ template <typename VFXConfig> struct FreqShiftMod : core::VoiceEffectTemplateBas
 
     // void processMonoToMono(float *datainL, float *dataoutL, float pitch) {}
 
+    size_t silentSamplesLength() const { return 10; }
+
   protected:
     float mSampleRate{1};
     float mPrior[2]{0.f, 0.f};

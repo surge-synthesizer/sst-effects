@@ -140,6 +140,7 @@ template <typename FXConfig> struct Reverb2 : core::EffectTemplateBase<FXConfig>
 
     void suspendProcessing() { initialize(); }
     int getRingoutDecay() const { return ringout_time; }
+    size_t silentSamplesLength() const { return 10; }
     void onSampleRateChanged() { initialize(); }
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const

@@ -317,6 +317,7 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
     }
     bool getKeytrack() const { return keytrackOn; }
     bool checkParameterConsistency() const { return true; }
+    size_t silentSamplesLength() const { return 10; }
 
   protected:
     bool keytrackOn{false};

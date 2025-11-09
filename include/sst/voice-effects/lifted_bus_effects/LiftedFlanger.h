@@ -62,6 +62,7 @@ template <typename VFXConfig> struct LiftedFlanger : core::VoiceEffectTemplateBa
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     size_t tailLength() const { return helper.busFX->getRingoutDecay() * VFXConfig::blockSize; }
+    size_t silentSamplesLength() const { return helper.busFX->silentSamplesLength(); }
 
     void setupValues()
     {
