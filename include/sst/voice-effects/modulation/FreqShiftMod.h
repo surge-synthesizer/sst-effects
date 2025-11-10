@@ -109,10 +109,8 @@ template <typename VFXConfig> struct FreqShiftMod : core::VoiceEffectTemplateBas
 
         DCfilter.setCoeff(filters::CytomicSVF::Mode::Highpass, 15.f, .5f, this->getSampleRateInv(),
                           0.f);
-        DCfilter.template retainCoeffForBlock<VFXConfig::blockSize>();
         shelf.setCoeff(filters::CytomicSVF::Mode::HighShelf, 5000.f, .1f, this->getSampleRateInv(),
                        .85f);
-        shelf.template retainCoeffForBlock<VFXConfig::blockSize>();
     }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
