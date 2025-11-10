@@ -91,9 +91,8 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
         if (t1 != silentSamplesLastCheck)
         {
             auto t = pow(2.f, t1);
-            if (this->getIsTemposync())
-                t *= this->temposyncratio;
-            this->silentSamplesVal = (size_t)(1.1 * t * this->getSampleRate());
+            t *= this->temposyncRatio(fld_time);
+            this->silentSamplesVal = (size_t)(1.1 * t * this->sampleRate());
             this->silentSamplesLastCheck = t1;
         }
         return silentSamplesVal;
