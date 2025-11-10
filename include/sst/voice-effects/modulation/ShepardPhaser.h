@@ -332,6 +332,7 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
     }
 
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
+    size_t silentSamplesLength() const { return 10; }
 
   protected:
     std::array<sst::filters::CytomicSVF, 12> filters;

@@ -338,6 +338,7 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
         return res;
     }
     bool getKeytrack() const { return keytrackOn; }
+    size_t silentSamplesLength() const { return 10; }
 
   protected:
     bool keytrackOn{false};

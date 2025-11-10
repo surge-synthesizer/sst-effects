@@ -88,6 +88,7 @@ template <typename FXConfig> struct Flanger : core::EffectTemplateBase<FXConfig>
 
     void suspendProcessing() { initialize(); }
     int getRingoutDecay() const { return ringout_value; }
+    size_t silentSamplesLength() const { return 10; }
     void onSampleRateChanged() { initialize(); }
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const

@@ -299,6 +299,7 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
     }
     bool getKeytrack() const { return keytrackOn; }
     bool checkParameterConsistency() const { return true; }
+    size_t silentSamplesLength() const { return 10; }
 
   protected:
     bool keytrackOn{false}, wasKeytrackOn{false};

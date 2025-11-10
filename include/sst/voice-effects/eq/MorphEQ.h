@@ -481,6 +481,7 @@ template <typename VFXConfig> struct MorphEQ : core::VoiceEffectTemplateBase<VFX
 
         return y * (band == 0 ? gainC0 : gainC1);
     }
+    size_t silentSamplesLength() const { return 10; }
 
   protected:
     std::array<float, numFloatParams> mLastParam{};

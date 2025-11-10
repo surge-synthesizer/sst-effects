@@ -198,6 +198,8 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
         }
     }
 
+    size_t silentSamplesLength() const { return 10; }
+
   protected:
     int holdtime{0};
     bool gate_state{false}, gate_zc_sync[2]{false, false};

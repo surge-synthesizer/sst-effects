@@ -31,9 +31,9 @@
 #include "sst/basic-blocks/mechanics/simd-ops.h"
 
 /*
- * Unlike other effects, Numbus is split into Nimbus and NimbusImpl.h to allow
+ * Unlike other effects, Nimbus is split into Nimbus and NimbusImpl.h to allow
  * inclusion of this in header files without pulling in the eurorack entire core
- * into your header as oppposed to TU space
+ * into your header as opposed to TU space
  *
  * For you, using NimbusImpl may be fine, or you may want to mix and match and
  * do an explicit instantiation or so on. If you are reading this and you don't
@@ -114,6 +114,7 @@ template <typename FXConfig> struct Nimbus : core::EffectTemplateBase<FXConfig>
 
     void suspendProcessing() { initialize(); }
     int getRingoutDecay() const { return -1; }
+    size_t silentSamplesLength() const { return this->sampleRate() * 5; }
     void onSampleRateChanged() { initialize(); }
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const

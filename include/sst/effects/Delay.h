@@ -89,6 +89,21 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
 
     void suspendProcessing() { initialize(); }
     int getRingoutDecay() const { return -1; }
+    float silentSamplesLastCheck{-100000.f};
+    size_t silentSamplesVal{0};
+    size_t silentSamplesLength()
+    {
+        std::cout << "the delay does it at least" << std::endl;
+        auto t1 = std::max(this->floatValue(dly_time_left) * this->temposyncRatio(dly_time_left),
+                           this->floatValue(dly_time_right) * this->temposyncRatio(dly_time_right));
+        if (t1 != silentSamplesLastCheck)
+        {
+            auto t = pow(2.f, t1);
+            this->silentSamplesVal = (size_t)(1.1 * t * this->sampleRate());
+            this->silentSamplesLastCheck = t1;
+        }
+        return silentSamplesVal;
+    }
     void onSampleRateChanged() { initialize(); }
 
     void initialize();

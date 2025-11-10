@@ -83,6 +83,21 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
 
     void suspendProcessing() { initialize(); }
     int getRingoutDecay() const { return -1; }
+    float silentSamplesLastCheck;
+    size_t silentSamplesVal{0};
+    size_t silentSamplesLength()
+    {
+        auto t1 = this->floatValue(fld_time);
+        if (t1 != silentSamplesLastCheck)
+        {
+            auto t = pow(2.f, t1);
+            if (this->getIsTemposync())
+                t *= this->temposyncratio;
+            this->silentSamplesVal = (size_t)(1.1 * t * this->getSampleRate());
+            this->silentSamplesLastCheck = t1;
+        }
+        return silentSamplesVal;
+    }
     void onSampleRateChanged() { initialize(); }
 
     void initialize();
