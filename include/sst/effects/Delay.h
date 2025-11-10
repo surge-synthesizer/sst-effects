@@ -93,7 +93,6 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
     size_t silentSamplesVal{0};
     size_t silentSamplesLength()
     {
-        std::cout << "the delay does it at least" << std::endl;
         auto t1 = std::max(this->floatValue(dly_time_left) * this->temposyncRatio(dly_time_left),
                            this->floatValue(dly_time_right) * this->temposyncRatio(dly_time_right));
         if (t1 != silentSamplesLastCheck)

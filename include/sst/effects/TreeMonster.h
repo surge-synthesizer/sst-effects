@@ -109,6 +109,8 @@ struct TreeMonster
         return pmd().withName("ERROR").asPercent();
     }
 
+    size_t silentSamplesLength() const { return FXConfig::blockSize; }
+
   public:
     static constexpr int16_t streamingVersion{1};
     static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const param)

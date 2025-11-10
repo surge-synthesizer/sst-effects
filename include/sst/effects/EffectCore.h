@@ -224,7 +224,7 @@ struct EffectTemplateBase
 
     inline float storageRand01() { return FXConfig::rand01(globalStorage); }
 
-    inline double sampleRate() { return FXConfig::sampleRate(globalStorage); }
+    inline double sampleRate() const { return FXConfig::sampleRate(globalStorage); }
 
     inline float noteToPitch(float p) { return FXConfig::noteToPitch(globalStorage, p); }
 
