@@ -47,6 +47,7 @@ template <typename VFXConfig> struct FreqShiftMod : core::VoiceEffectTemplateBas
 
     enum struct FreqShiftModIntParams : uint32_t
     {
+        stereo,
         num_params
     };
 
@@ -71,6 +72,15 @@ template <typename VFXConfig> struct FreqShiftMod : core::VoiceEffectTemplateBas
                 .withRange(-10, 10)
                 .withDefault(0);
         case FreqShiftModFloatParams::coarse:
+            if (keytrackOn)
+            {
+                return pmd()
+                    .asFloat()
+                    .withName("Offset")
+                    .withRange(-48.f, 48.f)
+                    .withDefault(0)
+                    .withLinearScaleFormatting("semitones");
+            }
             return pmd()
                 .asFloat()
                 .withName("Coarse")
@@ -86,38 +96,136 @@ template <typename VFXConfig> struct FreqShiftMod : core::VoiceEffectTemplateBas
         return pmd().withName("Unknown " + std::to_string(idx)).asPercent();
     }
 
+    basic_blocks::params::ParamMetaData intParamAt(int idx) const
+    {
+        using pmd = basic_blocks::params::ParamMetaData;
+        return pmd().asStereoSwitch().withDefault(false);
+    }
+
     void initVoiceEffect()
     {
         mHilbertStereo.setSampleRate(this->getSampleRate());
         mHilbertMono.setSampleRate(this->getSampleRate());
+
+        DCfilter.setCoeff(filters::CytomicSVF::Mode::Highpass, 15.f, .5f, this->getSampleRateInv(),
+                          0.f);
+        DCfilter.template retainCoeffForBlock<VFXConfig::blockSize>();
+        shelf.setCoeff(filters::CytomicSVF::Mode::HighShelf, 5000.f, .1f, this->getSampleRateInv(),
+                       .85f);
+        shelf.template retainCoeffForBlock<VFXConfig::blockSize>();
     }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
+
+    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
+    {
+        auto coarse = this->getFloatParam((int)FreqShiftModFloatParams::coarse);
+        if (keytrackOn)
+        {
+            coarse = 440 * this->note_to_pitch_ignoring_tuning(pitch + coarse);
+        }
+        auto fine = this->getFloatParam((int)FreqShiftModFloatParams::fine);
+        mSinOscL.setRate(2.0 * M_PI * (coarse + fine) * this->getSampleRateInv());
+
+        auto fbp = this->getFloatParam((int)FreqShiftModFloatParams::feedback);
+        mFeedbackLerp.newValue(fbp);
+
+        auto dummy{0.f};
+        for (auto i = 0U; i < VFXConfig::blockSize; ++i)
+        {
+            auto fb = mFeedbackLerp.v * mPrior[0];
+            filters::CytomicSVF::step(shelf, fb, dummy);
+            fb = sqrtOfTwo * fb / (1 + fb * fb);
+            auto iL = datainL[i] + fb;
+
+            auto [re, im] = mHilbertMono.stepPair(iL);
+            mSinOscL.step();
+
+            auto o = re * mSinOscL.v - im * mSinOscL.u;
+            filters::CytomicSVF::step(DCfilter, o, dummy);
+            mPrior[0] = o;
+
+            dataoutL[i] = mPrior[0];
+
+            mFeedbackLerp.process();
+        }
+    }
 
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
                        float *dataoutR, float pitch)
     {
-        auto rate = this->getFloatParam((int)FreqShiftModFloatParams::coarse) +
-                    this->getFloatParam((int)FreqShiftModFloatParams::fine);
-        mSinOsc.setRate(2.0 * M_PI * rate * this->getSampleRateInv());
+        if (this->getIntParam((int)FreqShiftModIntParams::stereo))
+        {
+            processStereoImpl<true>(datainL, datainR, dataoutL, dataoutR, pitch);
+        }
+        else
+        {
+            processStereoImpl<false>(datainL, datainR, dataoutL, dataoutR, pitch);
+        }
+    }
 
-        auto fbp = this->getFloatParam((int)FreqShiftModFloatParams::feedback) * 0.75;
+    void processMonoToStereo(const float *const datainL, float *dataoutR, float *dataoutL,
+                             float pitch)
+    {
+        processStereoImpl<true>(datainL, datainL, dataoutL, dataoutR, pitch);
+    }
+
+    template <bool stereo>
+    void processStereoImpl(const float *const datainL, const float *const datainR, float *dataoutL,
+                           float *dataoutR, float pitch)
+    {
+        auto coarse = this->getFloatParam((int)FreqShiftModFloatParams::coarse);
+        if (keytrackOn)
+        {
+            coarse = 440 * this->note_to_pitch_ignoring_tuning(pitch + coarse);
+        }
+
+        auto fine = this->getFloatParam((int)FreqShiftModFloatParams::fine);
+        auto rateL = coarse + fine;
+        mSinOscL.setRate(2.0 * M_PI * rateL * this->getSampleRateInv());
+        if constexpr (stereo)
+        {
+            auto rateR = coarse - fine;
+            mSinOscR.setRate(2.0 * M_PI * rateR * this->getSampleRateInv());
+        }
+
+        auto fbp = this->getFloatParam((int)FreqShiftModFloatParams::feedback);
+
         mFeedbackLerp.newValue(fbp);
 
         for (auto i = 0U; i < VFXConfig::blockSize; ++i)
         {
-            auto fb = mFeedbackLerp.v;
+            auto fbL = mFeedbackLerp.v * mPrior[0];
+            auto fbR = mFeedbackLerp.v * mPrior[1];
+            filters::CytomicSVF::step(shelf, fbL, fbR);
+            fbL = sqrtOfTwo * fbL / (1 + fbL * fbL);
+            fbR = sqrtOfTwo * fbR / (1 + fbR * fbR);
 
-            auto iL = datainL[i] + fb * mPrior[0];
-            auto iR = datainR[i] + fb * mPrior[1];
+            auto iL = datainL[i] + fbL;
+            auto iR = datainR[i] + fbR;
 
             auto [L, R] = mHilbertStereo.stepToPair(iL, iR);
             auto [Lre, Lim] = L;
             auto [Rre, Rim] = R;
 
-            mSinOsc.step();
+            mSinOscL.step();
+            mSinOscR.step();
 
-            mPrior[0] = (Lre * mSinOsc.v - Lim * mSinOsc.u);
-            mPrior[1] = (Rre * mSinOsc.v - Rim * mSinOsc.u);
+            auto oL{0.f}, oR{0.f};
+
+            oL = (Lre * mSinOscL.v - Lim * mSinOscL.u);
+            if constexpr (stereo)
+            {
+                oR = (Rre * mSinOscR.v - Rim * mSinOscR.u);
+            }
+            else
+            {
+                oR = (Rre * mSinOscL.v - Rim * mSinOscL.u);
+            }
+
+            filters::CytomicSVF::step(DCfilter, oL, oR);
+
+            mPrior[0] = oL;
+            mPrior[1] = oR;
 
             dataoutL[i] = mPrior[0];
             dataoutR[i] = mPrior[1];
@@ -126,16 +234,30 @@ template <typename VFXConfig> struct FreqShiftMod : core::VoiceEffectTemplateBas
         }
     }
 
-    // void processMonoToMono(float *datainL, float *dataoutL, float pitch) {}
-
+    bool getMonoToStereoSetting() const
+    {
+        return this->getIntParam((int)FreqShiftModIntParams::stereo);
+    }
+    bool enableKeytrack(bool b)
+    {
+        auto res = (b != keytrackOn);
+        keytrackOn = b;
+        return res;
+    }
+    bool getKeytrack() const { return keytrackOn; }
+    bool checkParameterConsistency() const { return true; }
     size_t silentSamplesLength() const { return 10; }
 
   protected:
+    bool keytrackOn{false};
     float mSampleRate{1};
     float mPrior[2]{0.f, 0.f};
     sst::basic_blocks::dsp::HilbertTransformStereoSSE mHilbertStereo;
     sst::basic_blocks::dsp::HilbertTransformMonoFloat mHilbertMono;
-    sst::basic_blocks::dsp::QuadratureOscillator<float> mSinOsc;
+    sst::basic_blocks::dsp::QuadratureOscillator<float> mSinOscL, mSinOscR;
+    sst::filters::CytomicSVF DCfilter, shelf;
+
+    static constexpr float sqrtOfTwo{1.4142136};
 
     sst::basic_blocks::dsp::lipol<float, VFXConfig::blockSize, true> mFeedbackLerp;
 

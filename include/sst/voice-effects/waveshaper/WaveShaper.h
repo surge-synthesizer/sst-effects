@@ -138,7 +138,6 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
     void processInternal(const float *const datainL, const float *const datainR, float *dataoutL,
                          float *dataoutR)
     {
-        // Todo: Smooth
         auto drv = this->dbToLinear(this->getFloatParam((int)WaveShaperFloatParams::drive));
         auto bias = this->getFloatParam((int)WaveShaperFloatParams::bias);
         auto gain = this->dbToLinear(this->getFloatParam((int)WaveShaperFloatParams::postgain));
