@@ -220,41 +220,36 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
     {
         setCoeffs(pitch);
 
-        float dataL alignas(16)[VFXConfig::blockSize];
-        float dataR alignas(16)[VFXConfig::blockSize];
-        basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(datainL, dataL);
-        basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(datainR, dataR);
+        basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(datainL, dataoutL);
+        basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(datainR, dataoutR);
 
         int it{0};
         for (auto &f : CySVFs)
         {
             if (!this->getIsDeactivated(it))
             {
-                f.template processBlock<VFXConfig::blockSize>(dataL, dataR, dataL, dataR);
+                f.template processBlock<VFXConfig::blockSize>(dataoutL, dataoutR, dataoutL,
+                                                              dataoutR);
             }
             ++it;
         }
-        basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(dataL, dataoutL);
-        basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(dataR, dataoutR);
     }
 
     void processMonoToMono(const float *const datain, float *dataout, float pitch)
     {
         setCoeffs(pitch);
 
-        float data alignas(16)[VFXConfig::blockSize];
-        basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(datain, data);
+        basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(datain, dataout);
 
         int it{0};
         for (auto &f : CySVFs)
         {
             if (!this->getIsDeactivated(it))
             {
-                f.template processBlock<VFXConfig::blockSize>(datain, dataout);
+                f.template processBlock<VFXConfig::blockSize>(dataout, dataout);
             }
             ++it;
         }
-        basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(data, dataout);
     }
 
     bool enableKeytrack(bool b)
