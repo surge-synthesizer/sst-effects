@@ -81,8 +81,7 @@ template <typename VFXConfig> struct TiltEQ : core::VoiceEffectTemplateBase<VFXC
                        float *dataoutR, float pitch)
     {
         setCoeffs();
-        tilter.template processBlock<VFXConfig::blockSize>(datainL, datainR, dataoutL,
-                                                               dataoutR);
+        tilter.template processBlock<VFXConfig::blockSize>(datainL, datainR, dataoutL, dataoutR);
     }
 
     void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
@@ -94,12 +93,14 @@ template <typename VFXConfig> struct TiltEQ : core::VoiceEffectTemplateBase<VFXC
     void setCoeffs()
     {
         float freq = 440 * this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpFreq));
-        // float slope = this->dbToLinear(std::clamp(this->getFloatParam(fpTilt), -18.f, 18.f) * .5f);
+        // float slope = this->dbToLinear(std::clamp(this->getFloatParam(fpTilt), -18.f, 18.f) *
+        // .5f);
         float slope = this->getFloatParam(fpTilt);
 
         if (slope != priorSlope || freq != priorFreq)
         {
-            tilter.template setCoeffForBlock<VFXConfig::blockSize>(freq, .07f, this->getSampleRateInv(), slope);
+            tilter.template setCoeffForBlock<VFXConfig::blockSize>(freq, .07f,
+                                                                   this->getSampleRateInv(), slope);
             priorSlope = slope;
             priorFreq = freq;
         }
