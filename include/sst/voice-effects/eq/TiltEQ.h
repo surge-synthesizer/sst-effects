@@ -22,6 +22,7 @@
 #define INCLUDE_SST_VOICE_EFFECTS_EQ_TILTEQ_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
+#include "sst/filters/CytomicTilt.h"
 
 #include "../VoiceEffectCore.h"
 
@@ -68,67 +69,54 @@ template <typename VFXConfig> struct TiltEQ : core::VoiceEffectTemplateBase<VFXC
         return pmd().asFloat().withName("Error");
     }
 
-    void initVoiceEffect() {}
-    void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
-
-    void setCoeffs()
+    void initVoiceEffect()
     {
-        float freq = 440 * this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpFreq));
-        float slope = std::clamp(this->getFloatParam(fpTilt), -18.f, 18.f) / 2.f;
-
-        float posGain = this->dbToLinear(slope);
-        float negGain = this->dbToLinear(-1 * slope);
-        float res = .07f;
-
-        if (slope == priorSlope && freq == priorFreq)
-        {
-            for (int i = 0; i < 2; i++)
-            {
-                filters[i].template retainCoeffForBlock<VFXConfig::blockSize>();
-            }
-        }
-        else
-        {
-            filters[0].template setCoeffForBlock<VFXConfig::blockSize>(
-                filters::CytomicSVF::Mode::LowShelf, freq, res, this->getSampleRateInv(), negGain);
-            filters[1].template setCoeffForBlock<VFXConfig::blockSize>(
-                filters::CytomicSVF::Mode::HighShelf, freq, res, this->getSampleRateInv(), posGain);
-            priorSlope = slope;
-            priorFreq = freq;
-        }
+        tilter.init();
+        priorFreq = -9999.f;
+        priorSlope = -9999.f;
     }
+    void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
                        float *dataoutR, float pitch)
     {
         setCoeffs();
-        filters[0].template processBlock<VFXConfig::blockSize>(datainL, datainR, dataoutL,
-                                                               dataoutR);
-        filters[1].template processBlock<VFXConfig::blockSize>(dataoutL, dataoutR, dataoutL,
-                                                               dataoutR);
+        tilter.template processBlock<VFXConfig::blockSize>(datainL, datainR, dataoutL, dataoutR);
     }
 
     void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         setCoeffs();
-        filters[0].template processBlock<VFXConfig::blockSize>(datainL, dataoutL);
-        filters[1].template processBlock<VFXConfig::blockSize>(dataoutL, dataoutL);
+        tilter.template processBlock<VFXConfig::blockSize>(datainL, dataoutL);
+    }
+
+    void setCoeffs()
+    {
+        float freq = 440 * this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpFreq));
+        float slope = this->dbToLinear(std::clamp(this->getFloatParam(fpTilt), -18.f, 18.f) * .5f);
+
+        if (slope != priorSlope || freq != priorFreq)
+        {
+            tilter.template setCoeffForBlock<VFXConfig::blockSize>(freq, .07f,
+                                                                   this->getSampleRateInv(), slope);
+            priorSlope = slope;
+            priorFreq = freq;
+        }
+        else
+        {
+            tilter.retainCoeffForBlock();
+        }
     }
 
     /*
     float getFrequencyGraph(float f)
     {
-        auto res = 1.f;
-        for (int i = 0; i < nBands; ++i)
-        {
-            res *= mParametric[i].plot_magnitude(f);
-        }
-        return res;
+
     }
     */
 
   protected:
-    std::array<sst::filters::CytomicSVF, 2> filters;
+    sst::filters::CytomicTilt tilter;
     float priorSlope = -123456.f;
     float priorFreq = -123456.f;
 
