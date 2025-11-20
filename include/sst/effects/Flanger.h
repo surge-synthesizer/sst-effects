@@ -140,7 +140,7 @@ template <typename FXConfig> struct Flanger : core::EffectTemplateBase<FXConfig>
             return result.withName("Spacing")
                 .withRange(0.f, 12.f)
                 .withDefault(0.f)
-                .withLinearScaleFormatting("semitones");
+                .withSemitoneFormatting();
 
         case fl_feedback:
             return result.withName("Feedback").asPercent().withDefault(0.f);

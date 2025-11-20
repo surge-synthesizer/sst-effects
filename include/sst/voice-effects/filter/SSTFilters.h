@@ -89,7 +89,7 @@ template <typename VFXConfig> struct SSTFilters : core::VoiceEffectTemplateBase<
                     .withRange(-48, 96)
                     .withName("Offset")
                     .withDefault(0)
-                    .withLinearScaleFormatting("semitones");
+                    .withSemitoneFormatting();
             }
             return pmd().asAudibleFrequency().withName("Cutoff").withDefault(0);
 

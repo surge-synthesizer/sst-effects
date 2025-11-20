@@ -66,7 +66,7 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
                     .withRange(0, 96)
                     .withName("Samplerate Offset")
                     .withDefault(96)
-                    .withLinearScaleFormatting("semitones");
+                    .withSemitoneFormatting();
             }
             return pmd()
                 .asAudibleFrequency()
@@ -85,7 +85,7 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
                     .withRange(-48, 96)
                     .withName("Cutoff Offset")
                     .withDefault(96)
-                    .withLinearScaleFormatting("semitones");
+                    .withSemitoneFormatting();
             }
             return pmd().asAudibleFrequency().withName("Cutoff");
         case fpResonance:

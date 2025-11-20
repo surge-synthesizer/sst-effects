@@ -79,7 +79,7 @@ template <typename VFXConfig> struct FreqShiftMod : core::VoiceEffectTemplateBas
                     .withName("Offset")
                     .withRange(-48.f, 48.f)
                     .withDefault(0)
-                    .withLinearScaleFormatting("semitones");
+                    .withSemitoneFormatting();
             }
             return pmd()
                 .asFloat()

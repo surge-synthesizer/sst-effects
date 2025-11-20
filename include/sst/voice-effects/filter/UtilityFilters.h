@@ -65,7 +65,7 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
                     .withName("LoCut Offset")
                     .withDefault(-48)
                     .deactivatable()
-                    .withLinearScaleFormatting("semitones");
+                    .withSemitoneFormatting();
             }
             return pmd()
                 .asAudibleFrequency()
@@ -81,7 +81,7 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
                     .withName("HiCut Offset")
                     .withDefault(-48)
                     .deactivatable()
-                    .withLinearScaleFormatting("semitones");
+                    .withSemitoneFormatting();
             }
             return pmd()
                 .asAudibleFrequency()
@@ -97,7 +97,7 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
                     .withName("LoSHelf Offset")
                     .withDefault(-48)
                     .deactivatable()
-                    .withLinearScaleFormatting("semitones");
+                    .withSemitoneFormatting();
             }
             return pmd()
                 .asAudibleFrequency()
@@ -113,7 +113,7 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
                     .withName("HiShelf Offset")
                     .withDefault(-48)
                     .deactivatable()
-                    .withLinearScaleFormatting("semitones");
+                    .withSemitoneFormatting();
             }
             return pmd()
                 .asAudibleFrequency()

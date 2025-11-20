@@ -72,7 +72,7 @@ template <typename VFXConfig> struct SinePlus : core::VoiceEffectTemplateBase<VF
                     .asFloat()
                     .withRange(-48, 48)
                     .withDefault(0)
-                    .withLinearScaleFormatting("semitones")
+                    .withSemitoneFormatting()
                     .withName("Tune");
             }
             return pmd().asAudibleFrequency().withName("Frequency");
@@ -92,7 +92,7 @@ template <typename VFXConfig> struct SinePlus : core::VoiceEffectTemplateBase<VF
                 .withName("Offset A")
                 .withRange(12, 44)
                 .withDefault(12)
-                .withLinearScaleFormatting("semitones");
+                .withSemitoneFormatting();
         case fpOffsetB:
             if (quantB)
             {
@@ -109,7 +109,7 @@ template <typename VFXConfig> struct SinePlus : core::VoiceEffectTemplateBase<VF
                 .withName("Offset B")
                 .withRange(12, 44)
                 .withDefault(19)
-                .withLinearScaleFormatting("semitones");
+                .withSemitoneFormatting();
         case fpMainBalance:
             return pmd().asPercentBipolar().withName("Main Balance");
         case fpBalanceAB:

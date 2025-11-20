@@ -77,7 +77,7 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
                 .withRange(-48, 48)
                 .withDefault(12)
                 .withName("Spacing")
-                .withLinearScaleFormatting("semitones");
+                .withSemitoneFormatting();
         case fpResonance:
             return pmd().asPercent().withDefault(0.707).withName("Resonance");
         case fpRate:
@@ -97,7 +97,7 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
                     .withRange(-48, 48)
                     .withName("Center Freq Offset")
                     .withDefault(0)
-                    .withLinearScaleFormatting("semitones");
+                    .withSemitoneFormatting();
             }
             return pmd().asAudibleFrequency().withName("Center Frequency").withDefault(0);
         }

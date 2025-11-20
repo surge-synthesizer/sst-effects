@@ -180,7 +180,7 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
                     .withRange(-48, 96)
                     .withName(std::string("Offset") + (stereo ? " L" : ""))
                     .withDefault(0)
-                    .withLinearScaleFormatting("semitones");
+                    .withSemitoneFormatting();
             }
             return pmd()
                 .asAudibleFrequency()
@@ -194,7 +194,7 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
                     .withRange(-48, 96)
                     .withName(!stereo ? std::string() : "Offset R")
                     .withDefault(0)
-                    .withLinearScaleFormatting("semitones");
+                    .withSemitoneFormatting();
             }
             return pmd()
                 .asAudibleFrequency()
