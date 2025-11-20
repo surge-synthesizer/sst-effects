@@ -82,7 +82,7 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
                     .asFloat()
                     .withRange(-48, 48)
                     .withDefault(0)
-                    .withLinearScaleFormatting("semitones")
+                    .withSemitoneFormatting()
                     .withName("Tune");
             }
             return pmd().asAudibleFrequency().withName("Frequency");
@@ -101,7 +101,7 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
                 .withName("Sync")
                 .withDefault(0)
                 .withEnabled(ot == Wave::PULSE)
-                .withLinearScaleFormatting("semitones");
+                .withSemitoneFormatting();
         case fpHighpass:
             if (keytrackOn)
             {
@@ -111,7 +111,7 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
                     .withName("Highpass Offset")
                     .withDefault(-48)
                     .withEnabled(ot == Wave::SAW)
-                    .withLinearScaleFormatting("semitones");
+                    .withSemitoneFormatting();
             }
             return pmd()
                 .asAudibleFrequency()
@@ -126,7 +126,7 @@ template <typename VFXConfig> struct GenVA : core::VoiceEffectTemplateBase<VFXCo
                     .withName("Lowpass Offset")
                     .withDefault(96)
                     .withEnabled(ot == Wave::SAW)
-                    .withLinearScaleFormatting("semitones");
+                    .withSemitoneFormatting();
             }
             return pmd()
                 .asAudibleFrequency()

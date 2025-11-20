@@ -126,7 +126,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
                     .withRange(-48.f, 48.f)
                     .withName("Tilt Freq")
                     .withDefault(0)
-                    .withLinearScaleFormatting("semitones");
+                    .withSemitoneFormatting();
             }
             return pmd().asAudibleFrequency().withName("Tilt Freq");
         }

@@ -71,7 +71,7 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
                     .withRange(-48, 96)
                     .withName(std::string("Offset") + (stereo ? " L" : ""))
                     .withDefault(0)
-                    .withLinearScaleFormatting("semitones");
+                    .withSemitoneFormatting();
             }
             return pmd()
                 .asAudibleFrequency()
@@ -85,7 +85,7 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
                     .withRange(-48, 96)
                     .withName(!stereo ? std::string() : "Offset R")
                     .withDefault(0)
-                    .withLinearScaleFormatting("semitones");
+                    .withSemitoneFormatting();
             }
             return pmd().asAudibleFrequency().withName(!stereo ? std::string() : "Frequency R");
         case fpDepth:

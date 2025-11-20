@@ -81,7 +81,7 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
                     .withName("HP Off")
                     .withDefault(-48)
                     .deactivatable()
-                    .withLinearScaleFormatting("semitones");
+                    .withSemitoneFormatting();
             }
             return pmd().asAudibleFrequency().withDefault(-60).withName("LoCut").deactivatable();
         case WaveShaperFloatParams::lowpass:
@@ -92,7 +92,7 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
                     .withRange(-48, 96)
                     .withName("LP Off")
                     .withDefault(48)
-                    .withLinearScaleFormatting("semitones")
+                    .withSemitoneFormatting()
                     .deactivatable();
             }
             return pmd().asAudibleFrequency().withDefault(70).withName("HiCut").deactivatable();

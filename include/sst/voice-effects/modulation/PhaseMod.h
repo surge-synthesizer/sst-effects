@@ -67,7 +67,7 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
                 return pmd()
                     .asFloat()
                     .withRange(-96, 96)
-                    .withLinearScaleFormatting("semitones")
+                    .withSemitoneFormatting()
                     .withDefault(0)
                     .withName("Offset");
             }

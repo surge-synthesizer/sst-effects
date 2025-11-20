@@ -94,7 +94,7 @@ template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFX
                     .withRange(-48, 96)
                     .withName("Freq Offset")
                     .withDefault(0)
-                    .withLinearScaleFormatting("semitones");
+                    .withSemitoneFormatting();
             }
             return pmd().asAudibleFrequency().withName("Center Freq");
         case fpRes:

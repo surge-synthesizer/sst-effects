@@ -84,7 +84,7 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
                     .asFloat()
                     .withRange(-48, 48)
                     .withDefault(0)
-                    .withLinearScaleFormatting("semitones")
+                    .withSemitoneFormatting()
                     .withName("Tune");
             }
             return pmd().asAudibleFrequency().withName("Frequency");
@@ -93,7 +93,7 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
                 .asFloat()
                 .withRange(0, 48)
                 .withDefault(0)
-                .withLinearScaleFormatting("semitones")
+                .withSemitoneFormatting()
                 .withName("Sync");
         case fpPulseWidth:
             return pmd().asPercent().withDefault(0.5).withName("Width");
