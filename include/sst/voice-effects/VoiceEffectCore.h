@@ -205,7 +205,7 @@ template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig:
         {                                                                                          \
             DVAL;                                                                                  \
         }                                                                                          \
-    };
+    }
 
     HASMEM(oversamplingRatio, constexpr int16_t getOversamplingRatio(), return 1, );
     HASMEM(getTempoPointer, double *getBaseTempoPointer(), return &defaultTempo, (asBase()));
