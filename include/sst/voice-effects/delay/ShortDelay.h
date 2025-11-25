@@ -75,16 +75,10 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
 
     ~ShortDelay()
     {
-        if (isShort)
-        {
-            lineSupport[0].template returnLines<shortLineSize>(this);
-            lineSupport[1].template returnLines<shortLineSize>(this);
-        }
-        else
-        {
-            lineSupport[0].template returnLines<longLineSize>(this);
-            lineSupport[1].template returnLines<longLineSize>(this);
-        }
+        lineSupport[0].dispatch(lineSize(),
+                                [this](auto N) { lineSupport[0].template returnLines<N>(this); });
+        lineSupport[1].dispatch(lineSize(),
+                                [this](auto N) { lineSupport[1].template returnLines<N>(this); });
     }
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
@@ -130,49 +124,16 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
         return pmd().asStereoSwitch().withDefault(false);
     }
 
+    size_t lineSize() const { return isShort ? shortLineSize : longLineSize; }
+
     void initVoiceEffect()
     {
-        if (this->getSampleRate() * 0.1 > (1 << 14))
+        isShort = this->getSampleRate() * 0.1 < (1 << 14);
+
+        for (int i = 0; i < 2; ++i)
         {
-            isShort = false;
-            for (int i = 0; i < 2; ++i)
-            {
-                if (lineSupport[i].template hasLinePointer<shortLineSize>())
-                {
-                    // swapped short to long. Return
-                    lineSupport[i].template returnLines<shortLineSize>(this);
-                }
-                if (!lineSupport[i].template hasLinePointer<longLineSize>())
-                {
-                    lineSupport[i].template preReserveLines<longLineSize>(this);
-                    lineSupport[i].template prepareLine<longLineSize>(this, sSincTable);
-                }
-                else
-                {
-                    lineSupport[i].template clearLine<longLineSize>();
-                }
-            }
-        }
-        else
-        {
-            isShort = true;
-            for (int i = 0; i < 2; ++i)
-            {
-                if (lineSupport[i].template hasLinePointer<longLineSize>())
-                {
-                    // swapped long to short. Return
-                    lineSupport[i].template returnLines<longLineSize>(this);
-                }
-                if (!lineSupport[i].template hasLinePointer<shortLineSize>())
-                {
-                    lineSupport[i].template preReserveLines<shortLineSize>(this);
-                    lineSupport[i].template prepareLine<shortLineSize>(this, sSincTable);
-                }
-                else
-                {
-                    lineSupport[i].template clearLine<shortLineSize>();
-                }
-            }
+            lineSupport[i].returnAllExcept(lineSize(), this);
+            lineSupport[i].reservePrepareAndClear(lineSize(), this, sSincTable);
         }
 
         lipolDelay[0].set_target_instant(
@@ -316,47 +277,32 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
                        float *dataoutR, float pitch)
     {
-        if (isShort)
-        {
-            stereoImpl(std::array{lineSupport[0].template getLinePointer<shortLineSize>(),
-                                  lineSupport[1].template getLinePointer<shortLineSize>()},
-                       datainL, datainR, dataoutL, dataoutR);
-        }
-        else
-        {
-            stereoImpl(std::array{lineSupport[0].template getLinePointer<longLineSize>(),
-                                  lineSupport[1].template getLinePointer<longLineSize>()},
-                       datainL, datainR, dataoutL, dataoutR);
-        }
+        // a very rare case where [&] is appropriate, binding the entire argument set for one call
+        lineSupport[0].dispatch(lineSize(), [&](auto N) {
+            auto *line0 = lineSupport[0].template getLinePointer<N>();
+            auto *line1 = lineSupport[1].template getLinePointer<N>();
+            std::array<decltype(line0), 2> lines = {line0, line1};
+            stereoImpl(lines, datainL, datainR, dataoutL, dataoutR);
+        });
     }
 
     void processMonoToStereo(const float *const datain, float *dataoutL, float *dataoutR,
                              float pitch)
     {
-        if (isShort)
-        {
-            stereoImpl(std::array{lineSupport[0].template getLinePointer<shortLineSize>(),
-                                  lineSupport[1].template getLinePointer<shortLineSize>()},
-                       datain, datain, dataoutL, dataoutR);
-        }
-        else
-        {
-            stereoImpl(std::array{lineSupport[0].template getLinePointer<longLineSize>(),
-                                  lineSupport[1].template getLinePointer<longLineSize>()},
-                       datain, datain, dataoutL, dataoutR);
-        }
+        lineSupport[0].dispatch(lineSize(), [&](auto N) {
+            auto *line0 = lineSupport[0].template getLinePointer<N>();
+            auto *line1 = lineSupport[1].template getLinePointer<N>();
+            std::array<decltype(line0), 2> lines = {line0, line1};
+            stereoImpl(lines, datain, datain, dataoutL, dataoutR);
+        });
     }
 
     void processMonoToMono(const float *const datain, float *dataout, float pitch)
     {
-        if (isShort)
-        {
-            monoImpl(lineSupport[0].template getLinePointer<shortLineSize>(), datain, dataout);
-        }
-        else
-        {
-            monoImpl(lineSupport[0].template getLinePointer<shortLineSize>(), datain, dataout);
-        }
+        lineSupport[0].dispatch(lineSize(), [&](auto N) {
+            auto *line = lineSupport[0].template getLinePointer<N>();
+            monoImpl(line, datain, dataout);
+        });
     }
 
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
