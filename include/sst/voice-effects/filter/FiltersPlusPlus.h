@@ -562,6 +562,11 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
         return res;
     }
     bool getKeytrack() const { return keytrackOn; }
+    bool getKeytrackDefault() const
+    {
+        return Model == filtersplusplus::FilterModel::Comb ? true : false;
+    }
+
     bool checkParameterConsistency() const { return true; }
     size_t silentSamplesLength() const { return 10; }
 

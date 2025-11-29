@@ -34,7 +34,7 @@ template <typename VFXConfig> struct SinePlus : core::VoiceEffectTemplateBase<VF
 {
     static constexpr const char *effectName{"Sine Plus"};
 
-    static constexpr int numFloatParams{5};
+    static constexpr int numFloatParams{6};
     static constexpr int numIntParams{2};
 
     enum FloatParams
@@ -43,7 +43,8 @@ template <typename VFXConfig> struct SinePlus : core::VoiceEffectTemplateBase<VF
         fpOffsetA,
         fpOffsetB,
         fpMainBalance,
-        fpBalanceAB,
+        fpOvertoneBalance,
+        fpLevel
     };
 
     enum IntParams
@@ -85,13 +86,14 @@ template <typename VFXConfig> struct SinePlus : core::VoiceEffectTemplateBase<VF
                     .withRange(2, 24)
                     .withDefault(2)
                     .withQuantizedStepCount(22)
-                    .withLinearScaleFormatting("Harmonic");
+                    .withDecimalPlaces(0)
+                    .withLinearScaleFormatting("th Harmonic");
             }
             return pmd()
                 .asFloat()
                 .withName("Offset A")
                 .withRange(12, 44)
-                .withDefault(12)
+                .withDefault(2)
                 .withSemitoneFormatting();
         case fpOffsetB:
             if (quantB)
@@ -100,20 +102,23 @@ template <typename VFXConfig> struct SinePlus : core::VoiceEffectTemplateBase<VF
                     .asFloat()
                     .withName("Offset B")
                     .withRange(2, 24)
-                    .withDefault(3)
+                    .withDefault(12)
                     .withQuantizedStepCount(22)
-                    .withLinearScaleFormatting("Harmonic");
+                    .withDecimalPlaces(0)
+                    .withLinearScaleFormatting("th Harmonic");
             }
             return pmd()
                 .asFloat()
                 .withName("Offset B")
                 .withRange(12, 44)
-                .withDefault(19)
+                .withDefault(12)
                 .withSemitoneFormatting();
         case fpMainBalance:
-            return pmd().asPercentBipolar().withName("Main Balance");
-        case fpBalanceAB:
-            return pmd().asPercentBipolar().withName("Balance AB");
+            return pmd().asPercentBipolar().withDefault(-.5f).withName("Main Balance");
+        case fpOvertoneBalance:
+            return pmd().asPercentBipolar().withDefault(-.5f).withName("Overtone Balance");
+        case fpLevel:
+            return pmd().asCubicDecibelAttenuation().withDefault(1.f).withName("Level");
         }
 
         return pmd().withName("Error");
@@ -192,15 +197,18 @@ template <typename VFXConfig> struct SinePlus : core::VoiceEffectTemplateBase<VF
 
         namespace pan = basic_blocks::dsp::pan_laws;
 
+        auto levT = std::clamp(this->getFloatParam(fpLevel), 0.f, 1.f);
+        levT = levT * levT * levT;
+
         pan::stereoEqualPower((this->getFloatParam(fpMainBalance) + 1) * .5f, matrix);
-        mainLerp.set_target(matrix[0]);
-        overtoneLerp.set_target(matrix[1]);
+        mainLerp.set_target(matrix[0] * levT);
+        overtoneLerp.set_target(matrix[1] * levT);
         float mainLevel alignas(16)[VFXConfig::blockSize];
         float overtoneLevel alignas(16)[VFXConfig::blockSize];
         mainLerp.store_block(mainLevel);
         overtoneLerp.store_block(overtoneLevel);
 
-        pan::stereoEqualPower((this->getFloatParam(fpBalanceAB) + 1) * .5f, matrix);
+        pan::stereoEqualPower((this->getFloatParam(fpOvertoneBalance) + 1) * .5f, matrix);
         aLerp.set_target(matrix[0]);
         bLerp.set_target(matrix[1]);
         float aLevel alignas(16)[VFXConfig::blockSize];
@@ -235,6 +243,7 @@ template <typename VFXConfig> struct SinePlus : core::VoiceEffectTemplateBase<VF
         return res;
     }
     bool getKeytrack() const { return keytrackOn; }
+    bool getKeytrackDefault() const { return true; }
 
     bool checkParameterConsistency() const { return true; }
 

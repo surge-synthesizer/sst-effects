@@ -49,9 +49,6 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
     using SincTable = sst::basic_blocks::tables::SurgeSincTableProvider;
     const SincTable &sSincTable;
 
-    static constexpr int shortLineSize{15}; // enough for 250ms at 96k
-    static constexpr int longLineSize{17};  // enough for 250ms at 96k
-
     enum FloatParams
     {
         fpTimeL,
@@ -75,10 +72,8 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
 
     ~ShortDelay()
     {
-        lineSupport[0].dispatch(lineSize(),
-                                [this](auto N) { lineSupport[0].template returnLines<N>(this); });
-        lineSupport[1].dispatch(lineSize(),
-                                [this](auto N) { lineSupport[1].template returnLines<N>(this); });
+        lineSupport[0].returnAll(this);
+        lineSupport[1].returnAll(this);
     }
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
@@ -124,11 +119,20 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
         return pmd().asStereoSwitch().withDefault(false);
     }
 
-    size_t lineSize() const { return isShort ? shortLineSize : longLineSize; }
+    size_t lineSize() const
+    {
+        int sz{1};
+
+        while (this->getSampleRate() * maxMiliseconds * 0.001 > 1 << sz)
+        {
+            sz++;
+        }
+
+        return static_cast<size_t>(std::clamp(sz, 12, 20));
+    }
 
     void initVoiceEffect()
     {
-        isShort = this->getSampleRate() * 0.1 < (1 << 14);
 
         for (int i = 0; i < 2; ++i)
         {
@@ -289,12 +293,7 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
     void processMonoToStereo(const float *const datain, float *dataoutL, float *dataoutR,
                              float pitch)
     {
-        lineSupport[0].dispatch(lineSize(), [&](auto N) {
-            auto *line0 = lineSupport[0].template getLinePointer<N>();
-            auto *line1 = lineSupport[1].template getLinePointer<N>();
-            std::array<decltype(line0), 2> lines = {line0, line1};
-            stereoImpl(lines, datain, datain, dataoutL, dataoutR);
-        });
+        processStereo(datain, datain, dataoutL, dataoutR, pitch);
     }
 
     void processMonoToMono(const float *const datain, float *dataout, float pitch)
@@ -341,14 +340,9 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
         return tm * (fbVals[ct] + 1);
     }
 
-    size_t silentSamplesLength() const
-    {
-        // max time is 1 second so
-        return this->getSampleRate() * 1.5;
-    }
+    size_t silentSamplesLength() const { return this->getSampleRate() * maxMiliseconds * .001f; }
 
     std::array<details::DelayLineSupport, 2> lineSupport;
-    bool isShort{true};
 
     std::array<float, numFloatParams> mLastParam{};
 

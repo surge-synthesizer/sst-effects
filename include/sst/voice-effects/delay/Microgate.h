@@ -23,9 +23,11 @@
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
-#include "../VoiceEffectCore.h"
-
 #include "sst/basic-blocks/mechanics/block-ops.h"
+#include "../VoiceEffectCore.h"
+#include "DelaySupport.h"
+
+#include <cmath>
 
 namespace sst::voice_effects::delay
 {
@@ -33,182 +35,342 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
 {
     static constexpr const char *effectName{"MicroGate"};
 
-    static constexpr int microgateBufferSize{8192};
-    static constexpr int microgateBlockSize{microgateBufferSize * sizeof(float) * 2};
-
-    enum struct MicroGateParams
-    {
-        hold,
-        loop,
-        threshold,
-        reduction,
-
-        num_params
-    };
-
-    static constexpr uint16_t numFloatParams{(uint16_t)MicroGateParams::num_params};
+    static constexpr uint16_t numFloatParams{4};
     static constexpr uint16_t numIntParams{0};
 
-    MicroGate() : core::VoiceEffectTemplateBase<VFXConfig>()
+    static constexpr int maxTime{-2}; // 2^maxTime = max in seconds
+
+    using SincTable = sst::basic_blocks::tables::SurgeSincTableProvider;
+    const SincTable &sSincTable;
+
+    enum FloatParams
     {
-        this->preReservePool(microgateBlockSize);
-    }
+        fpRepeats,
+        fpLoopLength,
+        fpThreshold,
+        fpThruLevel
+    };
+
+    MicroGate(SincTable &st) : sSincTable(st), core::VoiceEffectTemplateBase<VFXConfig>() {}
 
     ~MicroGate()
     {
-        if (loopbuffer[0])
-        {
-            VFXConfig::returnBlock(this, (uint8_t *)loopbuffer[0], microgateBlockSize);
-            loopbuffer[0] = nullptr;
-        }
+        lineSupport[0].template returnAll(this);
+        lineSupport[1].template returnAll(this);
     }
 
     basic_blocks::params::ParamMetaData paramAt(uint16_t idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
 
-        switch ((MicroGateParams)idx)
+        switch (idx)
         {
-        case MicroGateParams::hold:
-            return pmd().asLog2SecondsRange(-8, 5, -3).withName("hold").withDefault(-3.f);
-        case MicroGateParams::loop:
-            return pmd().asPercent().withName("loop").withDefault(0.5f);
-        case MicroGateParams::threshold:
-            return pmd().asLinearDecibel().withName("threshold").withDefault(-12.f);
-        case MicroGateParams::reduction:
-            return pmd().asLinearDecibel().withName("reduction").withDefault(-96.f);
-        case MicroGateParams::num_params:
-            break;
+        case fpRepeats:
+            return pmd()
+                .asFloat()
+                .withLinearScaleFormatting("repeats")
+                .withDecimalPlaces(0)
+                .withName("Repeats")
+                .withRange(2, 65)
+                .withCustomMaxDisplay(u8"\U0000221E")
+                .withDefault(4);
+        case fpLoopLength:
+            return pmd()
+                .asLog2SecondsRange(-8.f, maxTime, -6.f)
+                .withMilisecondsBelowOneSecond()
+                .withName("Repeat Length");
+        case fpThreshold:
+            return pmd()
+                .asLinearDecibel()
+                .withRange(-60, 12)
+                .withName("Threshold")
+                .withDefault(0.f);
+        case fpThruLevel:
+            return pmd().asLinearDecibel().withName("Thru Level").withDefault(0.f);
         }
 
         return pmd().withName("Unknown " + std::to_string(idx));
     }
 
+    size_t lineSize() const
+    {
+        int sz{1};
+        auto ctt = this->getSampleRate() * std::pow(2, maxTime);
+        while (ctt > 1 << sz)
+        {
+            sz++;
+        }
+        return static_cast<size_t>(std::clamp(sz, 12, 20));
+    }
+
     void initVoiceEffect()
     {
-        if (!loopbuffer[0])
+        srComp = this->getSampleRate() / 48000.f;
+        thruLevLerp.instantize();
+
+        recSize = lineSize();
+        for (int i = 0; i < 2; ++i)
         {
-            auto data = VFXConfig::checkoutBlock(this, microgateBlockSize);
-            memset(data, 0, microgateBlockSize);
-            loopbuffer[0] = (float *)data;
-            loopbuffer[1] = (float *)(data + microgateBufferSize * sizeof(float));
+            zcf[i].setSRComp(srComp);
+
+            lineSupport[i].returnAllExcept(recSize, this);
+            lineSupport[i].reservePrepareAndClear(recSize, this, sSincTable);
         }
     }
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
-    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
-                       float *dataoutR, float pitch)
+    template <typename T>
+    void stereoImpl(const std::array<T *, 2> &lines, const float *const datainL,
+                    const float *const datainR, float *dataoutL, float *dataoutR)
+    {
+
+        namespace mech = sst::basic_blocks::mechanics;
+
+        float thruLev alignas(16)[VFXConfig::blockSize];
+        float tl = this->dbToLinear(this->getFloatParam(fpThruLevel));
+        thruLevLerp.set_target(tl);
+        thruLevLerp.store_block(thruLev);
+
+        float threshold = this->dbToLinear(this->getFloatParam(fpThreshold));
+        auto envL = mech::blockAbsAvg<VFXConfig::blockSize>(datainL);
+        auto envR = mech::blockAbsAvg<VFXConfig::blockSize>(datainR);
+
+        if (!ARM && (envL > threshold || envR > threshold))
+        {
+            ARM = true;
+            repeated[0] = 0;
+            repeated[1] = 0;
+            zcf[0].newRun();
+            zcf[1].newRun();
+            lines[0]->clear();
+            lines[1]->clear();
+            recorded[0] = 0;
+            recorded[1] = 0;
+        }
+
+        int repeats = static_cast<int>(std::clamp(this->getFloatParam(fpRepeats), 2.f, 65.f));
+        if (repeats == 65)
+            repeats = INT_MAX;
+
+        float loopLength = std::max(
+            FIRipol, this->note_to_pitch_ignoring_tuning(12 * this->getFloatParam(fpLoopLength)) *
+                         this->getSampleRate());
+
+        for (int k = 0; k < VFXConfig::blockSize; k++)
+        {
+            float current[2] = {datainL[k], datainR[k]};
+
+            for (int c = 0; c < 2; c++)
+            {
+
+                if (REC[c])
+                {
+                    lines[c]->write(current[c]);
+                    REC[c] = recorded[c]++ <= 1 << recSize;
+                }
+
+                if (LOOP[c])
+                {
+                    if (repeated[c] > 0)
+                    {
+                        current[c] = lines[c]->readNaivelyAt(bufpos[c]);
+                    }
+
+                    if (bufpos[c]++ > loopLength)
+                    {
+                        if (zcf[c].checkSample(current[c]))
+                        {
+                            bufpos[c] = 0;
+                            if (++repeated[c] >= repeats)
+                            {
+                                LOOP[c] = false;
+                                REC[c] = false;
+                                ARM = LOOP[0] || LOOP[1];
+                            }
+                        }
+                    }
+                    else
+                    {
+                        zcf[c].logSample(current[c]);
+                    }
+                }
+                else
+                {
+                    if (ARM)
+                    {
+                        if (zcf[c].checkSampleAndSetDirection(current[c]))
+                        {
+                            bufpos[c] = 0;
+                            REC[c] = true;
+                            LOOP[c] = true;
+                        }
+                    }
+                    current[c] *= thruLev[k];
+                }
+            }
+            dataoutL[k] = current[0];
+            dataoutR[k] = current[1];
+        }
+    }
+
+    template <typename T> void monoImpl(T *line, const float *const datain, float *dataout)
     {
         namespace mech = sst::basic_blocks::mechanics;
 
-        constexpr int blockSize{VFXConfig::blockSize};
-        mech::copy_from_to<blockSize>(datainL, dataoutL);
-        mech::copy_from_to<blockSize>(datainR, dataoutR);
+        float thruLev alignas(16)[VFXConfig::blockSize];
+        float tl = this->dbToLinear(this->getFloatParam(fpThruLevel));
+        thruLevLerp.set_target(tl);
+        thruLevLerp.store_block(thruLev);
 
-        float threshold = this->dbToLinear(this->getFloatParam((int)MicroGateParams::threshold));
-        float reduction = this->dbToLinear(this->getFloatParam((int)MicroGateParams::reduction));
-        mReductionLerp.newValue(reduction);
-
-        int ihtime = (int)(float)(this->getSampleRate() *
-                                  this->equalNoteToPitch(
-                                      12 * this->getFloatParam((int)MicroGateParams::hold)));
-        float loopParam = this->getFloatParam((int)MicroGateParams::loop);
-
-        for (int k = 0; k < blockSize; k++)
+        float threshold = this->dbToLinear(this->getFloatParam(fpThreshold));
+        auto env = mech::blockAbsAvg<VFXConfig::blockSize>(datain);
+        if (!ARM && env > threshold)
         {
-            float input = std::max(fabs(datainL[k]), fabs(datainR[k]));
+            ARM = true;
+            repeated[0] = 0;
+            zcf[0].newRun();
+            line->clear();
+            recorded[0] = 0;
+        }
 
-            if ((input > threshold) && !gate_state)
+        int repeats = static_cast<int>(std::clamp(this->getFloatParam(fpRepeats), 2.f, 65.f));
+        if (repeats == 65)
+            repeats = INT_MAX;
+
+        float loopLength = std::max(
+            FIRipol, this->note_to_pitch_ignoring_tuning(12 * this->getFloatParam(fpLoopLength)) *
+                         this->getSampleRate());
+
+        for (int k = 0; k < VFXConfig::blockSize; k++)
+        {
+            float current = datain[k];
+
+            if (REC[0])
             {
-                holdtime = ihtime;
-                gate_state = true;
-                is_recording[0] = true;
-                bufpos[0] = 0;
-                is_recording[1] = true;
-                bufpos[1] = 0;
+                line->write(current);
+                REC[0] = recorded[0]++ <= 1 << recSize;
             }
 
-            if (holdtime < 0)
-                gate_state = false;
+            if (LOOP[0])
+            {
+                if (repeated[0] > 0)
+                {
+                    current = line->readNaivelyAt(bufpos[0]);
+                }
 
-            if ((!(onesampledelay[0] * datainL[k] > 0)) && (datainL[k] > 0))
-            {
-                gate_zc_sync[0] = gate_state;
-                int looplimit =
-                    (int)(float)(4 + 3900 * loopParam * loopParam * this->getSampleRate() / 48000);
-                if (bufpos[0] > looplimit)
+                if (bufpos[0]++ > loopLength)
                 {
-                    is_recording[0] = false;
-                    buflength[0] = bufpos[0];
-                }
-            }
-            if ((!(onesampledelay[1] * datainR[k] > 0)) && (datainR[k] > 0))
-            {
-                gate_zc_sync[1] = gate_state;
-                int looplimit =
-                    (int)(float)(4 + 3900 * loopParam * loopParam * this->getSampleRate() / 48000);
-                if (bufpos[1] > looplimit)
-                {
-                    is_recording[1] = false;
-                    buflength[1] = bufpos[1];
-                }
-            }
-            onesampledelay[0] = datainL[k];
-            onesampledelay[1] = datainR[k];
-
-            if (gate_zc_sync[0])
-            {
-                if (is_recording[0])
-                {
-                    loopbuffer[0][bufpos[0]++ & (microgateBufferSize - 1)] = datainL[k];
-                }
-                else
-                {
-                    dataoutL[k] = loopbuffer[0][bufpos[0] & (microgateBufferSize - 1)];
-                    bufpos[0]++;
-                    if (bufpos[0] >= buflength[0])
+                    if (zcf[0].checkSample(current))
                     {
                         bufpos[0] = 0;
+                        if (++repeated[0] >= repeats)
+                        {
+                            LOOP[0] = false;
+                            REC[0] = false;
+                            ARM = false;
+                        }
                     }
-                }
-            }
-            else
-                dataoutL[k] *= mReductionLerp.v;
-
-            if (gate_zc_sync[1])
-            {
-                if (is_recording[1])
-                {
-                    loopbuffer[1][bufpos[1]++ & (microgateBufferSize - 1)] = datainR[k];
                 }
                 else
                 {
-                    dataoutR[k] = loopbuffer[1][bufpos[1] & (microgateBufferSize - 1)];
-                    bufpos[1]++;
-                    if (bufpos[1] >= buflength[1])
-                        bufpos[1] = 0;
+                    zcf[0].logSample(current);
                 }
             }
             else
-                dataoutR[k] *= mReductionLerp.v;
-
-            holdtime--;
-            mReductionLerp.process();
+            {
+                if (ARM)
+                {
+                    if (zcf[0].checkSampleAndSetDirection(current))
+                    {
+                        bufpos[0] = 0;
+                        REC[0] = true;
+                        LOOP[0] = true;
+                    }
+                }
+                current *= thruLev[k];
+            }
+            dataout[k] = current;
         }
+    }
+
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
+    {
+        lineSupport[0].dispatch(recSize, [&](auto N) {
+            auto *line0 = lineSupport[0].template getLinePointer<N>();
+            auto *line1 = lineSupport[1].template getLinePointer<N>();
+            std::array<decltype(line0), 2> lines = {line0, line1};
+            stereoImpl(lines, datainL, datainR, dataoutL, dataoutR);
+        });
+    }
+
+    void processMonoToMono(const float *const datain, float *dataout, float pitch)
+    {
+        lineSupport[0].dispatch(recSize, [&](auto N) {
+            auto *line = lineSupport[1].template getLinePointer<N>();
+            monoImpl(line, datain, dataout);
+        });
     }
 
     size_t silentSamplesLength() const { return 10; }
 
   protected:
-    int holdtime{0};
-    bool gate_state{false}, gate_zc_sync[2]{false, false};
-    float onesampledelay[2]{-1, -1};
-    float *loopbuffer[2]{nullptr, nullptr};
+    float srComp{1.f};
+    uint16_t repeated[2]{1, 1};
     int bufpos[2]{0, 0}, buflength[2]{0, 0};
-    bool is_recording[2]{false, false};
+    bool ARM{false};
+    bool REC[2]{false, false};
+    bool LOOP[2]{false, false};
+    int recorded[2]{0, 0};
+    int recSize{0};
+    int BLOCK{0};
 
-    sst::basic_blocks::dsp::lipol<float, VFXConfig::blockSize, true> mReductionLerp;
+    std::array<details::DelayLineSupport, 2> lineSupport;
+
+    float FIRipol = static_cast<float>(SincTable::FIRipol_N);
+
+    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> thruLevLerp;
+
+    struct zeroCrossingFinder
+    {
+        void setSRComp(float s) { srCo = (int)s; }
+        void newRun() { safety = 5 * srCo; }
+
+        bool checkSampleAndSetDirection(const float sample)
+        {
+            if (safety-- > 0)
+            {
+                prior = sample;
+                return false;
+            }
+
+            if (std::signbit(sample * prior))
+            {
+                dir = sample > prior;
+                prior = sample;
+                return true;
+            }
+            prior = sample;
+            return false;
+        }
+
+        bool checkSample(const float sample)
+        {
+            bool res = std::signbit(sample * prior) && sample > prior == dir;
+            prior = sample;
+            return res;
+        }
+
+        void logSample(const float sample) { prior = sample; }
+
+      private:
+        int srCo{5};
+        int safety{5};
+        float prior{0.f};
+        bool dir{false};
+    };
+    std::array<zeroCrossingFinder, 2> zcf;
 
   public:
     static constexpr int16_t streamingVersion{1};

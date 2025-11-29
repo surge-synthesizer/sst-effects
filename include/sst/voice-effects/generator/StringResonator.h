@@ -33,9 +33,9 @@
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
 #include "sst/basic-blocks/dsp/MidSide.h"
 #include "sst/basic-blocks/tables/SincTableProvider.h"
-#include "DelaySupport.h"
+#include "../delay/DelaySupport.h"
 
-namespace sst::voice_effects::delay
+namespace sst::voice_effects::generator
 {
 template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplateBase<VFXConfig>
 {
@@ -49,8 +49,6 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
     using SincTable = sst::basic_blocks::tables::SurgeSincTableProvider;
     const SincTable &sSincTable;
 
-    static constexpr int shortLineSize{14};
-    static constexpr int longLineSize{16};
 
     enum FloatParams
     {
@@ -78,16 +76,8 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
 
     ~StringResonator()
     {
-        if (isShort)
-        {
-            lineSupport[0].template returnLines<shortLineSize>(this);
-            lineSupport[1].template returnLines<shortLineSize>(this);
-        }
-        else
-        {
-            lineSupport[0].template returnLines<longLineSize>(this);
-            lineSupport[1].template returnLines<longLineSize>(this);
-        }
+        lineSupport[0].returnAll(this);
+        lineSupport[1].returnAll(this);
     }
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
@@ -182,25 +172,23 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
         return pmd().withName("Error");
     }
 
+    size_t lineSize() const
+    {
+        int sz{1};
+        auto ctt = this->getSampleRate() * maxMiliseconds * 0.001;
+        while (ctt > 1 << sz)
+        {
+            sz++;
+        }
+        return static_cast<size_t>(std::clamp(sz, 12, 20));
+    }
+
     void initVoiceEffect()
     {
-        if (this->getSampleRate() * 0.1 > (1 << 14))
+        for (int i = 0; i < 2; ++i)
         {
-            isShort = false;
-            for (int i = 0; i < 2; ++i)
-            {
-                lineSupport[i].template preReserveLines<longLineSize>(this);
-                lineSupport[i].template prepareLine<longLineSize>(this, sSincTable);
-            }
-        }
-        else
-        {
-            isShort = true;
-            for (int i = 0; i < 2; ++i)
-            {
-                lineSupport[i].template preReserveLines<shortLineSize>(this);
-                lineSupport[i].template prepareLine<shortLineSize>(this, sSincTable);
-            }
+            lineSupport[i].returnAllExcept(lineSize(), this);
+            lineSupport[i].reservePrepareAndClear(lineSize(), this, sSincTable);
         }
     }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
@@ -665,32 +653,19 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
     {
         if (this->getIntParam(ipDualString))
         {
-            if (isShort)
-            {
-                stereoDualString(
-                    std::array{lineSupport[0].template getLinePointer<shortLineSize>(),
-                               lineSupport[1].template getLinePointer<shortLineSize>()},
-                    datainL, datainR, dataoutL, dataoutR, pitch);
-            }
-            else
-            {
-                stereoDualString(std::array{lineSupport[0].template getLinePointer<longLineSize>(),
-                                            lineSupport[1].template getLinePointer<longLineSize>()},
-                                 datainL, datainR, dataoutL, dataoutR, pitch);
-            }
+            lineSupport[0].dispatch(lineSize(), [&](auto N) {
+                auto *line0 = lineSupport[0].template getLinePointer<N>();
+                auto *line1 = lineSupport[1].template getLinePointer<N>();
+                std::array<decltype(line0),2> lines = {line0, line1};
+                stereoDualString(lines, datainL, datainR, dataoutL, dataoutR, pitch);
+            });
         }
         else
         {
-            if (isShort)
-            {
-                stereoSingleString(lineSupport[0].template getLinePointer<shortLineSize>(), datainL,
-                                   datainR, dataoutL, dataoutR, pitch);
-            }
-            else
-            {
-                stereoSingleString(lineSupport[0].template getLinePointer<shortLineSize>(), datainL,
-                                   datainR, dataoutL, dataoutR, pitch);
-            }
+            lineSupport[0].dispatch(lineSize(), [&](auto N) {
+            auto *line = lineSupport[0].template getLinePointer<N>();
+            stereoSingleString(line, datainL, datainR, dataoutL, dataoutR, pitch);
+            });
         }
     }
 
@@ -700,35 +675,23 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
         processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
     }
 
-    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datain, float *dataout, float pitch)
     {
         if (this->getIntParam(ipDualString))
         {
-            if (isShort)
-            {
-                monoDualString(std::array{lineSupport[0].template getLinePointer<shortLineSize>(),
-                                          lineSupport[1].template getLinePointer<shortLineSize>()},
-                               datainL, dataoutL, pitch);
-            }
-            else
-            {
-                monoDualString(std::array{lineSupport[0].template getLinePointer<shortLineSize>(),
-                                          lineSupport[1].template getLinePointer<shortLineSize>()},
-                               datainL, dataoutL, pitch);
-            }
+            lineSupport[0].dispatch(lineSize(), [&](auto N) {
+                auto *line0 = lineSupport[0].template getLinePointer<N>();
+                auto *line1 = lineSupport[1].template getLinePointer<N>();
+                std::array<decltype(line0), 2> lines = {line0, line1};
+                monoDualString(lines, datain, dataout, pitch);
+            });
         }
         else
         {
-            if (isShort)
-            {
-                monoSingleString(lineSupport[0].template getLinePointer<shortLineSize>(), datainL,
-                                 dataoutL, pitch);
-            }
-            else
-            {
-                monoSingleString(lineSupport[0].template getLinePointer<longLineSize>(), datainL,
-                                 dataoutL, pitch);
-            }
+            lineSupport[0].dispatch(lineSize(), [&](auto N) {
+                auto *line = lineSupport[0].template getLinePointer<N>();
+                monoSingleString(line, datain, dataout, pitch);
+            });
         }
     }
 
@@ -747,8 +710,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
 
   protected:
     bool keytrackOn{true};
-    std::array<details::DelayLineSupport, 2> lineSupport;
-    bool isShort{true};
+    std::array<delay::details::DelayLineSupport, 2> lineSupport;
     bool firstPitch{false};
 
     std::array<float, numFloatParams> mLastParam{};
