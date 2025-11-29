@@ -55,8 +55,8 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
 
     ~MicroGate()
     {
-        lineSupport[0].template returnAll(this);
-        lineSupport[1].template returnAll(this);
+        lineSupport[0].returnAll(this);
+        lineSupport[1].returnAll(this);
     }
 
     basic_blocks::params::ParamMetaData paramAt(uint16_t idx) const
@@ -72,7 +72,7 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
                 .withDecimalPlaces(0)
                 .withName("Repeats")
                 .withRange(2, 65)
-                .withCustomMaxDisplay(u8"\U0000221E")
+                .withCustomMaxDisplay("inf")
                 .withDefault(4);
         case fpLoopLength:
             return pmd()
