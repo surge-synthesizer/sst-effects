@@ -244,7 +244,6 @@ template <typename VFXConfig> struct SinePlus : core::VoiceEffectTemplateBase<VF
     }
     bool getKeytrack() const { return keytrackOn; }
     bool getKeytrackDefault() const { return true; }
-
     bool checkParameterConsistency() const { return true; }
 
   protected:
