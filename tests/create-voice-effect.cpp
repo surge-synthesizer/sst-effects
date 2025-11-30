@@ -91,7 +91,11 @@ template <typename T> struct VTester
 
 TEST_CASE("Can Create Voice FX")
 {
-    SECTION("MicroGate") { VTester<sst::voice_effects::delay::MicroGate<VTestConfig>>::TestVFX(); }
+    SECTION("MicroGate")
+    {
+        sst::basic_blocks::tables::SurgeSincTableProvider s;
+        VTester<sst::voice_effects::delay::MicroGate<VTestConfig>>::TestVFX(s);
+    }
     SECTION("BitCrusher")
     {
         VTester<sst::voice_effects::distortion::BitCrusher<VTestConfig>>::TestVFX();
@@ -118,11 +122,6 @@ TEST_CASE("Can Create Voice FX")
     SECTION("GenCorrelatedNoise")
     {
         VTester<sst::voice_effects::generator::GenCorrelatedNoise<VTestConfig>>::TestVFX();
-    }
-    SECTION("GenVA")
-    {
-        sst::basic_blocks::tables::ShortcircuitSincTableProvider s;
-        VTester<sst::voice_effects::generator::GenVA<VTestConfig>>::TestVFX(s);
     }
     SECTION("ParmEQ")
     {
