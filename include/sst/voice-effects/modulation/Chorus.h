@@ -33,12 +33,11 @@
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
 #include "sst/basic-blocks/dsp/RNG.h"
 #include "sst/basic-blocks/tables/SincTableProvider.h"
-#include "DelaySupport.h"
+#include "../delay/DelaySupport.h"
 
 #include "sst/basic-blocks/modulators/SimpleLFO.h"
-#include "sst/filters/CytomicSVF.h"
 
-namespace sst::voice_effects::delay
+namespace sst::voice_effects::modulation
 {
 template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXConfig>
 {
@@ -51,9 +50,6 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
 
     using SincTable = sst::basic_blocks::tables::SurgeSincTableProvider;
     const SincTable &sSincTable;
-
-    static constexpr int shortLineSize{15}; // enough for 250ms at 96k
-    static constexpr int longLineSize{17};  // enough for 250ms at 96k
 
     basic_blocks::dsp::RNG rng;
 
@@ -75,16 +71,8 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
 
     ~Chorus()
     {
-        if (isShort)
-        {
-            lineSupport[0].template returnLines<shortLineSize>(this);
-            lineSupport[1].template returnLines<shortLineSize>(this);
-        }
-        else
-        {
-            lineSupport[0].template returnLines<longLineSize>(this);
-            lineSupport[1].template returnLines<longLineSize>(this);
-        }
+        lineSupport[0].returnAll(this);
+        lineSupport[1].returnAll(this);
     }
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
@@ -95,7 +83,7 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
         case fpTime:
             return pmd()
                 .asFloat()
-                .withRange(0.f, 25.f)
+                .withRange(0.f, maxMiliseconds * .5f)
                 .withDefault(7.5f)
                 .withLinearScaleFormatting("ms")
                 .withName("Base Delay");
@@ -139,25 +127,24 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
         return pmd().asInt().withName("Error");
     }
 
+    size_t lineSize() const
+    {
+        int sz{1};
+
+        while (this->getSampleRate() * maxMiliseconds * 0.001 > 1 << sz)
+        {
+            sz++;
+        }
+
+        return static_cast<size_t>(std::clamp(sz, 12, 20));
+    }
+
     void initVoiceEffect()
     {
-        if (this->getSampleRate() * 0.1 > (1 << 14))
+        for (int i = 0; i < 2; ++i)
         {
-            isShort = false;
-            for (int i = 0; i < 2; ++i)
-            {
-                lineSupport[i].template preReserveLines<longLineSize>(this);
-                lineSupport[i].template prepareLine<longLineSize>(this, sSincTable);
-            }
-        }
-        else
-        {
-            isShort = true;
-            for (int i = 0; i < 2; ++i)
-            {
-                lineSupport[i].template preReserveLines<shortLineSize>(this);
-                lineSupport[i].template prepareLine<shortLineSize>(this, sSincTable);
-            }
+            lineSupport[i].returnAllExcept(lineSize(), this);
+            lineSupport[i].reservePrepareAndClear(lineSize(), this, sSincTable);
         }
 
         timeLerp[0].set_target_instant(
@@ -354,44 +341,35 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
                        float *dataoutR, float pitch)
     {
-        if (isShort)
-        {
-            stereoImpl(std::array{lineSupport[0].template getLinePointer<shortLineSize>(),
-                                  lineSupport[1].template getLinePointer<shortLineSize>()},
-                       datainL, datainR, dataoutL, dataoutR);
-        }
-        else
-        {
-            stereoImpl(std::array{lineSupport[0].template getLinePointer<longLineSize>(),
-                                  lineSupport[1].template getLinePointer<longLineSize>()},
-                       datainL, datainR, dataoutL, dataoutR);
-        }
+        // a very rare case where [&] is appropriate, binding the entire argument set for one call
+        lineSupport[0].dispatch(lineSize(), [&](auto N) {
+            auto *line0 = lineSupport[0].template getLinePointer<N>();
+            auto *line1 = lineSupport[1].template getLinePointer<N>();
+            std::array<decltype(line0), 2> lines = {line0, line1};
+            stereoImpl(lines, datainL, datainR, dataoutL, dataoutR);
+        });
     }
 
-    void processMonoToStereo(const float *const datainL, float *dataoutL, float *dataoutR,
+    void processMonoToStereo(const float *const datain, float *dataoutL, float *dataoutR,
                              float pitch)
     {
-        processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
+        processStereo(datain, datain, dataoutL, dataoutR, pitch);
     }
 
-    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datain, float *dataout, float pitch)
     {
-        if (isShort)
-        {
-            monoImpl(lineSupport[0].template getLinePointer<shortLineSize>(), datainL, dataoutL);
-        }
-        else
-        {
-            monoImpl(lineSupport[0].template getLinePointer<longLineSize>(), datainL, dataoutL);
-        }
+        lineSupport[0].dispatch(lineSize(), [&](auto N) {
+            auto *line = lineSupport[0].template getLinePointer<N>();
+            monoImpl(line, datain, dataout);
+        });
     }
 
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
 
-    size_t silentSamplesLength() const { return 10; }
+    size_t silentSamplesLength() const { return this->getSampleRate() * maxMiliseconds * .001f; }
 
   protected:
-    std::array<details::DelayLineSupport, 2> lineSupport;
+    std::array<delay::details::DelayLineSupport, 2> lineSupport;
     bool isShort{true};
 
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> feedbackLerp, timeLerp[2];
@@ -407,6 +385,6 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
     }
 };
 
-} // namespace sst::voice_effects::delay
+} // namespace sst::voice_effects::modulation
 
 #endif // SHORTCIRCUITXT_CHORUS_H

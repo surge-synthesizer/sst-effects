@@ -152,6 +152,19 @@ struct DelayLineSupport
         }
     }
 
+    void returnAll(auto *mp)
+    {
+        for (int i = shortestN; i <= longestN; ++i)
+        {
+            dispatch(i, [this, mp, i](auto NV) {
+                if (hasLinePointer<NV>())
+                {
+                    returnLines<NV>(mp);
+                }
+            });
+        }
+    }
+
     void reservePrepareAndClear(size_t Nrt, auto *mp, const SincTable &sSincTable)
     {
         dispatch(Nrt, [this, mp, &sSincTable](auto N) {

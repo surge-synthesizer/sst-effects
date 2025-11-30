@@ -28,7 +28,6 @@
 #include "sst/voice-effects/modulation/RingMod.h"
 #include "sst/voice-effects/waveshaper/WaveShaper.h"
 #include "sst/voice-effects/modulation/FreqShiftMod.h"
-#include "sst/voice-effects/generator/GenVA.h"
 #include "sst/voice-effects/modulation/PhaseMod.h"
 #include "sst/voice-effects/generator/GenCorrelatedNoise.h"
 #include "sst/voice-effects/eq/EqNBandParametric.h"
@@ -37,8 +36,7 @@
 #include "sst/voice-effects/eq/EqGraphic6Band.h"
 #include "sst/voice-effects/delay/Widener.h"
 #include "sst/voice-effects/delay/ShortDelay.h"
-#include "sst/voice-effects/delay/StringResonator.h"
-#include "sst/voice-effects/filter/SSTFilters.h"
+#include "sst/voice-effects/generator/StringResonator.h"
 #include "sst/voice-effects/filter/StaticPhaser.h"
 #include "sst/voice-effects/modulation/ShepardPhaser.h"
 #include "sst/voice-effects/modulation/Tremolo.h"
@@ -93,7 +91,11 @@ template <typename T> struct VTester
 
 TEST_CASE("Can Create Voice FX")
 {
-    SECTION("MicroGate") { VTester<sst::voice_effects::delay::MicroGate<VTestConfig>>::TestVFX(); }
+    SECTION("MicroGate")
+    {
+        sst::basic_blocks::tables::SurgeSincTableProvider s;
+        VTester<sst::voice_effects::delay::MicroGate<VTestConfig>>::TestVFX(s);
+    }
     SECTION("BitCrusher")
     {
         VTester<sst::voice_effects::distortion::BitCrusher<VTestConfig>>::TestVFX();
@@ -120,11 +122,6 @@ TEST_CASE("Can Create Voice FX")
     SECTION("GenCorrelatedNoise")
     {
         VTester<sst::voice_effects::generator::GenCorrelatedNoise<VTestConfig>>::TestVFX();
-    }
-    SECTION("GenVA")
-    {
-        sst::basic_blocks::tables::ShortcircuitSincTableProvider s;
-        VTester<sst::voice_effects::generator::GenVA<VTestConfig>>::TestVFX(s);
     }
     SECTION("ParmEQ")
     {
@@ -154,7 +151,7 @@ TEST_CASE("Can Create Voice FX")
     SECTION("StringExciter")
     {
         sst::basic_blocks::tables::SurgeSincTableProvider s;
-        VTester<sst::voice_effects::delay::StringResonator<VTestConfig>>::TestVFX(s);
+        VTester<sst::voice_effects::generator::StringResonator<VTestConfig>>::TestVFX(s);
     }
 
     SECTION("Static Phaser")

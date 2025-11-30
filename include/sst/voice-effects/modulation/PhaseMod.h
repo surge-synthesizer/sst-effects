@@ -233,6 +233,7 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
         return res;
     }
     bool getKeytrack() const { return keytrackOn; }
+    bool getKeytrackDefault() const { return true; }
 
   protected:
     bool keytrackOn{true};

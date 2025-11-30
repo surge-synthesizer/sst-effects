@@ -76,7 +76,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
             return pmd()
                 .asFloat()
                 .withRange(0.f, 1.f)
-                .withDefault(1.f)
+                .withDefault(.5f)
                 .withLinearScaleFormatting("%", 100.f)
                 .withName("Depth");
         case fpCrossover:
