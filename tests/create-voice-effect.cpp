@@ -151,7 +151,7 @@ TEST_CASE("Can Create Voice FX")
     SECTION("StringExciter")
     {
         sst::basic_blocks::tables::SurgeSincTableProvider s;
-        VTester<sst::voice_effects::delay::StringResonator<VTestConfig>>::TestVFX(s);
+        VTester<sst::voice_effects::generator::StringResonator<VTestConfig>>::TestVFX(s);
     }
 
     SECTION("Static Phaser")
