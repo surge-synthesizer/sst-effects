@@ -366,10 +366,7 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
 
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
 
-    size_t silentSamplesLength() const
-    {
-        return this->getSampleRate() * maxMiliseconds * .001f;
-    }
+    size_t silentSamplesLength() const { return this->getSampleRate() * maxMiliseconds * .001f; }
 
   protected:
     std::array<delay::details::DelayLineSupport, 2> lineSupport;
@@ -388,6 +385,6 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
     }
 };
 
-} // namespace sst::voice_effects::delay
+} // namespace sst::voice_effects::modulation
 
 #endif // SHORTCIRCUITXT_CHORUS_H

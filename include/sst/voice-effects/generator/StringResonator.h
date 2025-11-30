@@ -49,7 +49,6 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
     using SincTable = sst::basic_blocks::tables::SurgeSincTableProvider;
     const SincTable &sSincTable;
 
-
     enum FloatParams
     {
         fpLevelOne,
@@ -656,15 +655,15 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
             lineSupport[0].dispatch(lineSize(), [&](auto N) {
                 auto *line0 = lineSupport[0].template getLinePointer<N>();
                 auto *line1 = lineSupport[1].template getLinePointer<N>();
-                std::array<decltype(line0),2> lines = {line0, line1};
+                std::array<decltype(line0), 2> lines = {line0, line1};
                 stereoDualString(lines, datainL, datainR, dataoutL, dataoutR, pitch);
             });
         }
         else
         {
             lineSupport[0].dispatch(lineSize(), [&](auto N) {
-            auto *line = lineSupport[0].template getLinePointer<N>();
-            stereoSingleString(line, datainL, datainR, dataoutL, dataoutR, pitch);
+                auto *line = lineSupport[0].template getLinePointer<N>();
+                stereoSingleString(line, datainL, datainR, dataoutL, dataoutR, pitch);
             });
         }
     }
@@ -731,6 +730,6 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
     }
 };
 
-} // namespace sst::voice_effects::delay
+} // namespace sst::voice_effects::generator
 
 #endif // SHORTCIRCUITXT_EqNBandParametric_H
