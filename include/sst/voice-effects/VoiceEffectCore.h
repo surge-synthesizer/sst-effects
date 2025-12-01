@@ -38,6 +38,15 @@ static_assert(__cplusplus >= 202002L, "Surge team libraries have moved to C++ 20
 
 namespace sst::voice_effects::core
 {
+
+enum struct StreamingFlags : uint32_t
+{
+    NONE = 0,
+    IS_TEMPOSYNCED = 1 << 0,
+    IS_DEACTIVATED = 1 << 1,
+    IS_KEYTRACKED = 1 << 2
+};
+
 // Todo: as we port consider this FXConfig::BaseClass being a bit more configurable.
 template <typename VFXConfig> struct VoiceEffectTemplateBase : public VFXConfig::BaseClass
 {
