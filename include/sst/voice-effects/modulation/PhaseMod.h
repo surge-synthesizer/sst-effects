@@ -37,18 +37,12 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
 {
     static constexpr const char *effectName{"PhaseMod"};
     static constexpr int numFloatParams{2};
-    static constexpr int numIntParams{2};
+    static constexpr int numIntParams{0};
 
     enum FloatParams
     {
         fpTranspose,
         fpDepth,
-    };
-
-    enum IntParams
-    {
-        ipNum,
-        ipDenom,
     };
 
     PhaseMod() : core::VoiceEffectTemplateBase<VFXConfig>(), pre(6, true), post(6, true) {}
@@ -84,53 +78,15 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
         return pmd().withName("Unknown " + std::to_string(idx)).asPercent();
     }
 
-    basic_blocks::params::ParamMetaData intParamAt(int idx) const
-    {
-        using pmd = basic_blocks::params::ParamMetaData;
-
-        switch (idx)
-        {
-        case ipNum:
-            return pmd()
-                .asInt()
-                .withRange(1, 16)
-                .withDefault(1)
-                .withName("Numerator")
-                .withDimensionlessFormatting();
-        case ipDenom:
-            return pmd()
-                .asInt()
-                .withRange(1, 16)
-                .withDefault(1)
-                .withName("Denominator")
-                .withDimensionlessFormatting();
-        }
-
-        return pmd().withName("Error");
-    }
-
     void initVoiceEffect() {}
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
-
-    float getRatio()
-    {
-        auto num = (float)(this->getIntParam(ipNum));
-        auto denom = (float)(this->getIntParam(ipDenom));
-        if (num == denom)
-        {
-            return 0.f;
-        }
-
-        auto ratio = num / denom;
-        return 12 * std::log2(ratio);
-    }
 
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
                        float *dataoutR, float pitch)
     {
         namespace sdsp = sst::basic_blocks::dsp;
 
-        auto freq = this->getFloatParam(fpTranspose) + getRatio();
+        auto freq = this->getFloatParam(fpTranspose);
         if (keytrackOn)
         {
             freq += pitch;
@@ -182,7 +138,7 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
     {
         namespace sdsp = sst::basic_blocks::dsp;
 
-        auto freq = this->getFloatParam(fpTranspose) + getRatio();
+        auto freq = this->getFloatParam(fpTranspose);
         if (keytrackOn)
         {
             freq += pitch;
@@ -243,13 +199,29 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize << 1, true> omega;
 
   public:
-    static constexpr int16_t streamingVersion{1};
+    static constexpr int16_t streamingVersion{2};
     static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
-                                                   int *const iparam)
+                                                   int *const iparam,
+                                                   uint32_t *const streamingParams)
     {
-        // base implementation - we have never updated streaming
-        // input is parameters from stream version
-        assert(streamedFrom == 1);
+        assert(streamedFrom <= streamingVersion);
+        if (streamedFrom == 1)
+        {
+            // Between version 1 and 2 keytrack was all or nothing so just check param 0
+            // turns out we didn't need this here anyway but keep it as an example
+            // just in case
+            [[maybe_unused]] auto waskt =
+                streamingParams[0] & (uint32_t)voice_effects::core::StreamingFlags::IS_KEYTRACKED;
+            // used to be 0 and 1 were ratio
+            auto n = iparam[0];
+            auto d = iparam[1];
+            if (d == 0)
+            {
+                return;
+            }
+
+            fparam[0] += 12 * std::log2(1.f * n / d);
+        }
     }
 };
 } // namespace sst::voice_effects::modulation
