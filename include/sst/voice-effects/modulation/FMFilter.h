@@ -26,19 +26,14 @@
 
 #include "../VoiceEffectCore.h"
 
-#include <iostream>
-#include <ratio>
-
-#include "sst/basic-blocks/mechanics/block-ops.h"
-
 namespace sst::voice_effects::modulation
 {
 template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VFXConfig>
 {
     static constexpr const char *effectName{"FM Filter"};
 
-    static constexpr int numFloatParams{4};
-    static constexpr int numIntParams{4};
+    static constexpr int numFloatParams{5};
+    static constexpr int numIntParams{2};
 
     enum FloatParams
     {
@@ -46,14 +41,13 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
         fpFreqR,
         fpDepth,
         fpRes,
+        fpModFreq,
     };
 
     enum IntParams
     {
         ipStereo,
         ipMode,
-        ipNum,
-        ipDenom,
     };
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
@@ -97,6 +91,13 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
                 .withDefault(0.7f)
                 .withName("Resonance")
                 .withDimensionlessFormatting();
+        case fpModFreq:
+            return pmd()
+                .asFloat()
+                .withRange(-48, 48)
+                .withDefault(0.f)
+                .withName("Modulator Tuning")
+                .withSemitoneFormatting();
         }
         return pmd().withName("error ");
     }
@@ -125,20 +126,6 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
                     {4, "Allpass"},
                 })
                 .withDefault((int)md::Lowpass);
-        case ipNum:
-            return pmd()
-                .asInt()
-                .withRange(1, 16)
-                .withDefault(1)
-                .withName("Numerator")
-                .withDimensionlessFormatting();
-        case ipDenom:
-            return pmd()
-                .asInt()
-                .withRange(1, 16)
-                .withDefault(1)
-                .withName("Denominator")
-                .withDimensionlessFormatting();
         }
         return pmd().withName("error");
     }
@@ -155,17 +142,6 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
     }
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
-
-    float getRatio(int num, int denom)
-    {
-        if (num == denom)
-        {
-            return 0.f;
-        }
-
-        auto ratio = static_cast<float>(num) / static_cast<float>(denom);
-        return 12 * std::log2(ratio);
-    }
 
     void whatMode()
     {
@@ -198,15 +174,6 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
         bool stereo = this->getIntParam(ipStereo);
         auto depth = this->getFloatParam(fpDepth);
 
-        auto num = (this->getIntParam(ipNum));
-        auto denom = (this->getIntParam(ipDenom));
-        if (num != priorNum || denom != priorDenom)
-        {
-            ratio = getRatio(num, denom);
-            priorNum = num;
-            priorDenom = denom;
-        }
-
         auto freqL = this->getFloatParam(fpFreqL);
         auto freqR = this->getFloatParam((stereo) ? fpFreqR : fpFreqL);
         if (keytrackOn)
@@ -217,7 +184,8 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
         freqL = 440.0f * this->note_to_pitch_ignoring_tuning(freqL);
         freqR = 440.0f * this->note_to_pitch_ignoring_tuning(freqR);
 
-        mSinOsc.setRate(440.0 * 2 * M_PI * this->note_to_pitch_ignoring_tuning(pitch + ratio) *
+        auto tune = this->getFloatParam(fpModFreq);
+        mSinOsc.setRate(440.0 * 2 * M_PI * this->note_to_pitch_ignoring_tuning(pitch + tune) *
                         this->getSampleRateInv());
 
         auto outputL = 0.f;
@@ -258,15 +226,6 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
         auto res = std::clamp(this->getFloatParam(fpRes), 0.f, 1.f);
         auto depth = std::clamp(this->getFloatParam(fpDepth), 0.f, 1.f);
 
-        auto num = (this->getIntParam(ipNum));
-        auto denom = (this->getIntParam(ipDenom));
-        if (num != priorNum || denom != priorDenom)
-        {
-            ratio = getRatio(num, denom);
-            priorNum = num;
-            priorDenom = denom;
-        }
-
         auto freq = this->getFloatParam(fpFreqL);
         if (keytrackOn)
         {
@@ -274,7 +233,8 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
         }
         freq = 440.0f * this->note_to_pitch_ignoring_tuning(freq);
 
-        mSinOsc.setRate(440.0 * 2 * M_PI * this->note_to_pitch_ignoring_tuning(pitch + ratio) *
+        auto tune = this->getFloatParam(fpModFreq);
+        mSinOsc.setRate(440.0 * 2 * M_PI * this->note_to_pitch_ignoring_tuning(tune + pitch) *
                         this->getSampleRateInv());
 
         if (this->getIntParam(ipMode) != priorMode)
@@ -327,18 +287,21 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
 
     sst::filters::CytomicSVF::Mode mode{filters::CytomicSVF::Mode::Lowpass};
     int priorMode{-1};
-    int priorNum{-1};
-    int priorDenom{-1};
-    float ratio{-1.f};
 
   public:
-    static constexpr int16_t streamingVersion{1};
+    static constexpr int16_t streamingVersion{2};
     static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
                                                    int *const iparam)
     {
-        // base implementation - we have never updated streaming
-        // input is parameters from stream version
-        assert(streamedFrom == 1);
+        assert(streamedFrom <= 2);
+        if (streamedFrom == 1)
+        {
+            // removed n/d params and replaced with float carrier freq param.
+            if (iparam[3] == 0)
+                return;
+
+            fparam[4] = std::log2(1.f * iparam[2] / iparam[3]) * 12.f;
+        }
     }
 };
 } // namespace sst::voice_effects::modulation
