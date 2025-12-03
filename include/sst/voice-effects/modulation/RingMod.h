@@ -26,9 +26,6 @@
 
 #include "../VoiceEffectCore.h"
 
-#include <iostream>
-#include <array>
-
 #include "sst/basic-blocks/mechanics/block-ops.h"
 
 namespace sst::voice_effects::modulation
@@ -38,17 +35,11 @@ template <typename VFXConfig> struct RingMod : core::VoiceEffectTemplateBase<VFX
     static constexpr const char *effectName{"Ring Mod"};
 
     static constexpr int numFloatParams{1};
-    static constexpr int numIntParams{2};
+    static constexpr int numIntParams{0};
 
     enum FloatParams
     {
         fpCarrierFrequency,
-    };
-
-    enum IntParams
-    {
-        ipNum,
-        ipDenom
     };
 
     RingMod() : core::VoiceEffectTemplateBase<VFXConfig>() {}
@@ -83,43 +74,11 @@ template <typename VFXConfig> struct RingMod : core::VoiceEffectTemplateBase<VFX
     basic_blocks::params::ParamMetaData intParamAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
-
-        switch (idx)
-        {
-        case ipNum:
-            return pmd()
-                .asInt()
-                .withRange(1, 16)
-                .withDefault(1)
-                .withName("Numerator")
-                .withDimensionlessFormatting();
-        case ipDenom:
-            return pmd()
-                .asInt()
-                .withRange(1, 16)
-                .withDefault(1)
-                .withName("Denominator")
-                .withDimensionlessFormatting();
-        }
-
         return pmd().withName("Error");
     }
 
     void initVoiceEffect() {}
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
-
-    float getRatio()
-    {
-        auto num = (float)(this->getIntParam(ipNum));
-        auto denom = (float)(this->getIntParam(ipDenom));
-        if (num == denom)
-        {
-            return 0.f;
-        }
-
-        auto ratio = num / denom;
-        return 12 * std::log2(ratio);
-    }
 
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
                        float *dataoutR, float pitch)
@@ -128,7 +87,7 @@ template <typename VFXConfig> struct RingMod : core::VoiceEffectTemplateBase<VFX
 
         auto pt = this->getFloatParam(fpCarrierFrequency) + (keytrackOn ? pitch : 0);
 
-        qosc.setRate(440.0 * 2 * M_PI * this->note_to_pitch_ignoring_tuning(pt + getRatio()) *
+        qosc.setRate(440.0 * 2 * M_PI * this->note_to_pitch_ignoring_tuning(pt) *
                      this->getSampleRateInv());
         for (int i = 0; i < VFXConfig::blockSize; ++i)
         {
@@ -145,7 +104,7 @@ template <typename VFXConfig> struct RingMod : core::VoiceEffectTemplateBase<VFX
         namespace mech = sst::basic_blocks::mechanics;
         auto pt = this->getFloatParam(fpCarrierFrequency) + (keytrackOn ? pitch : 0);
 
-        qosc.setRate(440.0 * 2 * M_PI * this->note_to_pitch_ignoring_tuning(pt + getRatio()) *
+        qosc.setRate(440.0 * 2 * M_PI * this->note_to_pitch_ignoring_tuning(pt) *
                      this->getSampleRateInv());
         for (int i = 0; i < VFXConfig::blockSize; ++i)
         {
@@ -166,17 +125,20 @@ template <typename VFXConfig> struct RingMod : core::VoiceEffectTemplateBase<VFX
   protected:
     bool keytrackOn{true};
     sst::basic_blocks::dsp::QuadratureOscillator<float> qosc;
-    int priorNum = -1;
-    int priorDenom = -1;
 
   public:
-    static constexpr int16_t streamingVersion{1};
+    static constexpr int16_t streamingVersion{2};
     static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
                                                    int *const iparam)
     {
-        // base implementation - we have never updated streaming
-        // input is parameters from stream version
-        assert(streamedFrom == 1);
+        assert(streamedFrom <= 2);
+        if (streamedFrom == 1)
+        {
+            if (iparam[1] == 0)
+                return;
+
+            fparam[0] += std::log2(1.f * iparam[0] / iparam[1]) * 12.f;
+        }
     }
 };
 
