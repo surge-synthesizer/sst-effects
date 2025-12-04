@@ -36,16 +36,19 @@ namespace sst::voice_effects::modulation
 template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VFXConfig>
 {
     static constexpr const char *effectName{"PhaseMod"};
-    static constexpr int numFloatParams{2};
+    static constexpr int numFloatParams{3};
     static constexpr int numIntParams{0};
 
     enum FloatParams
     {
         fpTranspose,
+        fpLowpass,
         fpDepth,
     };
 
-    PhaseMod() : core::VoiceEffectTemplateBase<VFXConfig>(), pre(6, true), post(6, true) {}
+    PhaseMod() : core::VoiceEffectTemplateBase<VFXConfig>(), upFilter(6, true), downFilter(6, true)
+    {
+    }
 
     ~PhaseMod() {}
 
@@ -62,12 +65,26 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
                     .asFloat()
                     .withRange(-96, 96)
                     .withSemitoneFormatting()
-                    .withDefault(0)
+                    .withDefault(-12)
                     .withName("Offset");
             }
             else
             {
-                return pmd().asAudibleFrequency().withDefault(0).withName("Frequency");
+                return pmd().asAudibleFrequency().withDefault(220).withName("Frequency");
+            }
+        case fpLowpass:
+            if (keytrackOn)
+            {
+                return pmd()
+                    .asFloat()
+                    .withRange(0, 96)
+                    .withSemitoneFormatting()
+                    .withDefault(96)
+                    .withName("Lowpass Offset");
+            }
+            else
+            {
+                return pmd().asAudibleFrequency().withDefault(70).withName("Lowpass Frequency");
             }
         case fpDepth:
             return pmd().asDecibel().withName("Depth").withDefault(0);
@@ -78,33 +95,49 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
         return pmd().withName("Unknown " + std::to_string(idx)).asPercent();
     }
 
-    void initVoiceEffect() {}
+    void initVoiceEffect() { lpf.init(); }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
                        float *dataoutR, float pitch)
     {
         namespace sdsp = sst::basic_blocks::dsp;
+        namespace mech = sst::basic_blocks::mechanics;
+        using mode = sst::filters::CytomicSVF::Mode;
 
         auto freq = this->getFloatParam(fpTranspose);
+        auto lpfreq = this->getFloatParam(fpLowpass);
         if (keytrackOn)
         {
             freq += pitch;
+            lpfreq += pitch;
         }
+        lpf.setCoeffForBlock<VFXConfig::blockSize>(mode::Lowpass, lpfreq, 0.f,
+                                                   this->getSampleRateInv());
 
-        omega.set_target(0.5 * 440 * this->note_to_pitch_ignoring_tuning(freq) * M_PI_2 *
-                         this->getSampleRateInv());
-        pregain.set_target(3.1415 * this->dbToLinear(this->getFloatParam(fpDepth)));
+        omegaLerp.set_target(440 * this->note_to_pitch_ignoring_tuning(freq) * M_PI_2 *
+                             this->getSampleRateInv());
+
+        auto lvl = this->getFloatParam(fpDepth);
+        auto lvlComp = -lvl;
+        lvlComp *= 1 - std::signbit(lvlComp) * .25f;
+        lvlComp += 12.f;
+
+        preGainLerp.set_target(3.1415f * this->dbToLinear(lvl));
+        postGainLerp.set_target(3.1415f * this->dbToLinear(lvlComp));
 
         constexpr int bs2 = VFXConfig::blockSize << 1;
         float OS alignas(16)[2][bs2];
         float omInterp alignas(16)[bs2];
         float phVals alignas(16)[bs2];
+        float modulator alignas(16)[2][VFXConfig::blockSize];
 
-        pregain.multiply_2_blocks_to(datainL, datainR, OS[0], OS[1]);
-        pre.process_block_U2(OS[0], OS[1], OS[0], OS[1], bs2);
+        lpf.processBlock<VFXConfig::blockSize>(datainL, datainR, modulator[0], modulator[1]);
 
-        omega.store_block(omInterp);
+        preGainLerp.multiply_2_blocks_to(modulator[0], modulator[1], OS[0], OS[1]);
+        upFilter.process_block_U2(OS[0], OS[1], OS[0], OS[1], bs2);
+
+        omegaLerp.store_block(omInterp);
         phVals[0] = phase + omInterp[0];
         for (int k = 1; k < bs2; ++k)
         {
@@ -131,32 +164,49 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
             SIMD_MM(store_ps)(OS[1] + k, r1);
         }
 
-        post.process_block_D2(OS[0], OS[1], bs2, dataoutL, dataoutR);
+        downFilter.process_block_D2(OS[0], OS[1], bs2, dataoutL, dataoutR);
+        postGainLerp.multiply_2_blocks(dataoutL, dataoutR);
     }
 
     void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
         namespace sdsp = sst::basic_blocks::dsp;
+        namespace mech = sst::basic_blocks::mechanics;
+        using mode = sst::filters::CytomicSVF::Mode;
 
         auto freq = this->getFloatParam(fpTranspose);
+        auto lpfreq = this->getFloatParam(fpLowpass);
         if (keytrackOn)
         {
             freq += pitch;
+            lpfreq += pitch;
         }
+        lpf.setCoeffForBlock<VFXConfig::blockSize>(mode::Lowpass, lpfreq, 0.f,
+                                                   this->getSampleRateInv());
 
-        omega.set_target(0.5 * 440 * this->note_to_pitch_ignoring_tuning(freq) * M_PI_2 *
-                         this->getSampleRateInv());
-        pregain.set_target(3.1415 * this->dbToLinear(this->getFloatParam(fpDepth)));
+        omegaLerp.set_target(440 * this->note_to_pitch_ignoring_tuning(freq) * M_PI_2 *
+                             this->getSampleRateInv());
+
+        auto lvl = this->getFloatParam(fpDepth);
+        auto lvlComp = -lvl;
+        lvlComp *= 1 - std::signbit(lvlComp) * .25f;
+        lvlComp += 12.f;
+
+        preGainLerp.set_target(3.1415f * this->dbToLinear(lvl));
+        postGainLerp.set_target(3.1415f * this->dbToLinear(lvlComp));
 
         constexpr int bs2 = VFXConfig::blockSize << 1;
         float OS alignas(16)[2][bs2];
         float omInterp alignas(16)[bs2];
         float phVals alignas(16)[bs2];
+        float modulator alignas(16)[VFXConfig::blockSize];
 
-        pregain.multiply_block_to(datainL, OS[0]);
-        pre.process_block_U2(OS[0], OS[0], OS[0], OS[1], bs2);
+        lpf.processBlock<VFXConfig::blockSize>(datainL, modulator);
 
-        omega.store_block(omInterp);
+        preGainLerp.multiply_block_to(modulator, OS[0]);
+        upFilter.process_block_U2(OS[0], OS[0], OS[0], OS[1], bs2);
+
+        omegaLerp.store_block(omInterp);
         phVals[0] = phase + omInterp[0];
         for (int k = 1; k < bs2; ++k)
         {
@@ -179,7 +229,8 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
             SIMD_MM(store_ps)(OS[0] + k, r0);
         }
 
-        post.process_block_D2(OS[0], OS[0], bs2, dataoutL, 0);
+        downFilter.process_block_D2(OS[0], OS[0], bs2, dataoutL, 0);
+        postGainLerp.multiply_block(dataoutL);
     }
 
     bool enableKeytrack(bool b)
@@ -194,12 +245,13 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
   protected:
     bool keytrackOn{true};
     double phase{0.0};
-    sst::filters::HalfRate::HalfRateFilter pre, post;
-    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize> pregain;
-    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize << 1, true> omega;
+    sst::filters::HalfRate::HalfRateFilter upFilter, downFilter;
+    sst::filters::CytomicSVF lpf;
+    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize> preGainLerp, postGainLerp;
+    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize << 1, true> omegaLerp;
 
   public:
-    static constexpr int16_t streamingVersion{2};
+    static constexpr int16_t streamingVersion{3};
     static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
                                                    int *const iparam,
                                                    uint32_t *const streamingParams)
@@ -221,6 +273,10 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
             }
 
             fparam[0] += 12 * std::log2(1.f * n / d);
+        }
+        if (streamedFrom == 2)
+        {
+            fparam[0] -= 12.0f;
         }
     }
 };
