@@ -68,7 +68,6 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
     basic_blocks::params::ParamMetaData intParamAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
-        bool stereo = this->getIntParam(ipStereo) > 0;
 
         switch (idx)
         {
@@ -110,7 +109,6 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
                 .asAudibleFrequency()
                 .withName(std::string("Frequency") + (stereo ? " L" : ""))
                 .withDefault(0);
-
         case fpCenterFrequencyR:
             if (keytrackOn)
             {
@@ -125,12 +123,10 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
                 .asAudibleFrequency()
                 .withName(!stereo ? std::string() : "Frequency R")
                 .withDefault(0);
-
-            break;
         case fpSpacing:
             return pmd()
                 .asFloat()
-                .withRange(-48, 48)
+                .withRange(-96, 96)
                 .withDefault(12)
                 .withName("Spacing")
                 .withSemitoneFormatting();
@@ -150,6 +146,8 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
     {
         lipolFb.set_target_instant(
             std::sqrt(std::clamp(this->getFloatParam(fpFeedback), 0.f, 1.f)));
+        shelf.init();
+        hpf.init();
     }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
@@ -177,6 +175,8 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
             }
             fbAmt[0] = dL * fb[k];
             fbAmt[1] = dR * fb[k];
+            shelf.processBlockStep(fbAmt[0], fbAmt[1]);
+            hpf.processBlockStep(fbAmt[0], fbAmt[1]);
             dataoutL[k] = dL;
             dataoutR[k] = dR;
         }
@@ -196,20 +196,21 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
 
         mech::copy_from_to<VFXConfig::blockSize>(dataIn, dataOut);
 
-        this->lipolFb.set_target(
-            std::sqrt(std::clamp(this->getFloatParam(this->fpFeedback), 0.f, 1.f)));
+        lipolFb.set_target(std::sqrt(std::clamp(this->getFloatParam(fpFeedback), 0.f, 1.f)));
         float fb alignas(16)[VFXConfig::blockSize];
-        this->lipolFb.store_block(fb);
+        lipolFb.store_block(fb);
 
         for (int k = 0; k < VFXConfig::blockSize; ++k)
         {
-            auto dL = dataOut[k] + this->fbAmt[0];
-            for (int i = 0; i < this->getIntParam(this->ipStages); ++i)
+            auto dL = dataOut[k] + fbAmt[0];
+            for (int i = 0; i < this->getIntParam(ipStages); ++i)
             {
                 float tmp{0};
-                this->apfs[i].processBlockStep(dL, tmp);
+                apfs[i].processBlockStep(dL, tmp);
             }
-            this->fbAmt[0] = dL * fb[k];
+            fbAmt[0] = dL * fb[k];
+            shelf.processBlockStep(fbAmt[0]);
+            hpf.processBlockStep(fbAmt[0]);
             dataOut[k] = dL;
         }
     }
@@ -248,39 +249,50 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
                     apfs[i].init();
                 }
             }
-            auto mode = sst::filters::CytomicSVF::Mode::Allpass;
-            auto spread{0.f};
-            auto baseL{param[fpCenterFrequencyL]}, baseR{baseL};
-            if (iparam[ipStereo])
-            {
-                baseR = param[fpCenterFrequencyR];
-            }
+
+            auto freqL = 440.0 * this->note_to_pitch_ignoring_tuning(param[fpCenterFrequencyL]);
+            auto freqR =
+                iparam[ipStereo]
+                    ? 440.0 * this->note_to_pitch_ignoring_tuning(param[fpCenterFrequencyR])
+                    : freqL;
+
+            auto freqInc = 0.0;
             if (iparam[ipStages] > 1)
             {
-                spread = param[fpSpacing];
-                auto halfStage = iparam[ipStages] * 0.5;
-                baseL -= halfStage * spread;
-                baseR -= halfStage * spread;
+                freqInc = 440.0 * this->note_to_pitch_ignoring_tuning(param[fpSpacing] /
+                                                                      (iparam[ipStages] - 1));
             }
-            for (int i = 0; i < iparam[ipStages]; ++i)
+
+            auto res = std::clamp(param[fpResonance], 0.f, 1.f);
+            auto sg = 1 - param[fpFeedback] * 0.05;
+
+            hpf.template setCoeffForBlock<VFXConfig::blockSize>(
+                sst::filters::CytomicSVF::Mode::Highpass, 35.f, .25f, this->getSampleRateInv());
+
+            if (iparam[ipStereo])
             {
-                if (iparam[ipStereo])
+                for (int i = 0; i < iparam[ipStages]; ++i)
                 {
-                    auto freqL = 440.0 * this->note_to_pitch_ignoring_tuning(baseL + spread * i);
-                    auto freqR = 440.0 * this->note_to_pitch_ignoring_tuning(baseR + spread * i);
-
-                    auto res = std::clamp(param[fpResonance], 0.f, 1.f);
                     apfs[i].template setCoeffForBlock<VFXConfig::blockSize>(
-                        mode, freqL, freqR, res, res, this->getSampleRateInv(), 1.f, 1.f);
+                        allpass, freqL, freqR, res, res, this->getSampleRateInv(), 1.f, 1.f);
+                    freqL += freqInc;
+                    freqR += freqInc;
                 }
-                else
+                shelf.template setCoeffForBlock<VFXConfig::blockSize>(
+                    sst::filters::CytomicSVF::Mode::HighShelf, freqL, freqR, 0.f, 0.f,
+                    this->getSampleRateInv(), sg, sg);
+            }
+            else
+            {
+                for (int i = 0; i < iparam[ipStages]; ++i)
                 {
-                    auto freq = 440.0 * this->note_to_pitch_ignoring_tuning(baseL + spread * i);
-
-                    auto res = std::clamp(param[fpResonance], 0.f, 1.f);
                     apfs[i].template setCoeffForBlock<VFXConfig::blockSize>(
-                        mode, freq, res, this->getSampleRateInv());
+                        allpass, freqL, res, this->getSampleRateInv());
+                    freqL += freqInc;
                 }
+                shelf.template setCoeffForBlock<VFXConfig::blockSize>(
+                    sst::filters::CytomicSVF::Mode::HighShelf, freqL, 0.f, this->getSampleRateInv(),
+                    sg);
             }
             mLastParam = param;
             mLastIParam = iparam;
@@ -289,6 +301,8 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
         {
             for (int i = 0; i < iparam[ipStages]; ++i)
                 apfs[i].template retainCoeffForBlock<VFXConfig::blockSize>();
+            shelf.retainCoeffForBlock<VFXConfig::blockSize>();
+            hpf.retainCoeffForBlock<VFXConfig::blockSize>();
         }
     }
     bool enableKeytrack(bool b)
@@ -307,18 +321,33 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
     std::array<float, numFloatParams> mLastParam{};
     std::array<int, numIntParams> mLastIParam{};
     std::array<sst::filters::CytomicSVF, maxPhases> apfs;
+    sst::filters::CytomicSVF shelf;
+    sst::filters::CytomicSVF hpf;
+    const sst::filters::CytomicSVF::Mode allpass = sst::filters::CytomicSVF::Mode::Allpass;
 
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> lipolFb;
 
   public:
-    static constexpr int16_t streamingVersion{1};
+    static constexpr int16_t streamingVersion{2};
     static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
                                                    int *const iparam)
     {
-        // base implementation - we have never updated streaming
-        // input is parameters from stream version
-        assert(streamedFrom == 1);
+        assert(streamedFrom <= streamingVersion);
+
+        if (streamedFrom == 1)
+        {
+            auto stages = iparam[ipStages];
+            if (stages > 1)
+            {
+                auto spread = fparam[fpSpacing];
+                auto halfStage = stages * 0.5;
+                fparam[0] -= halfStage * spread;
+                fparam[1] -= halfStage * spread;
+
+                fparam[fpSpacing] = std::clamp((spread * (stages - 1)), -96.f, 96.f);
+            }
+        }
     }
 };
 } // namespace sst::voice_effects::filter
-#endif // SHORTCIRCUITXT_STATICPHASER_H
+#endif // INCLUDE_SST_VOICE_EFFECTS_FILTER_STATICPHASER_H
