@@ -27,8 +27,6 @@
 
 #include "../VoiceEffectCore.h"
 
-#include <iostream>
-
 #include "sst/basic-blocks/mechanics/block-ops.h"
 
 namespace sst::voice_effects::modulation
@@ -63,29 +61,26 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
             {
                 return pmd()
                     .asFloat()
-                    .withRange(-96, 96)
+                    .withRange(-128, 128)
                     .withSemitoneFormatting()
                     .withDefault(-12)
                     .withName("Offset");
             }
-            else
-            {
-                return pmd().asAudibleFrequency().withDefault(220).withName("Frequency");
-            }
+            return pmd().asAudibleFrequency().withRange(-140, 70).withDefault(0).withName(
+                "Frequency");
         case fpLowpass:
             if (keytrackOn)
             {
                 return pmd()
                     .asFloat()
-                    .withRange(0, 96)
+                    .withRange(-128, 128)
                     .withSemitoneFormatting()
-                    .withDefault(96)
+                    .withDefault(128)
+                    .deactivatable()
                     .withName("Lowpass Offset");
             }
-            else
-            {
-                return pmd().asAudibleFrequency().withDefault(70).withName("Lowpass Frequency");
-            }
+            return pmd().asAudibleFrequency().withDefault(70).deactivatable().withName(
+                "Lowpass Frequency");
         case fpDepth:
             return pmd().asDecibel().withName("Depth").withDefault(0);
         default:
@@ -112,8 +107,21 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
             freq += pitch;
             lpfreq += pitch;
         }
-        lpf.setCoeffForBlock<VFXConfig::blockSize>(mode::Lowpass, lpfreq, 0.f,
-                                                   this->getSampleRateInv());
+
+        float modulator alignas(16)[2][VFXConfig::blockSize];
+
+        if (this->getIsDeactivated(fpLowpass))
+        {
+            mech::copy_from_to<VFXConfig::blockSize>(datainL, modulator[0]);
+            mech::copy_from_to<VFXConfig::blockSize>(datainR, modulator[1]);
+        }
+        else
+        {
+            lpfreq = 440 * this->note_to_pitch_ignoring_tuning(lpfreq);
+            lpf.setCoeffForBlock<VFXConfig::blockSize>(mode::Lowpass, lpfreq, 0.f,
+                                                       this->getSampleRateInv());
+            lpf.processBlock<VFXConfig::blockSize>(datainL, datainR, modulator[0], modulator[1]);
+        }
 
         omegaLerp.set_target(440 * this->note_to_pitch_ignoring_tuning(freq) * M_PI_2 *
                              this->getSampleRateInv());
@@ -130,9 +138,6 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
         float OS alignas(16)[2][bs2];
         float omInterp alignas(16)[bs2];
         float phVals alignas(16)[bs2];
-        float modulator alignas(16)[2][VFXConfig::blockSize];
-
-        lpf.processBlock<VFXConfig::blockSize>(datainL, datainR, modulator[0], modulator[1]);
 
         preGainLerp.multiply_2_blocks_to(modulator[0], modulator[1], OS[0], OS[1]);
         upFilter.process_block_U2(OS[0], OS[1], OS[0], OS[1], bs2);
@@ -168,7 +173,7 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
         postGainLerp.multiply_2_blocks(dataoutL, dataoutR);
     }
 
-    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datain, float *dataout, float pitch)
     {
         namespace sdsp = sst::basic_blocks::dsp;
         namespace mech = sst::basic_blocks::mechanics;
@@ -181,8 +186,20 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
             freq += pitch;
             lpfreq += pitch;
         }
-        lpf.setCoeffForBlock<VFXConfig::blockSize>(mode::Lowpass, lpfreq, 0.f,
-                                                   this->getSampleRateInv());
+
+        float modulator alignas(16)[VFXConfig::blockSize];
+
+        if (this->getIsDeactivated(fpLowpass))
+        {
+            mech::copy_from_to<VFXConfig::blockSize>(datain, modulator);
+        }
+        else
+        {
+            lpfreq = 440 * this->note_to_pitch_ignoring_tuning(lpfreq);
+            lpf.setCoeffForBlock<VFXConfig::blockSize>(mode::Lowpass, lpfreq, 0.f,
+                                                       this->getSampleRateInv());
+            lpf.processBlock<VFXConfig::blockSize>(datain, modulator);
+        }
 
         omegaLerp.set_target(440 * this->note_to_pitch_ignoring_tuning(freq) * M_PI_2 *
                              this->getSampleRateInv());
@@ -199,9 +216,6 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
         float OS alignas(16)[2][bs2];
         float omInterp alignas(16)[bs2];
         float phVals alignas(16)[bs2];
-        float modulator alignas(16)[VFXConfig::blockSize];
-
-        lpf.processBlock<VFXConfig::blockSize>(datainL, modulator);
 
         preGainLerp.multiply_block_to(modulator, OS[0]);
         upFilter.process_block_U2(OS[0], OS[0], OS[0], OS[1], bs2);
@@ -229,8 +243,8 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
             SIMD_MM(store_ps)(OS[0] + k, r0);
         }
 
-        downFilter.process_block_D2(OS[0], OS[0], bs2, dataoutL, 0);
-        postGainLerp.multiply_block(dataoutL);
+        downFilter.process_block_D2(OS[0], OS[0], bs2, dataout, 0);
+        postGainLerp.multiply_block(dataout);
     }
 
     bool enableKeytrack(bool b)
