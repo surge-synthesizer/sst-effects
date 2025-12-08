@@ -127,9 +127,7 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
                              this->getSampleRateInv());
 
         auto lvl = this->getFloatParam(fpDepth);
-        auto lvlComp = -lvl;
-        lvlComp *= 1 - std::signbit(lvlComp) * .25f;
-        lvlComp += 12.f;
+        auto lvlComp = -lvl * (1 - .75f * !std::signbit(lvl));
 
         preGainLerp.set_target(3.1415f * this->dbToLinear(lvl));
         postGainLerp.set_target(3.1415f * this->dbToLinear(lvlComp));
@@ -205,9 +203,7 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
                              this->getSampleRateInv());
 
         auto lvl = this->getFloatParam(fpDepth);
-        auto lvlComp = -lvl;
-        lvlComp *= 1 - std::signbit(lvlComp) * .25f;
-        lvlComp += 12.f;
+        auto lvlComp = -lvl * (1 - .75f * !std::signbit(lvl));
 
         preGainLerp.set_target(3.1415f * this->dbToLinear(lvl));
         postGainLerp.set_target(3.1415f * this->dbToLinear(lvlComp));
