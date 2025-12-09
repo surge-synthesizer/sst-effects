@@ -57,6 +57,15 @@ template <typename VFXConfig> struct TiltEQ : core::VoiceEffectTemplateBase<VFXC
         switch (idx)
         {
         case fpFreq:
+            if (keytrackOn)
+            {
+                return pmd()
+                    .asFloat()
+                    .withRange(-48, 96)
+                    .withName("Freq Offset")
+                    .withDefault(24)
+                    .withSemitoneFormatting();
+            }
             return pmd().asAudibleFrequency().withName("Frequency");
         case fpTilt:
             return pmd()
@@ -80,27 +89,30 @@ template <typename VFXConfig> struct TiltEQ : core::VoiceEffectTemplateBase<VFXC
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
                        float *dataoutR, float pitch)
     {
-        setCoeffs();
+        setCoeffs(pitch);
         tilter.template processBlock<VFXConfig::blockSize>(datainL, datainR, dataoutL, dataoutR);
     }
 
     void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
-        setCoeffs();
+        setCoeffs(pitch);
         tilter.template processBlock<VFXConfig::blockSize>(datainL, dataoutL);
     }
 
-    void setCoeffs()
+    void setCoeffs(float pitch)
     {
-        float freq = 440 * this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpFreq));
+        float freq = 440 * this->note_to_pitch_ignoring_tuning(
+                               keytrackOn ? pitch + this->getFloatParam(fpFreq)
+                                          : this->getFloatParam(fpFreq));
         float slope = this->dbToLinear(std::clamp(this->getFloatParam(fpTilt), -18.f, 18.f) * .5f);
 
-        if (slope != priorSlope || freq != priorFreq)
+        if (slope != priorSlope || freq != priorFreq || keytrackOn != wasKeytrackOn)
         {
             tilter.template setCoeffForBlock<VFXConfig::blockSize>(freq, .07f,
                                                                    this->getSampleRateInv(), slope);
             priorSlope = slope;
             priorFreq = freq;
+            wasKeytrackOn = keytrackOn;
         }
         else
         {
@@ -115,7 +127,16 @@ template <typename VFXConfig> struct TiltEQ : core::VoiceEffectTemplateBase<VFXC
     }
     */
 
+    bool enableKeytrack(bool b)
+    {
+        auto res = (b != keytrackOn);
+        keytrackOn = b;
+        return res;
+    }
+    bool getKeytrack() const { return keytrackOn; }
+
   protected:
+    bool keytrackOn{false}, wasKeytrackOn{false};
     sst::filters::CytomicTilt tilter;
     float priorSlope = -123456.f;
     float priorFreq = -123456.f;
