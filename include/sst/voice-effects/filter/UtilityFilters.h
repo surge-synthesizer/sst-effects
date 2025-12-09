@@ -79,7 +79,7 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
                     .asFloat()
                     .withRange(-48, 96)
                     .withName("HiCut Offset")
-                    .withDefault(-48)
+                    .withDefault(96)
                     .deactivatable()
                     .withSemitoneFormatting();
             }
