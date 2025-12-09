@@ -93,9 +93,9 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
             {
                 return pmd()
                     .asFloat()
-                    .withRange(0, 48)
+                    .withRange(-48, 48)
                     .withName("LoSHelf Offset")
-                    .withDefault(-48)
+                    .withDefault(12)
                     .deactivatable()
                     .withSemitoneFormatting();
             }
@@ -111,7 +111,7 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
                     .asFloat()
                     .withRange(0, 96)
                     .withName("HiShelf Offset")
-                    .withDefault(-48)
+                    .withDefault(24)
                     .deactivatable()
                     .withSemitoneFormatting();
             }
