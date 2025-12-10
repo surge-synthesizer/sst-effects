@@ -18,8 +18,8 @@
  * https://github.com/surge-synthesizer/sst-effects
  */
 
-#ifndef INCLUDE_SST_VOICE_EFFECTS_CATEGORY_THREEOPPHASEMOD_H
-#define INCLUDE_SST_VOICE_EFFECTS_CATEGORY_THREEOPPHASEMOD_H
+#ifndef INCLUDE_SST_VOICE_EFFECTS_GENERATOR_3OPPHASEMOD_H
+#define INCLUDE_SST_VOICE_EFFECTS_GENERATOR_3OPPHASEMOD_H
 
 #include "sst/basic-blocks/tables/TwoToTheXProvider.h"
 #include "sst/basic-blocks/tables/SixSinesWaveProvider.h"

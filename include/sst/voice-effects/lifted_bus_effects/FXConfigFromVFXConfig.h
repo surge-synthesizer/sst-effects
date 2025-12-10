@@ -94,6 +94,7 @@ template <typename Inside, typename FX> struct LiftHelper
     FX *busFX{nullptr};
     Inside *that;
     LiftHelper(Inside *is) : that(is) { that->preReserveSingleInstancePool(memChunkSize); }
+
     ~LiftHelper()
     {
         if (busFX)
@@ -103,14 +104,18 @@ template <typename Inside, typename FX> struct LiftHelper
         }
     }
 
-    void init()
+    void guaranteeBusFX()
     {
         if (!busFX)
         {
             busFXMem = that->checkoutBlock(memChunkSize);
             busFX = new (busFXMem) FX(that, that, &(valuesForFX[0]));
         }
+    }
 
+    void init()
+    {
+        guaranteeBusFX();
         that->setupValues();
         busFX->initialize();
     }
