@@ -44,17 +44,19 @@ template <typename VFXConfig> struct LiftedReverb1 : core::VoiceEffectTemplateBa
 
     LiftedReverb1() : helper(this), core::VoiceEffectTemplateBase<VFXConfig>() {}
 
-    basic_blocks::params::ParamMetaData paramAt(int idx) const
+    basic_blocks::params::ParamMetaData paramAt(int idx)
     {
         using pmd = basic_blocks::params::ParamMetaData;
+        helper.guaranteeBusFX();
         auto udx = idx;
         if (idx > 0) // we skip shape
             udx = idx + 1;
         return helper.busFX->paramAt(udx);
     }
 
-    basic_blocks::params::ParamMetaData intParamAt(int idx) const
+    basic_blocks::params::ParamMetaData intParamAt(int idx)
     {
+        helper.guaranteeBusFX();
         return helper.busFX->paramAt(reverb1_t::rev1_shape);
     }
 

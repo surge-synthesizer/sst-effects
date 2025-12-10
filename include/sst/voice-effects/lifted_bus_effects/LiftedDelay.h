@@ -43,9 +43,10 @@ template <typename VFXConfig> struct LiftedDelay : core::VoiceEffectTemplateBase
 
     LiftedDelay() : helper(this), core::VoiceEffectTemplateBase<VFXConfig>() {}
 
-    basic_blocks::params::ParamMetaData paramAt(int idx) const
+    basic_blocks::params::ParamMetaData paramAt(int idx)
     {
         using pmd = basic_blocks::params::ParamMetaData;
+        helper.guaranteeBusFX();
         return helper.busFX->paramAt(idx);
     }
 

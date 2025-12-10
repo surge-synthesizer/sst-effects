@@ -44,9 +44,10 @@ template <typename VFXConfig> struct LiftedReverb2 : core::VoiceEffectTemplateBa
 
     LiftedReverb2() : helper(this), core::VoiceEffectTemplateBase<VFXConfig>() {}
 
-    basic_blocks::params::ParamMetaData paramAt(int idx) const
+    basic_blocks::params::ParamMetaData paramAt(int idx)
     {
         using pmd = basic_blocks::params::ParamMetaData;
+        helper.guaranteeBusFX();
         return helper.busFX->paramAt(idx);
     }
 

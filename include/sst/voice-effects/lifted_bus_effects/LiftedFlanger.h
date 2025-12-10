@@ -45,15 +45,17 @@ template <typename VFXConfig> struct LiftedFlanger : core::VoiceEffectTemplateBa
     LiftedFlanger() : helper(this), core::VoiceEffectTemplateBase<VFXConfig>() {}
 
     // turns out the two ints are first making this easy
-    basic_blocks::params::ParamMetaData paramAt(int idx) const
+    basic_blocks::params::ParamMetaData paramAt(int idx)
     {
         using pmd = basic_blocks::params::ParamMetaData;
 
+        helper.guaranteeBusFX();
         return helper.busFX->paramAt(idx + 2);
     }
 
-    basic_blocks::params::ParamMetaData intParamAt(int idx) const
+    basic_blocks::params::ParamMetaData intParamAt(int idx)
     {
+        helper.guaranteeBusFX();
         return helper.busFX->paramAt(idx);
     }
 

@@ -75,8 +75,8 @@ struct VTestConfig
 
     static void preReservePool(BaseClass *, size_t) {}
     static void preReserveSingleInstancePool(BaseClass *, size_t) {}
-    static uint8_t *checkoutBlock(BaseClass *, size_t) { return nullptr; }
-    static void returnBlock(BaseClass *, uint8_t *, size_t) {}
+    static uint8_t *checkoutBlock(BaseClass *, size_t s) { return (uint8_t *)malloc(s); }
+    static void returnBlock(BaseClass *, uint8_t *p, size_t) { free(p); }
 };
 template <typename T> struct VTester
 {
