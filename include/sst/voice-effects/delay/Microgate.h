@@ -33,7 +33,8 @@ namespace sst::voice_effects::delay
 {
 template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"MicroGate"};
+    static constexpr const char *displayName{"MicroGate"};
+    static constexpr const char *streamingName{"micro-gate-fx"};
 
     static constexpr uint16_t numFloatParams{4};
     static constexpr uint16_t numIntParams{0};

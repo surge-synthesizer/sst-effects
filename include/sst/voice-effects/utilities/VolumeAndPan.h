@@ -33,7 +33,8 @@ namespace sst::voice_effects::utilities
 {
 template <typename VFXConfig> struct VolumeAndPan : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Vol/Pan Utility"};
+    static constexpr const char *displayName{"Vol/Pan Utility"};
+    static constexpr const char *streamingName{"volume-pan"};
 
     static constexpr int numFloatParams{2};
     static constexpr int numIntParams{0};

@@ -48,6 +48,13 @@ if (${SST_EFFECTS_BUILD_TESTS})
         )
     endif ()
 
+    if (NOT TARGET sst-plugininfra)
+        CPMAddPackage(NAME sst-plugininfra
+                GITHUB_REPOSITORY surge-synthesizer/sst-plugininfra
+                GIT_TAG main
+        )
+    endif ()
+
     if (NOT TARGET fmt)
         CPMAddPackage(NAME fmt
                 GITHUB_REPOSITORY fmtlib/fmt
@@ -110,6 +117,12 @@ if (${SST_EFFECTS_BUILD_TESTS})
     endif()
 
 endif ()
+
+
+if (TARGET sst-plugininfra::tinyxml)
+    message(STATUS "Implementing preset support for sst-effects")
+    target_compile_definitions(${PROJECT_NAME} INTERFACE SST_EFFECTS_PRESETS=1)
+endif()
 
 
 if (TARGET eurorack)

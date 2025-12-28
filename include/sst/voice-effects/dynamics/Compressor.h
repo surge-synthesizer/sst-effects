@@ -35,7 +35,8 @@ namespace sst::voice_effects::dynamics
 {
 template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Compressor"};
+    static constexpr const char *displayName{"Compressor"};
+    static constexpr const char *streamingName{"compressor"};
 
     static constexpr size_t rmsBufferSize{1024}; // TODO: SR invariance...
     float *rmsBlock{nullptr};

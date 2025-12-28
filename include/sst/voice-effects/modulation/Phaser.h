@@ -34,7 +34,8 @@ namespace sst::voice_effects::modulation
 {
 template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Phaser"};
+    static constexpr const char *displayName{"Phaser"};
+    static constexpr const char *streamingName{"modulated-phaser"};
 
     static constexpr int numFloatParams{6};
     static constexpr int numIntParams{2};

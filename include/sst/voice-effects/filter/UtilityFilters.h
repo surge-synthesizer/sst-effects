@@ -28,7 +28,8 @@ namespace sst::voice_effects::filter
 {
 template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Utility Filters"};
+    static constexpr const char *displayName{"Utility Filter"};
+    static constexpr const char *streamingName{"util-filt"};
 
     static constexpr int numFloatParams{6};
     static constexpr int numIntParams{0};

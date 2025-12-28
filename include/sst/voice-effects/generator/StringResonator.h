@@ -39,7 +39,8 @@ namespace sst::voice_effects::generator
 {
 template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"String Exciter"};
+    static constexpr const char *displayName{"String Resonator"};
+    static constexpr const char *streamingName{"stringex-fx"};
 
     static constexpr int numFloatParams{8};
     static constexpr int numIntParams{2};

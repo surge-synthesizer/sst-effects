@@ -41,7 +41,8 @@ namespace sst::voice_effects::modulation
 {
 template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Chorus"};
+    static constexpr const char *displayName{"Chorus"};
+    static constexpr const char *streamingName{"voice-chorus"};
 
     static constexpr int numFloatParams{4};
     static constexpr int numIntParams{2};

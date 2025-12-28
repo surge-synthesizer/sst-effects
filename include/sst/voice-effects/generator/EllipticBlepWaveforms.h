@@ -35,7 +35,8 @@ namespace sst::voice_effects::generator
 template <typename VFXConfig>
 struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Waveform Oscillator"};
+    static constexpr const char *displayName{"Virtual Analog"};
+    static constexpr const char *streamingName{"osc-ebwf"};
 
     static constexpr int numFloatParams{7};
     static constexpr int numIntParams{5};

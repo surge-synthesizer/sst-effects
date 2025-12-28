@@ -35,7 +35,22 @@ namespace sst::voice_effects::eq
 template <typename VFXConfig, int NBands>
 struct EqNBandParametric : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"EQNBand"};
+    static constexpr const char *displayName{"EQNBand"};
+    static constexpr const char *streamingNameByBand()
+    {
+        static_assert(NBands >= 1 && NBands <= 3);
+        switch (NBands)
+        {
+        case 1:
+            return "eq-parm-1band";
+        case 2:
+            return "eq-parm-2band";
+        case 3:
+            return "eq-parm-3band";
+        }
+        return "";
+    }
+    static constexpr const char *streamingName{streamingNameByBand()};
 
     static constexpr int numFloatParams{3 * NBands};
     static constexpr int numIntParams{NBands};

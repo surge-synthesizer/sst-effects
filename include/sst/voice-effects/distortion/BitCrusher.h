@@ -28,7 +28,8 @@ namespace sst::voice_effects::distortion
 {
 template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"BitCrusher"};
+    static constexpr const char *displayName{"BitCrusher"};
+    static constexpr const char *streamingName{"bit-crusher-fx"};
 
     static constexpr int numFloatParams{5};
     static constexpr int numIntParams{2};

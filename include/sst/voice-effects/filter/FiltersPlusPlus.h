@@ -37,7 +37,71 @@ namespace sst::voice_effects::filter
 template <typename VFXConfig, filtersplusplus::FilterModel Model>
 struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Filters++"};
+    static constexpr auto nameFn()
+    {
+        constexpr size_t maxFN{40};
+        constexpr auto modelStr = sst::filtersplusplus::toCharPtr(Model);
+        constexpr size_t totalLen = 10 + maxFN + 1; // "Filters++ " + model + null
+
+        std::array<char, totalLen> result{};
+        std::fill(result.begin(), result.end(), 0);
+
+        // Copy "Filters++ " (10 characters)
+        result[0] = 'F';
+        result[1] = 'i';
+        result[2] = 'l';
+        result[3] = 't';
+        result[4] = 'e';
+        result[5] = 'r';
+        result[6] = 's';
+        result[7] = '+';
+        result[8] = '+';
+        result[9] = ' ';
+
+        // Copy model name
+        for (size_t i = 0; (i < maxFN) && (modelStr[i] != 0); ++i)
+            result[10 + i] = modelStr[i];
+
+        result[totalLen - 1] = '\0';
+        return result;
+    }
+    static constexpr auto ens = nameFn();
+    static constexpr auto displayName = ens.data();
+
+    static constexpr const char *streamingNameByModel()
+    {
+        switch (Model)
+        {
+        case filtersplusplus::FilterModel::CytomicSVF:
+            return "filt-cytomic";
+        case filtersplusplus::FilterModel::VemberClassic:
+            return "vemberclassic";
+        case filtersplusplus::FilterModel::DiodeLadder:
+            return "diodeladder";
+        case filtersplusplus::FilterModel::TriPole:
+            return "tripole";
+        case filtersplusplus::FilterModel::OBXD_4Pole:
+            return "obxd-4pole";
+        case filtersplusplus::FilterModel::CutoffWarp:
+            return "cutoffwarp";
+        case filtersplusplus::FilterModel::ResonanceWarp:
+            return "reswarp";
+        case filtersplusplus::FilterModel::SampleAndHold:
+            return "SnH";
+        case filtersplusplus::FilterModel::Comb:
+            return "Comb";
+        case filtersplusplus::FilterModel::K35:
+            return "k35";
+        case filtersplusplus::FilterModel::VintageLadder:
+            return "vintageladder";
+        default:
+            break;
+        }
+        return "-error-";
+    }
+    // If you hit this assert you've created on a model not in above switch
+    static_assert(streamingNameByModel()[0] != '-');
+    static constexpr auto streamingName{streamingNameByModel()};
 
     static constexpr int numFloatParams{4};
     static constexpr int numIntParams{5};

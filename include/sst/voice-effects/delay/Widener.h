@@ -39,7 +39,8 @@ namespace sst::voice_effects::delay
 {
 template <typename VFXConfig> struct Widener : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Widener"};
+    static constexpr const char *displayName{"Widener"};
+    static constexpr const char *streamingName{"fxstereo-fx"};
 
     static constexpr int numFloatParams{3};
     static constexpr int numIntParams{0};

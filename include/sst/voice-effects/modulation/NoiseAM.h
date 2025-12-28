@@ -37,7 +37,8 @@ namespace sst::voice_effects::modulation
 {
 template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Noise AM"};
+    static constexpr const char *displayName{"Noise AM"};
+    static constexpr const char *streamingName{"noise-am"};
 
     static constexpr int numFloatParams{3};
     static constexpr int numIntParams{2};

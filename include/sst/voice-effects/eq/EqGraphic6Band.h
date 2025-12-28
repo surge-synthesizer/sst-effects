@@ -34,7 +34,8 @@ namespace sst::voice_effects::eq
 {
 template <typename VFXConfig> struct EqGraphic6Band : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"EQ 6 Band"};
+    static constexpr const char *displayName{"6 Band Graphic"};
+    static constexpr const char *streamingName{"eq-grp-6"};
 
     static constexpr int nBands{6};
     static constexpr int numFloatParams{nBands};

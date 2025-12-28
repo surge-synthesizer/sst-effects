@@ -33,7 +33,8 @@ namespace sst::voice_effects::liftbus
 namespace mech = sst::basic_blocks::mechanics;
 template <typename VFXConfig> struct LiftedFlanger : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Reverb1"};
+    static constexpr const char *displayName{"Flanger"};
+    static constexpr const char *streamingName{"lifted-flanger"};
 
     static constexpr int numFloatParams{7};
     static constexpr int numIntParams{2};

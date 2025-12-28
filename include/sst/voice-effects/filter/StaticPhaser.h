@@ -35,7 +35,8 @@ namespace sst::voice_effects::filter
 {
 template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"StaticPhaser"};
+    static constexpr const char *displayName{"Static Phaser"};
+    static constexpr const char *streamingName{"filt-statph"};
 
     static constexpr int numFloatParams{5};
     static constexpr int numIntParams{2};

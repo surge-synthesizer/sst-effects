@@ -35,7 +35,8 @@ namespace sst::voice_effects::eq
 {
 template <typename VFXConfig> struct TiltEQ : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Tilt EQ"};
+    static constexpr const char *displayName{"Tilt EQ"};
+    static constexpr const char *streamingName{"eq-tilt"};
 
     static constexpr int numFloatParams{2};
     static constexpr int numIntParams{0};

@@ -31,7 +31,8 @@ namespace sst::voice_effects::generator
 {
 template <typename VFXConfig> struct ThreeOpPhaseMod : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"3op Phase Mod"};
+    static constexpr const char *displayName{"3op Phase Mod"};
+    static constexpr const char *streamingName{"3op-pm"};
 
     static constexpr int numFloatParams{9};
     static constexpr int numIntParams{0};

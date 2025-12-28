@@ -32,7 +32,8 @@ namespace sst::voice_effects::modulation
 {
 template <typename VFXConfig> struct RingMod : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Ring Mod"};
+    static constexpr const char *displayName{"Ring Mod"};
+    static constexpr const char *streamingName{"ringmod-fx"};
 
     static constexpr int numFloatParams{1};
     static constexpr int numIntParams{0};
