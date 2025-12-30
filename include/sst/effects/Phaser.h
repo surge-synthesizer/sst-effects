@@ -22,6 +22,7 @@
 #define INCLUDE_SST_EFFECTS_PHASER_H
 
 #include <cstring>
+#include <cmath>
 #include "EffectCore.h"
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/Lag.h"
@@ -106,8 +107,7 @@ template <typename FXConfig> struct Phaser : core::EffectTemplateBase<FXConfig>
         widthM.instantize();
         mix.instantize();
 
-        modLFOL.setSampleRate(this->sampleRate());
-        modLFOR.setSampleRate(this->sampleRate());
+        modLFO.setSampleRate(this->sampleRate());
     }
 
     ~Phaser()
@@ -118,8 +118,7 @@ template <typename FXConfig> struct Phaser : core::EffectTemplateBase<FXConfig>
 
     void onSampleRateChanged()
     {
-        modLFOL.setSampleRate(this->sampleRate());
-        modLFOR.setSampleRate(this->sampleRate());
+        modLFO.setSampleRate(this->sampleRate());
         initialize();
     }
 
@@ -179,24 +178,25 @@ template <typename FXConfig> struct Phaser : core::EffectTemplateBase<FXConfig>
 
         int mwave = this->intValue(ph_mod_wave);
         float depth = std::clamp(this->floatValue(ph_mod_depth), 0.f, 2.f);
+        float stereo = std::clamp(this->floatValue(ph_stereo), 0.f, 1.f);
 
         if (this->isDeactivated(ph_mod_rate))
         {
             // auto rmin = fxdata->p[ph_mod_rate].val_min.f;
             // auto rmax = fxdata->p[ph_mod_rate].val_max.f;
-            auto rmin = -7.f; // we cant query this at release runtime in teh audio thread
+            auto rmin = -7.f; // we cant query this at release runtime on the audio thread
             auto rmax = 9.f;
             auto phase =
                 std::clamp((this->floatValue(ph_mod_rate) - rmin) / (rmax - rmin), 0.f, 1.f);
 
-            modLFOL.pre_process(mwave, 0.f, depth, phase);
-            modLFOR.pre_process(mwave, 0.f, depth, phase + 0.5 * this->floatValue(ph_stereo));
+            modLFO.processStartOfBlock(mwave, 0.f, depth, phase, stereo);
         }
         else
         {
-            modLFOL.pre_process(mwave, rate, depth, 0.f);
-            modLFOR.pre_process(mwave, rate, depth, 0.5 * this->floatValue(ph_stereo));
+            modLFO.processStartOfBlock(mwave, rate, depth, 0.f, stereo);
         }
+
+        auto lfoVals = modLFO.valueStereo();
 
         // if stages is set to 1 to indicate we are in legacy mode, use legacy freqs and spans
         if (n_stages < 2)
@@ -204,13 +204,11 @@ template <typename FXConfig> struct Phaser : core::EffectTemplateBase<FXConfig>
             // 4 stages in original phaser mode
             for (int i = 0; i < 2; i++)
             {
-                double omega =
-                    biquad[2 * i]->calc_omega(2 * this->floatValue(ph_center) + legacy_freq[i] +
-                                              legacy_span[i] * modLFOL.value());
+                double omega = biquad[2 * i]->calc_omega(
+                    2 * this->floatValue(ph_center) + legacy_freq[i] + legacy_span[i] * lfoVals[0]);
                 biquad[2 * i]->coeff_APF(omega, 1.0 + 0.8 * this->floatValue(ph_sharpness));
-                omega =
-                    biquad[2 * i + 1]->calc_omega(2 * this->floatValue(ph_center) + legacy_freq[i] +
-                                                  legacy_span[i] * modLFOR.value());
+                omega = biquad[2 * i + 1]->calc_omega(2 * this->floatValue(ph_center) +
+                                                      legacy_freq[i] + legacy_span[i] * lfoVals[1]);
                 biquad[2 * i + 1]->coeff_APF(omega, 1.0 + 0.8 * this->floatValue(ph_sharpness));
             }
         }
@@ -221,11 +219,11 @@ template <typename FXConfig> struct Phaser : core::EffectTemplateBase<FXConfig>
                 double center = powf(2, (i + 1.0) * 2 / n_stages);
                 double omega = biquad[2 * i]->calc_omega(2 * this->floatValue(ph_center) +
                                                          this->floatValue(ph_spread) * center +
-                                                         2.0 / (i + 1) * modLFOL.value());
+                                                         2.0 / (i + 1) * lfoVals[0]);
                 biquad[2 * i]->coeff_APF(omega, 1.0 + 0.8 * this->floatValue(ph_sharpness));
                 omega = biquad[2 * i + 1]->calc_omega(2 * this->floatValue(ph_center) +
                                                       this->floatValue(ph_spread) * center +
-                                                      (2.0 / (i + 1) * modLFOR.value()));
+                                                      2.0 / (i + 1) * lfoVals[1]);
                 biquad[2 * i + 1]->coeff_APF(omega, 1.0 + 0.8 * this->floatValue(ph_sharpness));
             }
         }
@@ -347,13 +345,16 @@ fxdata->p[ph_mod_rate].deactivated = false;
             return pmd()
                 .asInt()
                 .withName("Waveform")
-                .withRange(0, 5)
-                .withUnorderedMapFormatting({{0, "Sine"},
-                                             {1, "Triangle"},
-                                             {2, "Saw"},
-                                             {3, "Noise"},
-                                             {4, "Sample & Hold"},
-                                             {5, "Square"}})
+                .withRange(0, 6)
+                .withUnorderedMapFormatting({
+                    {0, "Sine"},
+                    {1, "Triangle"},
+                    {2, "Ramp"},
+                    {3, "Saw"},
+                    {4, "Square"},
+                    {5, "Noise"},
+                    {6, "Sample & Hold"},
+                })
                 .withDefault(0);
         default:
             break;
@@ -381,15 +382,29 @@ fxdata->p[ph_mod_rate].deactivated = false;
     float legacy_freq[4] = {1.5 / 12, 19.5 / 12, 35 / 12, 50 / 12};
     float legacy_span[4] = {2.0, 1.5, 1.0, 0.5};
 
-    sst::basic_blocks::modulators::FXModControl<FXConfig::blockSize> modLFOL, modLFOR;
+    sst::basic_blocks::modulators::FXModControl<FXConfig::blockSize> modLFO;
 
   public:
-    static constexpr int16_t streamingVersion{1};
+    static constexpr int16_t streamingVersion{2};
     static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const param)
     {
-        // base implementation - we have never updated streaming
-        // input is parameters from stream version
-        assert(streamedFrom == 1);
+        assert(streamedFrom <= streamingVersion);
+        // 1->2 reordered mod waves and added actual saw (renamed "saw" to ramp)
+        if (streamedFrom < 2)
+        {
+            if (param[ph_mod_wave] == 3 || param[ph_mod_wave] == 4)
+            {
+                // noise and snh were 3/4, are now 5/6
+                param[ph_mod_wave] += 2;
+                // and stereo could not be reduced, but now can
+                param[ph_stereo] = 1.f;
+            }
+            else if (param[ph_mod_wave] == 5)
+            {
+                // square was 5, is now 4
+                param[ph_mod_wave] -= 1;
+            }
+        }
     }
 };
 } // namespace sst::effects::phaser
