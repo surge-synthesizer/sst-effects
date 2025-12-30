@@ -28,7 +28,8 @@ namespace sst::voice_effects::distortion
 {
 template <typename VFXConfig> struct Slewer : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Slewer"};
+    static constexpr const char *displayName{"Slewer"};
+    static constexpr const char *streamingName{"slewer-fx"};
 
     enum FloatParamIdx
     {

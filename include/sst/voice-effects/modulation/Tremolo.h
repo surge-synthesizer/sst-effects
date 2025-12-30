@@ -38,7 +38,8 @@ namespace sst::voice_effects::modulation
 template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFXConfig>
 {
     // Have these constexpr members
-    static constexpr const char *effectName{"Tremolo"};
+    static constexpr const char *displayName{"Tremolo"};
+    static constexpr const char *streamingName{"tremolo"};
 
     static constexpr int numFloatParams{4};
     static constexpr int numIntParams{3};

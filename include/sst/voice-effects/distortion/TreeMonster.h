@@ -29,7 +29,8 @@ namespace sst::voice_effects::distortion
 {
 template <typename VFXConfig> struct TreeMonster : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"TreeMonster"};
+    static constexpr const char *displayName{"Treemonster"};
+    static constexpr const char *streamingName{"treemonster-voice"};
 
     static constexpr int numFloatParams{4};
     static constexpr int numIntParams{0};

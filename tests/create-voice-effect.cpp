@@ -82,7 +82,7 @@ template <typename T> struct VTester
 {
     template <class... Args> static void TestVFX(Args &&...a)
     {
-        INFO("Starting test with instantiation : " << T::effectName);
+        INFO("Starting test with instantiation : " << T::displayName);
         auto fx = std::make_unique<T>(std::forward<Args>(a)...);
         REQUIRE(fx);
         fx->initVoiceEffectParams();

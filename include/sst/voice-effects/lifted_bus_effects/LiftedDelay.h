@@ -33,7 +33,8 @@ namespace sst::voice_effects::liftbus
 namespace mech = sst::basic_blocks::mechanics;
 template <typename VFXConfig> struct LiftedDelay : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Delay"};
+    static constexpr const char *displayName{"Dual Delay"};
+    static constexpr const char *streamingName{"lifted-delay"};
 
     static constexpr int numFloatParams{8};
     static constexpr int numIntParams{0};

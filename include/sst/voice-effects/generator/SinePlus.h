@@ -32,7 +32,8 @@ namespace sst::voice_effects::generator
 {
 template <typename VFXConfig> struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Sine Plus"};
+    static constexpr const char *displayName{"Sine Plus"};
+    static constexpr const char *streamingName{"osc-sineplus"};
 
     static constexpr int numFloatParams{6};
     static constexpr int numIntParams{2};

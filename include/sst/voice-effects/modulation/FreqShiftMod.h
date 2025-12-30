@@ -35,7 +35,8 @@ namespace sst::voice_effects::modulation
 {
 template <typename VFXConfig> struct FreqShiftMod : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Freq Shift Mod"};
+    static constexpr const char *displayName{"Freqshift Mod"};
+    static constexpr const char *streamingName{"pitchring-fx"};
 
     enum struct FreqShiftModFloatParams : uint32_t
     {

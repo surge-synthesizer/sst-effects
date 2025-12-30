@@ -35,7 +35,8 @@ namespace sst::voice_effects::waveshaper
 {
 template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"WaveShaper"};
+    static constexpr const char *displayName{"WaveShaper"};
+    static constexpr const char *streamingName{"waveshaper-fx"};
 
     enum struct WaveShaperFloatParams : uint32_t
     {

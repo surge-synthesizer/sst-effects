@@ -41,7 +41,8 @@ struct GenCorrelatedNoise
     : core::VoiceEffectTemplateBase<VFXConfig>,
       effects_shared::WidthProvider<GenCorrelatedNoise<VFXConfig>, VFXConfig::blockSize, true>
 {
-    static constexpr const char *effectName{"Correlated Noise"};
+    static constexpr const char *displayName{"Correlated Noise"};
+    static constexpr const char *streamingName{"osc-correlated-noise"};
 
     static constexpr int numFloatParams{3};
     static constexpr int numIntParams{1};

@@ -30,7 +30,8 @@ namespace sst::voice_effects::modulation
 {
 template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"FM Filter"};
+    static constexpr const char *displayName{"FM Filter"};
+    static constexpr const char *streamingName{"filt-fm"};
 
     static constexpr int numFloatParams{5};
     static constexpr int numIntParams{2};

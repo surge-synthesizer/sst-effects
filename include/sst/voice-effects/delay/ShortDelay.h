@@ -39,7 +39,8 @@ namespace sst::voice_effects::delay
 {
 template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Short Delay"};
+    static constexpr const char *displayName{"Simple Delay"};
+    static constexpr const char *streamingName{"simpdel-fx"};
 
     static constexpr int numFloatParams{6};
     static constexpr int numIntParams{1};

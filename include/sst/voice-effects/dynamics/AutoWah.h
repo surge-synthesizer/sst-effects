@@ -32,7 +32,8 @@ namespace sst::voice_effects::dynamics
 {
 template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Auto Wah"};
+    static constexpr const char *displayName{"Auto Wah"};
+    static constexpr const char *streamingName{"autowah"};
 
     static constexpr size_t rmsBufferSize{1024}; // TODO: SR invariance...
     float *rmsBlock{nullptr};

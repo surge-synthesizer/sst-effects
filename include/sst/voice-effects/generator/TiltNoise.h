@@ -39,7 +39,8 @@ template <typename VFXConfig>
 struct TiltNoise : core::VoiceEffectTemplateBase<VFXConfig>,
                    effects_shared::WidthProvider<TiltNoise<VFXConfig>, VFXConfig::blockSize, true>
 {
-    static constexpr const char *effectName{"Tilt Noise"};
+    static constexpr const char *displayName{"Tilt Noise"};
+    static constexpr const char *streamingName{"osc-tilt-noise"};
 
     static constexpr int numFloatParams{3};
     static constexpr int numIntParams{1};

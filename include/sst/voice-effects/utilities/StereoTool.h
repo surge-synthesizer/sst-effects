@@ -33,7 +33,8 @@ template <typename VFXConfig>
 struct StereoTool : core::VoiceEffectTemplateBase<VFXConfig>,
                     effects_shared::WidthProvider<StereoTool<VFXConfig>, VFXConfig::blockSize, true>
 {
-    static constexpr const char *effectName{"Stereo Tool"};
+    static constexpr const char *displayName{"Stereo Tool"};
+    static constexpr const char *streamingName{"stereo-tool"};
 
     static constexpr int numFloatParams{4};
     static constexpr int numIntParams{0};

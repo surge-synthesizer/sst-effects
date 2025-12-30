@@ -212,7 +212,8 @@ template <typename VFXConfig> struct MorphEQ : core::VoiceEffectTemplateBase<VFX
            }},
         // clang-format on
     };
-    static constexpr const char *effectName{"Morph EQ"};
+    static constexpr const char *displayName{"Morph"};
+    static constexpr const char *streamingName{"eq-morph"};
 
     static constexpr int numFloatParams{5};
     static constexpr int numIntParams{2};

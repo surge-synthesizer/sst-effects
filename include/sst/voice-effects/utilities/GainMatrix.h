@@ -33,7 +33,8 @@ namespace sst::voice_effects::utilities
 {
 template <typename VFXConfig> struct GainMatrix : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *effectName{"Gain Matrix"};
+    static constexpr const char *displayName{"Gain Matrix"};
+    static constexpr const char *streamingName{"gain-matrix"};
 
     static constexpr int numFloatParams{4};
     static constexpr int numIntParams{0};
