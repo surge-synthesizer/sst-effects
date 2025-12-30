@@ -91,6 +91,10 @@ if (${SST_EFFECTS_BUILD_TESTS})
     target_compile_definitions(${PROJECT_NAME}-test PRIVATE CATCH_CONFIG_DISABLE_EXCEPTIONS=1)
     target_include_directories(${PROJECT_NAME}-test PRIVATE libs/catch2)
 
+    if (UNIX AND NOT APPLE)
+        target_compile_options(${PROJECT_NAME}-test PRIVATE -march=native)
+    endif ()
+
 
     if(${SST_EFFECTS_BUILD_EXAMPLES})
         message(STATUS "Building Examples / CLI Driver")
