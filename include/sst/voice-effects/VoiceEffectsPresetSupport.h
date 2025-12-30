@@ -23,6 +23,9 @@
 
 #if SST_EFFECTS_PRESETS
 #include "tinyxml/tinyxml.h"
+#include "preset-api.h"
+#include <vector>
+#include <string>
 
 namespace sst::voice_effects::presets
 {
@@ -230,6 +233,16 @@ inline bool fromPreset(const std::string &s, PresetReceiver auto &r)
     }
 
     return true;
+}
+
+inline std::vector<std::string> factoryPresetPathsFor(const std::string &streamingName)
+{
+    return sst::effects::presets::recurseBelow("presets/voice-effects/" + streamingName);
+}
+
+inline std::string factoryPresetContentByPath(const std::string &path)
+{
+    return sst::effects::presets::loadContent(path);
 }
 
 } // namespace sst::voice_effects::presets
