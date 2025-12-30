@@ -111,7 +111,7 @@ if (${SST_EFFECTS_BUILD_TESTS})
         add_executable(CLIExample
             examples/CLIExample.cpp
         )
-        target_link_libraries(CLIExample PUBLIC dr_libs CLI11::CLI11 simde sst-basic-blocks sst-filters sst-waveshapers fmt ${PROJECT_NAME})
+        target_link_libraries(CLIExample PUBLIC dr_libs CLI11::CLI11 simde sst-basic-blocks sst-plugininfra::tinyxml sst-filters sst-waveshapers fmt ${PROJECT_NAME})
         target_compile_definitions(CLIExample PUBLIC _USE_MATH_DEFINES=1)
 
     endif()
