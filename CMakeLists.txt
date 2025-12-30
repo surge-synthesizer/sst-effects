@@ -131,9 +131,13 @@ if (TARGET sst-plugininfra::tinyxml)
     file(GLOB_RECURSE PRESETS "presets/**")
 
     cmrc_add_resource_library(${PROJECT_NAME}-presets NAMESPACE sst_effects_presets ${PRESETS})
+    set_target_properties(${PROJECT_NAME}-presets PROPERTIES UNITY_BUILD FALSE)
+
     add_library(${PROJECT_NAME}-preset-api STATIC src/preset-api.cpp)
     target_include_directories(${PROJECT_NAME}-preset-api PUBLIC src)
+    set_target_properties(${PROJECT_NAME}-preset-api PROPERTIES UNITY_BUILD FALSE)
     target_link_libraries(${PROJECT_NAME}-preset-api ${PROJECT_NAME}-presets)
+
     target_link_libraries(${PROJECT_NAME} INTERFACE ${PROJECT_NAME}-preset-api sst-plugininfra::tinyxml)
 endif()
 
