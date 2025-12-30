@@ -86,7 +86,7 @@ if (${SST_EFFECTS_BUILD_TESTS})
                 /wd4101
                 /wd4305)
     endif()
-    target_link_libraries(${PROJECT_NAME}-test PUBLIC simde sst-basic-blocks sst-pluginfra::tinyxml sst-filters sst-waveshapers fmt ${PROJECT_NAME})
+    target_link_libraries(${PROJECT_NAME}-test PUBLIC simde sst-basic-blocks sst-plugininfra::tinyxml sst-filters sst-waveshapers fmt ${PROJECT_NAME})
     target_compile_definitions(${PROJECT_NAME}-test PUBLIC _USE_MATH_DEFINES=1)
     target_compile_definitions(${PROJECT_NAME}-test PRIVATE CATCH_CONFIG_DISABLE_EXCEPTIONS=1)
     target_include_directories(${PROJECT_NAME}-test PRIVATE libs/catch2)
