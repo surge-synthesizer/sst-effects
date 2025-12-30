@@ -11,6 +11,13 @@ find(
     'include'
 );
 
+find(
+    {
+        wanted => \&findfiles,
+    },
+    'src'
+);
+
 
 find(
     {

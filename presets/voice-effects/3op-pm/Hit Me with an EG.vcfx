@@ -1,0 +1,11 @@
+<sst-voice-effect effect-streaming-version="1" preset-streaming-version="1" effect="3op-pm" temposync="0" keytrack="1">
+    <float-param index="0" value="1.003724" deactivated="0" />
+    <float-param index="1" value="2.196797" deactivated="0" />
+    <float-param index="2" value="0.000000" deactivated="0" />
+    <float-param index="3" value="0.559760" deactivated="0" />
+    <float-param index="4" value="0.209206" deactivated="0" />
+    <float-param index="5" value="0.456169" deactivated="0" />
+    <float-param index="6" value="0.251531" deactivated="0" />
+    <float-param index="7" value="0.000000" deactivated="0" />
+    <float-param index="8" value="0.000000" deactivated="0" />
+</sst-voice-effect>

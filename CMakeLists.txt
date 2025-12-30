@@ -86,7 +86,7 @@ if (${SST_EFFECTS_BUILD_TESTS})
                 /wd4101
                 /wd4305)
     endif()
-    target_link_libraries(${PROJECT_NAME}-test PUBLIC simde sst-basic-blocks sst-plugininfra::tinyxml sst-filters sst-waveshapers fmt ${PROJECT_NAME})
+    target_link_libraries(${PROJECT_NAME}-test PUBLIC simde sst-basic-blocks sst-filters sst-waveshapers fmt ${PROJECT_NAME})
     target_compile_definitions(${PROJECT_NAME}-test PUBLIC _USE_MATH_DEFINES=1)
     target_compile_definitions(${PROJECT_NAME}-test PRIVATE CATCH_CONFIG_DISABLE_EXCEPTIONS=1)
     target_include_directories(${PROJECT_NAME}-test PRIVATE libs/catch2)
@@ -115,7 +115,7 @@ if (${SST_EFFECTS_BUILD_TESTS})
         add_executable(CLIExample
             examples/CLIExample.cpp
         )
-        target_link_libraries(CLIExample PUBLIC dr_libs CLI11::CLI11 simde sst-basic-blocks sst-plugininfra::tinyxml sst-filters sst-waveshapers fmt ${PROJECT_NAME})
+        target_link_libraries(CLIExample PUBLIC dr_libs CLI11::CLI11 simde sst-basic-blocks sst-filters sst-waveshapers fmt ${PROJECT_NAME})
         target_compile_definitions(CLIExample PUBLIC _USE_MATH_DEFINES=1)
 
     endif()
@@ -126,6 +126,15 @@ endif ()
 if (TARGET sst-plugininfra::tinyxml)
     message(STATUS "Implementing preset support for sst-effects")
     target_compile_definitions(${PROJECT_NAME} INTERFACE SST_EFFECTS_PRESETS=1)
+    include(cmake/CmakeRC.cmake)
+
+    file(GLOB_RECURSE PRESETS "presets/**")
+
+    cmrc_add_resource_library(${PROJECT_NAME}-presets NAMESPACE sst_effects_presets ${PRESETS})
+    add_library(${PROJECT_NAME}-preset-api STATIC src/preset-api.cpp)
+    target_include_directories(${PROJECT_NAME}-preset-api PUBLIC src)
+    target_link_libraries(${PROJECT_NAME}-preset-api ${PROJECT_NAME}-presets)
+    target_link_libraries(${PROJECT_NAME} INTERFACE ${PROJECT_NAME}-preset-api sst-plugininfra::tinyxml)
 endif()
 
 
