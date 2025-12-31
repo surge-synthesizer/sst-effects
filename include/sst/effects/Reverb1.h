@@ -170,6 +170,7 @@ Reverb1<FXConfig>::Reverb1(typename FXConfig::GlobalStorage *s, typename FXConfi
                            typename FXConfig::ValueStorage *p)
     : core::EffectTemplateBase<FXConfig>(s, e, p), band1(s), locut(s), hicut(s)
 {
+    static_assert(core::ValidEffect<Reverb1>);
 }
 
 template <typename FXConfig> inline void Reverb1<FXConfig>::initialize()

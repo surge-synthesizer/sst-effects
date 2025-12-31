@@ -80,6 +80,7 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
                 typename FXConfig::ValueStorage *p)
         : core::EffectTemplateBase<FXConfig>(s, e, p)
     {
+        static_assert(core::ValidEffect<FloatyDelay>);
     }
 
     void suspendProcessing() { initialize(); }

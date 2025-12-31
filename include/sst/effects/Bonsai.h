@@ -821,6 +821,7 @@ template <typename FXConfig> struct Bonsai : core::EffectTemplateBase<FXConfig>
            typename FXConfig::ValueStorage *p)
         : core::EffectTemplateBase<FXConfig>(s, e, p)
     {
+        static_assert(core::ValidEffect<Bonsai>);
     }
 
     void initialize();

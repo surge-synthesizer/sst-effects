@@ -82,54 +82,71 @@
 #include "EffectCoreDetails.h"
 
 #include <type_traits>
+#include <concepts>
 
 static_assert(__cplusplus >= 202002L, "Surge team libraries have moved to C++ 20");
 
 namespace sst::effects::core
 {
-// Todo: as we port consider this FXConfig::BaseClass being a bit more configurable.
+
+template <int S>
+concept ValidBlockSize = (S & (S - 1)) == 0 && S >= 4;
+
 template <typename FXConfig>
+concept ValidEffectConfiguration =
+    requires {
+        // required constants and types
+        { FXConfig::blockSize } -> std::convertible_to<const int>;
+        typename FXConfig::BaseClass;
+        typename FXConfig::GlobalStorage;
+        typename FXConfig::EffectStorage;
+        typename FXConfig::ValueStorage;
+        typename FXConfig::BiquadAdapter;
+    } && ValidBlockSize<FXConfig::blockSize> && std::is_class_v<typename FXConfig::BaseClass> &&
+    std::is_class_v<typename FXConfig::BiquadAdapter> &&
+    requires(typename FXConfig::BaseClass *bc, const typename FXConfig::BaseClass *const cbc,
+             typename FXConfig::GlobalStorage *gs, typename FXConfig::EffectStorage *es,
+             typename FXConfig::ValueStorage *vs, int idx, float f) {
+        // value accessors
+        { FXConfig::floatValueAt(cbc, vs, idx) } -> std::convertible_to<float>;
+        { FXConfig::intValueAt(cbc, vs, idx) } -> std::convertible_to<int>;
+        // rate and sync
+        { FXConfig::envelopeRateLinear(gs, f) } -> std::convertible_to<float>;
+        { FXConfig::temposyncRatio(gs, es, idx) } -> std::convertible_to<float>;
+        // flags
+        { FXConfig::isDeactivated(es, idx) } -> std::convertible_to<bool>;
+        { FXConfig::isExtended(es, idx) } -> std::convertible_to<bool>;
+        // environment
+        { FXConfig::rand01(gs) } -> std::convertible_to<float>;
+        { FXConfig::sampleRate(gs) } -> std::convertible_to<double>;
+        { FXConfig::noteToPitch(gs, f) } -> std::convertible_to<float>;
+        { FXConfig::noteToPitchIgnoringTuning(gs, f) } -> std::convertible_to<float>;
+        { FXConfig::noteToPitchInv(gs, f) } -> std::convertible_to<float>;
+        { FXConfig::dbToLinear(gs, f) } -> std::convertible_to<float>;
+    };
+
+// Requirements for a concrete, instantiated effect type T
+template <typename T>
+concept ValidEffect = requires(T t, const T ct, int idx, float *L, float *R) {
+    // static members
+    { T::streamingName } -> std::convertible_to<const char *>;
+    { T::displayName } -> std::convertible_to<const char *>;
+    { T::numParams };
+    // methods
+    { t.initialize() } -> std::same_as<void>;
+    { t.processBlock(L, R) } -> std::same_as<void>;
+    { t.suspendProcessing() } -> std::same_as<void>;
+    { ct.getRingoutDecay() } -> std::convertible_to<int>;
+    { ct.paramAt(idx) };
+    { t.onSampleRateChanged() } -> std::same_as<void>;
+};
+
+template <ValidEffectConfiguration FXConfig>
 struct EffectTemplateBase
     : public FXConfig::BaseClass,
       effects_shared::WidthProvider<EffectTemplateBase<FXConfig>, FXConfig::blockSize>
 {
     using FXConfig_t = FXConfig;
-
-    static_assert(std::is_integral<decltype(FXConfig::blockSize)>::value);
-    static_assert(!(FXConfig::blockSize & (FXConfig::blockSize - 1))); // 2^n
-    static_assert(FXConfig::blockSize >= 4);                           // > simd register length
-    static_assert(std::is_class<typename FXConfig::BaseClass>::value);
-    static_assert(std::is_pointer<typename FXConfig::GlobalStorage *>::value);
-    static_assert(std::is_pointer<typename FXConfig::EffectStorage *>::value);
-    static_assert(std::is_class<typename FXConfig::BiquadAdapter>::value);
-    static_assert(std::is_pointer<typename FXConfig::ValueStorage *>::value);
-    static_assert(std::is_same<decltype(FXConfig::floatValueAt),
-                               float(const typename FXConfig::BaseClass *const,
-                                     const typename FXConfig::ValueStorage *const, int)>::value);
-    static_assert(std::is_same<decltype(FXConfig::intValueAt),
-                               int(const typename FXConfig::BaseClass *const,
-                                   const typename FXConfig::ValueStorage *const, int)>::value);
-    static_assert(std::is_same<decltype(FXConfig::envelopeRateLinear),
-                               float(typename FXConfig::GlobalStorage *, float)>::value);
-    static_assert(std::is_same<decltype(FXConfig::temposyncRatio),
-                               float(typename FXConfig::GlobalStorage *,
-                                     typename FXConfig::EffectStorage *, int)>::value);
-    static_assert(std::is_same<decltype(FXConfig::isDeactivated),
-                               bool(typename FXConfig::EffectStorage *, int)>::value);
-    static_assert(std::is_same<decltype(FXConfig::isExtended),
-                               bool(typename FXConfig::EffectStorage *, int)>::value);
-    static_assert(
-        std::is_same<decltype(FXConfig::rand01), float(typename FXConfig::GlobalStorage *)>::value);
-    static_assert(std::is_same<decltype(FXConfig::sampleRate),
-                               double(typename FXConfig::GlobalStorage *)>::value);
-    static_assert(std::is_same<decltype(FXConfig::noteToPitch),
-                               float(typename FXConfig::GlobalStorage *, float)>::value);
-    static_assert(std::is_same<decltype(FXConfig::noteToPitchIgnoringTuning),
-                               float(typename FXConfig::GlobalStorage *, float)>::value);
-    static_assert(std::is_same<decltype(FXConfig::noteToPitchInv),
-                               float(typename FXConfig::GlobalStorage *, float)>::value);
-    static_assert(std::is_same<decltype(FXConfig::dbToLinear),
-                               float(typename FXConfig::GlobalStorage *, float)>::value);
 
     typename FXConfig::GlobalStorage *globalStorage{nullptr};
     typename FXConfig::EffectStorage *fxStorage{nullptr};

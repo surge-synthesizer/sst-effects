@@ -81,6 +81,9 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
           typename FXConfig::ValueStorage *p)
         : core::EffectTemplateBase<FXConfig>(s, e, p), lp(s), hp(s)
     {
+        // Ensure template meets core effect concept
+        static_assert(core::ValidEffect<Delay>);
+
         // We should no longer need this
         mix.set_blocksize(FXConfig::blockSize);
         pan.set_blocksize(FXConfig::blockSize);
