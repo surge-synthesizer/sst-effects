@@ -60,6 +60,7 @@ struct TreeMonster
                 typename FXConfig::ValueStorage *p)
         : parent_t(s, e, p)
     {
+        static_assert(core::ValidEffect<TreeMonster>);
         this->lp.storage = s;
         this->hp.storage = s;
     }

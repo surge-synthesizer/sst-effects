@@ -74,6 +74,7 @@ template <typename FXConfig> struct RotarySpeaker : core::EffectTemplateBase<FXC
                   typename FXConfig::ValueStorage *p)
         : core::EffectTemplateBase<FXConfig>(s, e, p), xover(s), lowbass(s)
     {
+        static_assert(core::ValidEffect<RotarySpeaker>);
         mix.set_blocksize(FXConfig::blockSize);
         widthS.set_blocksize(FXConfig::blockSize);
         widthM.set_blocksize(FXConfig::blockSize);

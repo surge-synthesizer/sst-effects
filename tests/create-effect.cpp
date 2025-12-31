@@ -22,6 +22,7 @@
 #include <type_traits>
 #include "catch2.hpp"
 #include "sst/basic-blocks/simd/setup.h"
+#include "sst/effects/EffectCore.h"
 
 #include "sst/effects/Delay.h"
 #include "sst/effects/FloatyDelay.h"
@@ -96,16 +97,7 @@ struct TestConfig
 
 template <typename T> struct Tester
 {
-    static_assert(std::is_same<decltype(T::streamingName), const char *const>::value);
-    static_assert(std::is_integral<decltype(T::numParams)>::value);
-    static_assert(std::is_same<decltype(&T::initialize), void (T::*)()>::value);
-    static_assert(std::is_same<decltype(&T::processBlock),
-                               void (T::*)(float *__restrict, float *__restrict)>::value);
-    static_assert(std::is_same<decltype(&T::suspendProcessing), void (T::*)()>::value);
-    static_assert(std::is_same<decltype(&T::getRingoutDecay), int (T::*)() const>::value);
-    static_assert(std::is_same<decltype(&T::paramAt),
-                               sst::basic_blocks::params::ParamMetaData (T::*)(int) const>::value);
-    static_assert(std::is_same<decltype(&T::onSampleRateChanged), void (T::*)()>::value);
+    static_assert(sst::effects::core::ValidEffect<T>);
 
     static void TestFX()
     {

@@ -47,6 +47,7 @@ Nimbus<FXConfig>::Nimbus(typename FXConfig::GlobalStorage *s, typename FXConfig:
                          typename FXConfig::ValueStorage *p)
     : core::EffectTemplateBase<FXConfig>(s, e, p)
 {
+    static_assert(core::ValidEffect<Nimbus>);
     const int memLen = 118784;
     const int ccmLen = 65536 - 128;
     block_mem = new uint8_t[memLen]();

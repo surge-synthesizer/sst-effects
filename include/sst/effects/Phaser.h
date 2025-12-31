@@ -65,6 +65,7 @@ template <typename FXConfig> struct Phaser : core::EffectTemplateBase<FXConfig>
            typename FXConfig::ValueStorage *p)
         : core::EffectTemplateBase<FXConfig>(s, e, p), lp(s), hp(s)
     {
+        static_assert(core::ValidEffect<Phaser>);
         for (int i = 0; i < n_bq_units; i++)
         {
             biquad[i] = new BiquadFilter(this->globalStorage);

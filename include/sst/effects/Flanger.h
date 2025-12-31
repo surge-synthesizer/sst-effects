@@ -82,6 +82,7 @@ template <typename FXConfig> struct Flanger : core::EffectTemplateBase<FXConfig>
             typename FXConfig::ValueStorage *p)
         : core::EffectTemplateBase<FXConfig>(s, e, p)
     {
+        static_assert(core::ValidEffect<Flanger>);
     }
 
     void initialize();

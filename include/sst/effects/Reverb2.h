@@ -256,6 +256,7 @@ Reverb2<FXConfig>::Reverb2(typename FXConfig::GlobalStorage *s, typename FXConfi
                            typename FXConfig::ValueStorage *p)
     : core::EffectTemplateBase<FXConfig>(s, e, p)
 {
+    static_assert(core::ValidEffect<Reverb2>);
     _state = 0.f;
 }
 
