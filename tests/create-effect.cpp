@@ -96,7 +96,7 @@ struct TestConfig
 
 template <typename T> struct Tester
 {
-    static_assert(std::is_same<decltype(T::effectName), const char *const>::value);
+    static_assert(std::is_same<decltype(T::streamingName), const char *const>::value);
     static_assert(std::is_integral<decltype(T::numParams)>::value);
     static_assert(std::is_same<decltype(&T::initialize), void (T::*)()>::value);
     static_assert(std::is_same<decltype(&T::processBlock),
@@ -109,7 +109,7 @@ template <typename T> struct Tester
 
     static void TestFX()
     {
-        INFO("Starting test with instantiation : " << T::effectName);
+        INFO("Starting test with instantiation : " << T::streamingName);
         auto fx = std::make_unique<T>(nullptr, nullptr, nullptr);
         REQUIRE(fx);
     };

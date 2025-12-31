@@ -40,7 +40,7 @@ namespace sfx = sst::effects;
 
 template <typename T> struct Tester
 {
-    static_assert(std::is_same<decltype(T::effectName), const char *const>::value);
+    static_assert(std::is_same<decltype(T::streamingName), const char *const>::value);
     static_assert(std::is_integral<decltype(T::numParams)>::value);
     static_assert(std::is_same<decltype(&T::initialize), void (T::*)()>::value);
     static_assert(std::is_same<decltype(&T::processBlock),
@@ -54,7 +54,7 @@ template <typename T> struct Tester
     {
         using FX = T;
 
-        INFO("Starting test with concrete implementation " << T::effectName);
+        INFO("Starting test with concrete implementation " << T::streamingName);
 
         auto gs = sst::effects::core::ConcreteConfig::GlobalStorage(48000);
         auto es = sfx::core::ConcreteConfig::EffectStorage();
