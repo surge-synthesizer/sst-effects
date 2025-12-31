@@ -58,7 +58,8 @@ template <typename FXConfig> struct Nimbus : core::EffectTemplateBase<FXConfig>
         std::cerr << "Warning: Using nimbus without eurorack module" << std::endl;
     }
 
-    static constexpr const char *effectName{"nimbus"};
+    static constexpr const char *streamingName{"nimbus"};
+    static constexpr const char *displayName{"Nimbus - Deactivated"};
     static constexpr int numParams{0};
     void initialize() {}
     void processBlock(float *__restrict, float *__restrict) {}
@@ -103,7 +104,8 @@ template <typename FXConfig> struct Nimbus : core::EffectTemplateBase<FXConfig>
         nmb_num_params,
     };
     static constexpr int numParams{nmb_num_params};
-    static constexpr const char *effectName{"nimbus"};
+    static constexpr const char *streamingName{"nimbus"};
+    static constexpr const char *displayName{"Nimbus"};
 
     Nimbus(typename FXConfig::GlobalStorage *s, typename FXConfig::EffectStorage *e,
            typename FXConfig::ValueStorage *p);

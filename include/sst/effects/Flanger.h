@@ -75,7 +75,8 @@ template <typename FXConfig> struct Flanger : core::EffectTemplateBase<FXConfig>
     };
 
     static constexpr int numParams{fl_num_params};
-    static constexpr const char *effectName{"flanger"};
+    static constexpr const char *streamingName{"flanger"};
+    static constexpr const char *displayName{"Flanger"};
 
     Flanger(typename FXConfig::GlobalStorage *s, typename FXConfig::EffectStorage *e,
             typename FXConfig::ValueStorage *p)

@@ -53,7 +53,8 @@ struct TreeMonster
         typename core::EffectTemplateBase<FXConfig>::BiquadFilterType>;
 
     static constexpr int numParams{parent_t::tm_num_ctrls};
-    static constexpr const char *effectName{"treemonster"};
+    static constexpr const char *streamingName{"treemonster"};
+    static constexpr const char *displayName{"Treemonster"};
 
     TreeMonster(typename FXConfig::GlobalStorage *s, typename FXConfig::EffectStorage *e,
                 typename FXConfig::ValueStorage *p)
