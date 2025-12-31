@@ -71,7 +71,8 @@ template <typename FXConfig> struct FloatyDelay : core::EffectTemplateBase<FXCon
     };
 
     static constexpr int numParams{fld_num_params};
-    static constexpr const char *effectName{"Floaty Delay"};
+    static constexpr const char *streamingName{"floatydelay"};
+    static constexpr const char *displayName{"Floaty Delay"};
 
     basic_blocks::dsp::RNG rng;
 

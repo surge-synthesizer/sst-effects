@@ -814,7 +814,8 @@ template <typename FXConfig> struct Bonsai : core::EffectTemplateBase<FXConfig>
     };
 
     static constexpr int numParams{b_num_params};
-    static constexpr const char *effectName{"bonsai"};
+    static constexpr const char *streamingName{"bonsai"};
+    static constexpr const char *displayName{"Bonsai"};
 
     Bonsai(typename FXConfig::GlobalStorage *s, typename FXConfig::EffectStorage *e,
            typename FXConfig::ValueStorage *p)

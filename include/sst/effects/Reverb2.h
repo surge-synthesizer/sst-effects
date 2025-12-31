@@ -57,7 +57,8 @@ template <typename FXConfig> struct Reverb2 : core::EffectTemplateBase<FXConfig>
     };
 
     static constexpr int numParams{rev2_mix + 1};
-    static constexpr const char *effectName{"reverb2"};
+    static constexpr const char *streamingName{"reverb2"};
+    static constexpr const char *displayName{"Reverb 2"};
 
     static constexpr int NUM_BLOCKS = 4;
     static constexpr int NUM_INPUT_ALLPASSES = 4;

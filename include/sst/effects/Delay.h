@@ -74,7 +74,8 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
     };
 
     static constexpr int numParams{dly_num_params};
-    static constexpr const char *effectName{"delay"};
+    static constexpr const char *streamingName{"delay"};
+    static constexpr const char *displayName{"Dual Delay"};
 
     Delay(typename FXConfig::GlobalStorage *s, typename FXConfig::EffectStorage *e,
           typename FXConfig::ValueStorage *p)

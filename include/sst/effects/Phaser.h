@@ -58,7 +58,8 @@ template <typename FXConfig> struct Phaser : core::EffectTemplateBase<FXConfig>
     using BiquadFilter = typename core::EffectTemplateBase<FXConfig>::BiquadFilterType;
 
     static constexpr int numParams{ph_num_params};
-    static constexpr const char *effectName{"phaser"};
+    static constexpr const char *streamingName{"phaser"};
+    static constexpr const char *displayName{"Phaser"};
 
     Phaser(typename FXConfig::GlobalStorage *s, typename FXConfig::EffectStorage *e,
            typename FXConfig::ValueStorage *p)

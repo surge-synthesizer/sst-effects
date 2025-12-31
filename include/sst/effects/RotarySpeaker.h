@@ -63,7 +63,8 @@ template <typename FXConfig> struct RotarySpeaker : core::EffectTemplateBase<FXC
         sst::waveshapers::WaveshaperType::wst_fuzzsoft};
 
     static constexpr int numParams{rot_num_params};
-    static constexpr const char *effectName{"rotaryspeaker"};
+    static constexpr const char *streamingName{"rotaryspeaker"};
+    static constexpr const char *displayName{"Rotary Speaker"};
 
     typename core::EffectTemplateBase<FXConfig>::lipol_ps_blocksz widthS alignas(16),
         widthM alignas(16), mix alignas(16);
