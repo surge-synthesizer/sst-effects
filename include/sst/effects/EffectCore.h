@@ -116,6 +116,7 @@ concept ValidEffectConfiguration =
         // flags
         { FXConfig::isDeactivated(es, idx) } -> std::convertible_to<bool>;
         { FXConfig::isExtended(es, idx) } -> std::convertible_to<bool>;
+        { FXConfig::isTemposynced(es, idx) } -> std::convertible_to<bool>;
         // environment
         { FXConfig::rand01(gs) } -> std::convertible_to<float>;
         { FXConfig::sampleRate(gs) } -> std::convertible_to<double>;
