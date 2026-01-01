@@ -74,6 +74,7 @@ struct TestConfig
     static inline float temposyncRatio(GlobalStorage *s, EffectStorage *e, int idx) { return 1; }
 
     static inline bool isDeactivated(EffectStorage *e, int idx) { return false; }
+    static inline bool isTemposynced(EffectStorage *e, int idx) { return false; }
 
     static inline bool isExtended(EffectStorage *s, int idx) { return false; }
 

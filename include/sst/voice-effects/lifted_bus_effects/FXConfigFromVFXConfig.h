@@ -61,6 +61,8 @@ template <typename BASE> struct FXConfigFromVFXConfig
         return s->getTempoSyncRatio();
     }
 
+    static inline bool isTemposynced(EffectStorage *e, int idx) { return e->isTemposync; }
+
     static inline bool isDeactivated(EffectStorage *e, int idx) { return false; }
 
     static inline bool isExtended(EffectStorage *s, int idx) { return false; }

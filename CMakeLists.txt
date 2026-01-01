@@ -95,6 +95,8 @@ if (${SST_EFFECTS_BUILD_TESTS})
         target_compile_options(${PROJECT_NAME}-test PRIVATE -march=native)
     endif ()
 
+    set_target_properties(${PROJECT_NAME}-test PROPERTIES UNITY_BUILD FALSE)
+
 
     if(${SST_EFFECTS_BUILD_EXAMPLES})
         message(STATUS "Building Examples / CLI Driver")
@@ -117,7 +119,7 @@ if (${SST_EFFECTS_BUILD_TESTS})
         )
         target_link_libraries(CLIExample PUBLIC dr_libs CLI11::CLI11 simde sst-basic-blocks sst-filters sst-waveshapers fmt ${PROJECT_NAME})
         target_compile_definitions(CLIExample PUBLIC _USE_MATH_DEFINES=1)
-
+        set_target_properties(CLIExample PROPERTIES UNITY_BUILD FALSE)
     endif()
 
 endif ()
