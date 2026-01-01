@@ -163,7 +163,7 @@ struct ConcreteConfig
     }
     static inline float temposyncRatio(GlobalStorage *s, EffectStorage *e, int idx) { return 1; }
     static inline bool isDeactivated(EffectStorage *e, int idx) { return false; }
-    static inline bool isTemposycned(EffectStorage *e, int idx) { return false; }
+    static inline bool isTemposynced(EffectStorage *e, int idx) { return false; }
     static inline bool isExtended(EffectStorage *e, int idx) { return false; }
     static inline float rand01(GlobalStorage *s) { return (float)rand() / (float)RAND_MAX; }
     static inline double sampleRate(GlobalStorage *s) { return s->sampleRate; }
