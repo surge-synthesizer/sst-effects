@@ -207,6 +207,7 @@ TEST_CASE("Can Create Voice FX")
     }
     SECTION("Voice Flanger")
     {
-        VTester<sst::voice_effects::modulation::VoiceFlanger<VTestConfig>>::TestVFX();
+        sst::basic_blocks::tables::SimpleSineProvider s;
+        VTester<sst::voice_effects::modulation::VoiceFlanger<VTestConfig>>::TestVFX(s);
     }
 }
