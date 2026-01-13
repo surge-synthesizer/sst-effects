@@ -46,16 +46,12 @@ namespace sst::voice_effects::modulation
 #define SETALL(a) SIMD_MM(set1_ps)(a)
 #define SHUFFLE(a, b) SIMD_MM(shuffle_ps)(a, a, SIMD_MM_SHUFFLE(3 + b, 2 + b, 1 + b, 0 + b))
 
-template <typename VFXConfig> struct Flanger : core::VoiceEffectTemplateBase<VFXConfig>
+template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBase<VFXConfig>
 {
-    static constexpr const char *displayName{"Flanger"};
+    static constexpr const char *displayName{"VoiceFlanger"};
     static constexpr const char *streamingName{"voice-flanger"};
 
-    /*
-     * 50ms is what the chorus gets. Let's give this one the same amount of memory.
-     * It's got 4 lines total instead of two per channel. So each one gets a quarter of that.
-     * 50 / 4 = 12.5ms or about 80Hz
-     */
+    // really we just need enough for 4 * 110Hz
     static constexpr float maxTotalMilliseconds{50};
 
     static constexpr int numFloatParams{4};
@@ -81,11 +77,11 @@ template <typename VFXConfig> struct Flanger : core::VoiceEffectTemplateBase<VFX
     using SineTable = basic_blocks::tables::SimpleSineProvider;
     SineTable &sT;
 
-    Flanger(SineTable &sineTable)
-        : core::VoiceEffectTemplateBase<VFXConfig>(), sT(sineTable), modProc(&sT)
+    VoiceFlanger(SineTable &sineTable)
+        : core::VoiceEffectTemplateBase<VFXConfig>(), sT(sineTable), quadHelper(&sT)
     {
     }
-    ~Flanger() { modLines.returnAll(this); }
+    ~VoiceFlanger() { modLines.returnAll(this); }
 
     basic_blocks::params::ParamMetaData paramAt(int idx) const
     {
@@ -101,10 +97,10 @@ template <typename VFXConfig> struct Flanger : core::VoiceEffectTemplateBase<VFX
                 .asFloat()
                 .withName("Base Freq")
                 .withSemitoneZeroAt440Formatting()
-                .withDefault(-12)
-                .withRange(-24, 0.f);
+                .withDefault(-0)
+                .withRange(-24, 24.f);
         case fpFeedback:
-            return pmd().asPercent().withDefault(0.f).withName("Feedback");
+            return pmd().asPercent().withDefault(0.75f).withName("Feedback");
         case fpRate:
             return pmd().asLfoRate(-7, 3.3219280f).withDefault(-2).withName("Rate");
         case fpDepth:
@@ -239,7 +235,7 @@ template <typename VFXConfig> struct Flanger : core::VoiceEffectTemplateBase<VFX
         }
 
         SIMD_M128 lv, pl, pr; // lfo values, left pan factors, right pan factors
-        modProc.newValues(currentPhase,  lv, pl, pr);
+        quadHelper.newValues(currentPhase, lv, pl, pr);
 
         // the 5% downscale prevents delay time hitting 0. Sounds bad-ish if it does.
         auto depth = .95f * std::clamp(this->getFloatParam(fpDepth), 0.f, 1.f);
@@ -267,11 +263,11 @@ template <typename VFXConfig> struct Flanger : core::VoiceEffectTemplateBase<VFX
         for (int i = 0; i < VFXConfig::blockSize; ++i)
         {
             auto fromModLine = lines->read(time[i]);
-            Qcomp::panLinesToOutputs(leftPans[i], rightPans[i], fromModLine, dataoutL[i],
+            QuadHelper::panLinesToOutputs(leftPans[i], rightPans[i], fromModLine, dataoutL[i],
                                      dataoutR[i]);
 
             SIMD_M128 inputs =
-                Qcomp::balancedMonoSum(leftPans[i], rightPans[i], datainL[i], datainR[i]);
+                QuadHelper::balancedMonoSum(leftPans[i], rightPans[i], datainL[i], datainR[i]);
 
             auto backToLine = MUL(SETALL(fbAmt[i]), fromModLine);
 
@@ -289,9 +285,82 @@ template <typename VFXConfig> struct Flanger : core::VoiceEffectTemplateBase<VFX
         mech::scale_by<VFXConfig::blockSize>(.5f, dataoutL, dataoutR);
     }
 
-    template <typename T> void monoImpl(T *line, const float *const datainL, float *dataoutL)
+    template <typename T>
+    void monoImpl(T *lines, const float *const datain, float *dataout, float pitch)
     {
         namespace mech = sst::basic_blocks::mechanics;
+
+        float p = this->getFloatParam(fpRoot) + (pitch * keytrackOn);
+        while (p < -24)
+        {
+            p += 12.f;
+        }
+        auto freqSSE =
+            MUL(DIV(ONE, MUL(SETALL(440 * this->note_to_pitch_ignoring_tuning(p)), COMBSPACE)),
+                SampleRateSSE);
+
+        fixTimeLerp.set_targets(freqSSE);
+        SIMD_M128 fixedTime[VFXConfig::blockSize];
+        fixTimeLerp.store_block(fixedTime);
+
+        double rate = this->envelope_rate_linear_nowrap(-this->getFloatParam(fpRate)) *
+                      this->getTempoSyncRatio();
+
+        lfoPhase = std::fmod(lfoPhase + rate, 1.f);
+        monoLfoPhase = std::fmod(lfoPhase + rate * .6666667f, 1.f);
+        float curLFOPhase{lfoPhase};
+        float curLevPhase{lfoPhase};
+
+        if (this->getIntParam(ipBehavior))
+        {
+            if (lfoPhase - rate <= 0.f)
+            {
+                rnd_hist[3] = rnd_hist[2];
+                rnd_hist[2] = rnd_hist[1];
+                rnd_hist[1] = rnd_hist[0];
+                rnd_hist[0] = rng.unif01();
+            }
+            curLFOPhase = sst::basic_blocks::dsp::cubic_ipol(rnd_hist[3], rnd_hist[2], rnd_hist[1],
+                                                              rnd_hist[0], lfoPhase);
+        }
+
+        SIMD_M128 lfov, levv; // lfo values, level values
+        quadHelper.monoLFOVals(curLFOPhase, lfov);
+        quadHelper.monoLevels(curLevPhase, levv);
+
+        auto depth = .95f * std::clamp(this->getFloatParam(fpDepth), 0.f, 1.f);
+        modTimeLerp.set_targets(ADD(freqSSE, MUL(MUL(lfov, freqSSE), SETALL(depth))));
+        SIMD_M128 time[VFXConfig::blockSize];
+        modTimeLerp.store_block(time);
+
+        leftLerp.set_targets(levv);
+        SIMD_M128 levels[VFXConfig::blockSize];
+        leftLerp.store_block(levels);
+
+        auto fbp = std::clamp(this->getFloatParam(fpFeedback), 0.f, 1.f);
+        feedbackLerp.set_target(fbp * fbp);
+        float fbAmt alignas(16)[VFXConfig::blockSize];
+        feedbackLerp.store_block(fbAmt);
+
+        // -1 or 1
+        SIMD_M128 POL = SETALL(1.f - this->getIntParam(ipPolarity) * 2.f);
+
+        LPfilter.prepareBlock();
+        for (int i = 0; i < VFXConfig::blockSize; ++i)
+        {
+            auto fromModLine = lines->read(time[i]);
+            dataout[i] = .5f * mech::hsum_ps(MUL(levels[i], fromModLine));
+
+            auto backToLine = MUL(SETALL(fbAmt[i]), fromModLine);
+            backToLine = DIV(MUL(backToLine, SQRT2), ADD(ONE, MUL(backToLine, backToLine)));
+            backToLine = LPfilter.processSample(backToLine);
+            backToLine = MUL(backToLine, POL);
+
+            SIMD_M128 inputs = MUL(levels[i], SETALL(datain[i]));
+            lines->write(ADD(inputs, backToLine));
+        }
+        LPfilter.concludeBlock();
+        DCblocker.processBlock<VFXConfig::blockSize>(dataout, dataout);
     }
 
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
@@ -306,18 +375,24 @@ template <typename VFXConfig> struct Flanger : core::VoiceEffectTemplateBase<VFX
     void processMonoToStereo(const float *const datain, float *dataoutL, float *dataoutR,
                              float pitch)
     {
-        processStereo(datain, datain, dataoutL, dataoutR, pitch);
+        namespace mech = sst::basic_blocks::mechanics;
+
+        float dataInv alignas(16)[VFXConfig::blockSize];
+        mech::copy_from_to<VFXConfig::blockSize>(datain, dataInv);
+        mech::scale_by<VFXConfig::blockSize>(-0.f, dataInv);
+
+        processStereo(dataInv, datain, dataoutL, dataoutR, pitch);
     }
 
-    // void processMonoToMono(const float *const datain, float *dataout, float pitch)
-    // {
-    //     modLines.dispatch(lineSize(), [&](auto N) {
-    //         auto *line = modLines.template getLinePointer<N>();
-    //         monoImpl(line, datain, dataout);
-    //     });
-    // }
-    //
-    // bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
+    void processMonoToMono(const float *const datain, float *dataout, float pitch)
+    {
+        modLines.dispatch(lineSize(), [&](auto N) {
+            auto *lines = modLines.template getLinePointer<N>();
+            monoImpl(lines, datain, dataout, pitch);
+        });
+    }
+
+    bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
 
     size_t silentSamplesLength() const
     {
@@ -342,6 +417,7 @@ template <typename VFXConfig> struct Flanger : core::VoiceEffectTemplateBase<VFX
     filters::CytomicSVF DCblocker;
 
     float lfoPhase;
+    float monoLfoPhase;
     float rnd_hist[4] = {0, 0, 0, 0};
 
     const SIMD_M128 ONE = SETALL(1.f);
@@ -353,26 +429,25 @@ template <typename VFXConfig> struct Flanger : core::VoiceEffectTemplateBase<VFX
     const SIMD_M128 COMBSPACE = SIMD_MM(set_ps)(2.25f, 1.75f, 1.5, 1.f);
     SIMD_M128 SampleRateSSE{};
 
-    /* This gives you 4 sine outputs at 0, 90°, 180° and 270°,
-     * plus 4 sines for panning the 4 signals
-     * around in sync with the modulation.
-     * If you feed in a ramp or saw you get the regular tri/sine,
-     * But you can also feed in other waveforms and retain the quadrature relations
-     * See basic_blocks::Modulators::FXModControl for more detail.
-     */
-    struct Qcomp
+    struct QuadHelper
     {
-        Qcomp(SineTable *sineTable) : sine(sineTable->table)
+        QuadHelper(SineTable *sineTable) : sine(sineTable->table)
         {
             auto tS = static_cast<float>(sineTable->tableSize);
             auto tM = sineTable->tableSize - 1;
             LFO_TABLE_SIZE_SSE = SIMD_MM(set1_ps)(tS);
             LFO_TABLE_MASK_SSE = SIMD_MM(set1_epi32)(tM);
         }
-        ~Qcomp() {}
+        ~QuadHelper() {}
 
-        inline void newValues(float phase, SIMD_M128 &lfoVals, SIMD_M128 &panL,
-                              SIMD_M128 &panR)
+        /* This gives you 4 sine outputs at 0, 90°, 180° and 270°,
+         * plus 4 sines for panning the 4 signals
+         * around in sync with the modulation.
+         * If you feed in a ramp or saw you get the regular tri/sine,
+         * But you can also feed in other waveforms and retain the quadrature relations
+         * See basic_blocks::Modulators::FXModControl for more detail.
+         */
+        inline void newValues(float phase, SIMD_M128 &lfoVals, SIMD_M128 &panL, SIMD_M128 &panR)
         {
             assert(sine != nullptr);
             assert(0 <= phase && phase <= 1);
@@ -394,10 +469,6 @@ template <typename VFXConfig> struct Flanger : core::VoiceEffectTemplateBase<VFX
 
             lfoVals = SHUFFLE(ADD(MUL(liv, SUB(oneSSE, lipsf)), MUL(lipsf, livn)), 1);
 
-            // lfoVals = SUB(
-            //     MUL(twoSSE, basic_blocks::mechanics::abs_ps(SUB(MUL(twoSSE, quadPhase),
-            //     oneSSE))), oneSSE);
-
             quadPhase = MUL(quadPhase, halfSSE);
 
             auto sips = MUL(quadPhase, LFO_TABLE_SIZE_SSE);
@@ -416,6 +487,55 @@ template <typename VFXConfig> struct Flanger : core::VoiceEffectTemplateBase<VFX
             panR = SHUFFLE(panL, 2);
         }
 
+        // these are similar, except do LFOval and level computations separately
+        // which is useful in MonoToMono mode
+        inline void monoLFOVals(float phase, SIMD_M128 &lfoVals)
+        {
+            assert(sine != nullptr);
+            assert(0 <= phase && phase <= 1);
+
+            auto quadPhase = ADD(SIMD_MM(set1_ps)(phase), OFFSETS);
+            quadPhase = SUB(quadPhase, SIMD_MM(floor_ps)(quadPhase));
+
+            auto lips = MUL(quadPhase, LFO_TABLE_SIZE_SSE);
+            auto lipsi = SIMD_MM(cvttps_epi32(lips));
+            auto lipsn = SIMD_MM(and_si128)(SIMD_MM(add_epi32)(lipsi, SIMD_MM(set1_epi32)(1)),
+                                            LFO_TABLE_MASK_SSE);
+            auto lipsf = SUB(lips, SIMD_MM(cvtepi32_ps)(lipsi));
+            SIMD_M128 liv = SIMD_MM(set_ps)(
+                sine[SIMD_MM(extract_epi32)(lipsi, 3)], sine[SIMD_MM(extract_epi32)(lipsi, 2)],
+                sine[SIMD_MM(extract_epi32)(lipsi, 1)], sine[SIMD_MM(extract_epi32)(lipsi, 0)]);
+            SIMD_M128 livn = SIMD_MM(set_ps)(
+                sine[SIMD_MM(extract_epi32)(lipsn, 3)], sine[SIMD_MM(extract_epi32)(lipsn, 2)],
+                sine[SIMD_MM(extract_epi32)(lipsn, 1)], sine[SIMD_MM(extract_epi32)(lipsn, 0)]);
+
+            lfoVals = SHUFFLE(ADD(MUL(liv, SUB(oneSSE, lipsf)), MUL(lipsf, livn)), 1);
+        }
+
+        inline void monoLevels(float phase, SIMD_M128 &levelVals)
+        {
+            assert(sine != nullptr);
+            assert(0 <= phase && phase <= 1);
+
+            auto quadPhase = ADD(SIMD_MM(set1_ps)(phase), OFFSETS);
+            quadPhase = SUB(quadPhase, SIMD_MM(floor_ps)(quadPhase));
+            quadPhase = MUL(quadPhase, halfSSE);
+
+            auto sips = MUL(quadPhase, LFO_TABLE_SIZE_SSE);
+            auto sipsi = SIMD_MM(cvttps_epi32(sips));
+            auto sipsn = SIMD_MM(and_si128)(SIMD_MM(add_epi32)(sipsi, SIMD_MM(set1_epi32)(1)),
+                                            LFO_TABLE_MASK_SSE);
+            auto sipsf = SUB(sips, SIMD_MM(cvtepi32_ps)(sipsi));
+            SIMD_M128 siv = SIMD_MM(set_ps)(
+                sine[SIMD_MM(extract_epi32)(sipsi, 3)], sine[SIMD_MM(extract_epi32)(sipsi, 2)],
+                sine[SIMD_MM(extract_epi32)(sipsi, 1)], sine[SIMD_MM(extract_epi32)(sipsi, 0)]);
+            SIMD_M128 sivn = SIMD_MM(set_ps)(
+                sine[SIMD_MM(extract_epi32)(sipsn, 3)], sine[SIMD_MM(extract_epi32)(sipsn, 2)],
+                sine[SIMD_MM(extract_epi32)(sipsn, 1)], sine[SIMD_MM(extract_epi32)(sipsn, 0)]);
+
+            levelVals = ADD(MUL(siv, SUB(oneSSE, sipsf)), MUL(sipsf, sivn));
+        }
+
         static SIMD_M128 balancedMonoSum(const SIMD_M128 fromL, const SIMD_M128 fromR, float inL,
                                          float inR)
         {
@@ -431,18 +551,19 @@ template <typename VFXConfig> struct Flanger : core::VoiceEffectTemplateBase<VFX
         }
 
       private:
-        const SIMD_M128 oneSSE{SETALL(1.0)};
-        const SIMD_M128 negoneSSE{SETALL(-1.0)};
-        const SIMD_M128 twoSSE{SETALL(2.0)};
-        const SIMD_M128 negtwoSSE{SETALL(-2.0)};
-        const SIMD_M128 halfSSE{SETALL(0.5)};
+        const SIMD_M128 oneSSE{SETALL(1.f)};
+        const SIMD_M128 negoneSSE{SETALL(-1.f)};
+        const SIMD_M128 twoSSE{SETALL(2.f)};
+        const SIMD_M128 negtwoSSE{SETALL(-2.f)};
+        const SIMD_M128 halfSSE{SETALL(0.5f)};
+        const SIMD_M128 fourSSE{SETALL(4.f)};
         // pointer to a float[8192] sine table
         float *sine{nullptr};
         SIMD_M128 LFO_TABLE_SIZE_SSE;
         SIMD_M128I LFO_TABLE_MASK_SSE;
         const SIMD_M128 OFFSETS = SIMD_MM(set_ps)(.75f, .5f, .25f, 0.f);
     };
-    Qcomp modProc;
+    QuadHelper quadHelper;
 
     /* A linear interpolator that processes
      * 4 values in parallel and gives you an array of
@@ -497,6 +618,7 @@ template <typename VFXConfig> struct Flanger : core::VoiceEffectTemplateBase<VFX
 #undef DIV
 #undef MUL
 #undef SETALL
+#undef SHUFFLE
 };
 } // namespace sst::voice_effects::modulation
 
