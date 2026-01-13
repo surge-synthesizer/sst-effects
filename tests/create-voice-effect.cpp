@@ -205,8 +205,8 @@ TEST_CASE("Can Create Voice FX")
     {
         VTester<sst::voice_effects::liftbus::LiftedDelay<VTestConfig>>::TestVFX();
     }
-    SECTION("Lifted Flanger")
+    SECTION("Voice Flanger")
     {
-        VTester<sst::voice_effects::liftbus::LiftedFlanger<VTestConfig>>::TestVFX();
+        VTester<sst::voice_effects::modulation::VoiceFlanger<VTestConfig>>::TestVFX();
     }
 }

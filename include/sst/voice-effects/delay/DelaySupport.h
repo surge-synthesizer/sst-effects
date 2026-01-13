@@ -26,7 +26,7 @@
 
 namespace sst::voice_effects::delay::details
 {
-template <template<int N> typename lineType> struct DelayLineSupport
+template <template <int N> typename lineType> struct DelayLineSupport
 {
     static constexpr int shortestN{12}, longestN{20};
     using SincTable = sst::basic_blocks::tables::SurgeSincTableProvider;
@@ -44,9 +44,8 @@ template <template<int N> typename lineType> struct DelayLineSupport
         auto lp = new (lineBuffer) LineN<N>(st);
         std::get<N - shortestN>(linePointers) = lp;
     }
-    // TODO: enable_if shenanigans
-    template <size_t N, typename MemoryPoolProvider>
-    void prepareLine(MemoryPoolProvider *mp)
+    // TODO: enable_if or concepts shenanigans
+    template <size_t N, typename MemoryPoolProvider> void prepareLine(MemoryPoolProvider *mp)
     {
         lineBuffer = mp->checkoutBlock(sizeof(LineN<N>));
         auto lp = new (lineBuffer) LineN<N>();

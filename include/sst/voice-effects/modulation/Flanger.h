@@ -264,7 +264,7 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
         {
             auto fromModLine = lines->read(time[i]);
             QuadHelper::panLinesToOutputs(leftPans[i], rightPans[i], fromModLine, dataoutL[i],
-                                     dataoutR[i]);
+                                          dataoutR[i]);
 
             SIMD_M128 inputs =
                 QuadHelper::balancedMonoSum(leftPans[i], rightPans[i], datainL[i], datainR[i]);
@@ -321,7 +321,7 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
                 rnd_hist[0] = rng.unif01();
             }
             curLFOPhase = sst::basic_blocks::dsp::cubic_ipol(rnd_hist[3], rnd_hist[2], rnd_hist[1],
-                                                              rnd_hist[0], lfoPhase);
+                                                             rnd_hist[0], lfoPhase);
         }
 
         SIMD_M128 lfov, levv; // lfo values, level values

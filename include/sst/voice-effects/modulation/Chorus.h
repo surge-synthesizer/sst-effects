@@ -365,7 +365,8 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
     size_t silentSamplesLength() const { return this->getSampleRate() * maxMiliseconds * .001f; }
 
   protected:
-    std::array<delay::details::DelayLineSupport<sst::basic_blocks::dsp::SSESincDelayLine>, 2> lineSupport;
+    std::array<delay::details::DelayLineSupport<sst::basic_blocks::dsp::SSESincDelayLine>, 2>
+        lineSupport;
 
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> feedbackLerp, timeLerp[2];
 
