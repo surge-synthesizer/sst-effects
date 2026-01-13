@@ -40,6 +40,7 @@
 #include "sst/voice-effects/filter/StaticPhaser.h"
 #include "sst/voice-effects/modulation/ShepardPhaser.h"
 #include "sst/voice-effects/modulation/Tremolo.h"
+#include "sst/voice-effects/modulation/Flanger.h"
 #include "sst/voice-effects/modulation/Phaser.h"
 #include "sst/voice-effects/modulation/FMFilter.h"
 #include "sst/voice-effects/generator/TiltNoise.h"
@@ -52,7 +53,6 @@
 #include "sst/voice-effects/lifted_bus_effects/LiftedReverb1.h"
 #include "sst/voice-effects/lifted_bus_effects/LiftedReverb2.h"
 #include "sst/voice-effects/lifted_bus_effects/LiftedDelay.h"
-#include "sst/voice-effects/lifted_bus_effects/LiftedFlanger.h"
 
 struct VTestConfig
 {
