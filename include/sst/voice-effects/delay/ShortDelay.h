@@ -26,8 +26,6 @@
 
 #include "../VoiceEffectCore.h"
 
-#include <iostream>
-
 #include "sst/basic-blocks/mechanics/block-ops.h"
 #include "sst/basic-blocks/dsp/SSESincDelayLine.h"
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
@@ -343,7 +341,7 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
 
     size_t silentSamplesLength() const { return this->getSampleRate() * maxMiliseconds * .001f; }
 
-    std::array<details::DelayLineSupport, 2> lineSupport;
+    std::array<details::DelayLineSupport<sst::basic_blocks::dsp::SSESincDelayLine>, 2> lineSupport;
 
     std::array<float, numFloatParams> mLastParam{};
 

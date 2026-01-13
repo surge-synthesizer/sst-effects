@@ -171,7 +171,7 @@ template <typename VFXConfig> struct Widener : core::VoiceEffectTemplateBase<VFX
     }
 
   protected:
-    details::DelayLineSupport lineSupport;
+    details::DelayLineSupport<sst::basic_blocks::dsp::SSESincDelayLine> lineSupport;
 
     bool isShort{true};
     std::array<float, numFloatParams> mLastParam{};

@@ -327,7 +327,7 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
     int recSize{0};
     int BLOCK{0};
 
-    std::array<details::DelayLineSupport, 2> lineSupport;
+    std::array<details::DelayLineSupport<sst::basic_blocks::dsp::SSESincDelayLine>, 2> lineSupport;
 
     float FIRipol = static_cast<float>(SincTable::FIRipol_N);
 

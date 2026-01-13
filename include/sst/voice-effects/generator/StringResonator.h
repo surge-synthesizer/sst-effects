@@ -195,9 +195,8 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
 
     float equalPowerFormula(float theta)
     {
-        return float(theta +
-                     (theta * theta * theta) * (-0.166666667f + theta * theta * 0.00833333333f)) *
-               1.414213562f;
+        return theta + (theta * theta * theta) * (-0.166666667f + theta * theta * 0.00833333333f) *
+                           1.414213562f;
     }
 
     void balancedMonoSum(float pan, float leftIn, float rightIn, float &sum)
@@ -710,7 +709,8 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
 
   protected:
     bool keytrackOn{true};
-    std::array<delay::details::DelayLineSupport, 2> lineSupport;
+    std::array<delay::details::DelayLineSupport<sst::basic_blocks::dsp::SSESincDelayLine>, 2>
+        lineSupport;
     bool firstPitch{false};
 
     std::array<float, numFloatParams> mLastParam{};
