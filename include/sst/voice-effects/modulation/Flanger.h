@@ -176,21 +176,26 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
         feedbackLerp.set_target_instant(this->getFloatParam(fpFeedback));
 
         LPfilter.setSampleRateAndBlockSize(this->getSampleRate(), VFXConfig::blockSize);
+        DCblocker.setSampleRateAndBlockSize(this->getSampleRate(), VFXConfig::blockSize);
         LPfilter.setFilterModel(filtersplusplus::FilterModel::CytomicSVF);
+        DCblocker.setFilterModel(filtersplusplus::FilterModel::CytomicSVF);
         LPfilter.setPassband(filtersplusplus::Passband::LP);
+        DCblocker.setPassband(filtersplusplus::Passband::HP);
         if (!LPfilter.prepareInstance())
         {
             std::cout << "LP filter prep failed" << std::endl;
         }
+        if (!DCblocker.prepareInstance())
+        {
+            std::cout << "DC blocker prep failed" << std::endl;
+        }
         LPfilter.makeConstantCoefficients(0, 65.f, 0.f);
+        DCblocker.makeConstantCoefficients(0, -60.f, 0.f);
         for (int i = 1; i < 3; ++i)
         {
             LPfilter.copyCoefficientsFromVoiceToVoice(0, i);
+            DCblocker.copyCoefficientsFromVoiceToVoice(0, i);
         }
-
-        DCblocker.setCoeff(filters::CytomicSVF::Mode::Highpass, -60, -0.f,
-                           this->getSampleRateInv());
-        DCblocker.template retainCoeffForBlock<VFXConfig::blockSize>();
     }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
@@ -259,6 +264,7 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
         SIMD_M128 POL = SETALL(1.f - this->getIntParam(ipPolarity) * 2.f);
 
         LPfilter.prepareBlock();
+        DCblocker.prepareBlock();
         for (int i = 0; i < VFXConfig::blockSize; ++i)
         {
             auto fromModLine = lines->read(time[i]);
@@ -274,12 +280,13 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
             backToLine = DIV(MUL(backToLine, SQRT2), ADD(ONE, MUL(backToLine, backToLine)));
             // then filter off a tiny bit of highs
             backToLine = LPfilter.processSample(backToLine);
+            backToLine = DCblocker.processSample(backToLine);
             backToLine = MUL(backToLine, POL);
 
             lines->write(ADD(inputs, backToLine));
         }
         LPfilter.concludeBlock();
-        DCblocker.processBlock<VFXConfig::blockSize>(dataoutL, dataoutR, dataoutL, dataoutR);
+        DCblocker.concludeBlock();
 
         mech::scale_by<VFXConfig::blockSize>(.5f, dataoutL, dataoutR);
     }
@@ -345,6 +352,7 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
         SIMD_M128 POL = SETALL(1.f - this->getIntParam(ipPolarity) * 2.f);
 
         LPfilter.prepareBlock();
+        DCblocker.prepareBlock();
         for (int i = 0; i < VFXConfig::blockSize; ++i)
         {
             auto fromModLine = lines->read(time[i]);
@@ -353,13 +361,14 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
             auto backToLine = MUL(SETALL(fbAmt[i]), fromModLine);
             backToLine = DIV(MUL(backToLine, SQRT2), ADD(ONE, MUL(backToLine, backToLine)));
             backToLine = LPfilter.processSample(backToLine);
+            backToLine = DCblocker.processSample(backToLine);
             backToLine = MUL(backToLine, POL);
 
             SIMD_M128 inputs = MUL(levels[i], SETALL(datain[i]));
             lines->write(ADD(inputs, backToLine));
         }
         LPfilter.concludeBlock();
-        DCblocker.processBlock<VFXConfig::blockSize>(dataout, dataout);
+        DCblocker.concludeBlock();
     }
 
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
@@ -412,8 +421,7 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
     bool first{true};
     delay::details::DelayLineSupport<sst::basic_blocks::dsp::quadDelayLine> modLines;
     basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> feedbackLerp;
-    filtersplusplus::Filter LPfilter;
-    filters::CytomicSVF DCblocker;
+    filtersplusplus::Filter LPfilter, DCblocker;
 
     float lfoPhase;
     float monoLfoPhase;

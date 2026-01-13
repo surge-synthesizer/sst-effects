@@ -133,6 +133,9 @@ template <typename VFXConfig> struct ThreeOpPhaseMod : core::VoiceEffectTemplate
         mech::clear_block<VFXConfig::blockSize>(d12);
         mech::clear_block<VFXConfig::blockSize>(d13);
         mech::clear_block<VFXConfig::blockSize>(d23);
+
+        DCBlocker.setCoeff(filters::CytomicSVF::Mode::Highpass, 15, 0.f, this->getSampleRateInv());
+        DCBlocker.template retainCoeffForBlock<VFXConfig::blockSize>();
     }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
@@ -181,6 +184,7 @@ template <typename VFXConfig> struct ThreeOpPhaseMod : core::VoiceEffectTemplate
                                                              dataoutR);
         mech::scale_accumulate_from_to<VFXConfig::blockSize>(out3[0], out3[1], .5f, dataoutL,
                                                              dataoutR);
+        DCBlocker.processBlock<VFXConfig::blockSize>(dataoutL, dataoutR, dataoutL, dataoutR);
     }
 
     void processMonoToMono(const float *const datain, float *dataout, float pitch)
@@ -214,6 +218,7 @@ template <typename VFXConfig> struct ThreeOpPhaseMod : core::VoiceEffectTemplate
         mech::clear_block<VFXConfig::blockSize>(dataout);
         mech::scale_accumulate_from_to<VFXConfig::blockSize>(out2, .5f, dataout);
         mech::scale_accumulate_from_to<VFXConfig::blockSize>(out3, .5f, dataout);
+        DCBlocker.processBlock<VFXConfig::blockSize>(dataout, dataout);
     }
 
     bool enableKeytrack(bool b)
@@ -229,6 +234,7 @@ template <typename VFXConfig> struct ThreeOpPhaseMod : core::VoiceEffectTemplate
 
   protected:
     bool keytrackOn{false}, wasKeytrackOn{false}, first{true};
+    filters::CytomicSVF DCBlocker;
 
     uint32_t phase2[2]{0, 0};
     float fbVal2[2][2]{{0.f, 0.f}, {0.f, 0.f}};
