@@ -44,8 +44,6 @@ namespace sst::voice_effects::modulation
 #define DIV(a, b) SIMD_MM(div_ps)(a, b)
 #define MUL(a, b) SIMD_MM(mul_ps)(a, b)
 #define SETALL(a) SIMD_MM(set1_ps)(a)
-#define SHUFONE(a) SIMD_MM(shuffle_ps)(a, a, SIMD_MM_SHUFFLE(4, 3, 2, 1))
-#define SHUFTWO(a) SIMD_MM(shuffle_ps)(a, a, SIMD_MM_SHUFFLE(5, 4, 3, 2))
 
 template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBase<VFXConfig>
 {
@@ -469,7 +467,7 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
                 sine[SIMD_MM(extract_epi32)(lipsn, 3)], sine[SIMD_MM(extract_epi32)(lipsn, 2)],
                 sine[SIMD_MM(extract_epi32)(lipsn, 1)], sine[SIMD_MM(extract_epi32)(lipsn, 0)]);
 
-            lfoVals = SHUFONE(ADD(MUL(liv, SUB(oneSSE, lipsf)), MUL(lipsf, livn)));
+            lfoVals = mech::shuffle_all_ps<1>(ADD(MUL(liv, SUB(oneSSE, lipsf)), MUL(lipsf, livn)));
 
             quadPhase = MUL(quadPhase, halfSSE);
 
@@ -486,13 +484,14 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
                 sine[SIMD_MM(extract_epi32)(sipsn, 1)], sine[SIMD_MM(extract_epi32)(sipsn, 0)]);
 
             panL = ADD(MUL(siv, SUB(oneSSE, sipsf)), MUL(sipsf, sivn));
-            panR = SHUFTWO(panL);
+            panR = mech::shuffle_all_ps<2>(panL);
         }
 
         // these are similar, except do LFOval and level computations separately
         // which is useful in MonoToMono mode
         inline void monoLFOVals(float phase, SIMD_M128 &lfoVals)
         {
+            namespace mech = sst::basic_blocks::mechanics;
             assert(sine != nullptr);
             assert(0 <= phase && phase <= 1);
 
@@ -511,7 +510,7 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
                 sine[SIMD_MM(extract_epi32)(lipsn, 3)], sine[SIMD_MM(extract_epi32)(lipsn, 2)],
                 sine[SIMD_MM(extract_epi32)(lipsn, 1)], sine[SIMD_MM(extract_epi32)(lipsn, 0)]);
 
-            lfoVals = SHUFONE(ADD(MUL(liv, SUB(oneSSE, lipsf)), MUL(lipsf, livn)));
+            lfoVals = mech::shuffle_all_ps<1>(ADD(MUL(liv, SUB(oneSSE, lipsf)), MUL(lipsf, livn)));
         }
 
         inline void monoLevels(float phase, SIMD_M128 &levelVals)
