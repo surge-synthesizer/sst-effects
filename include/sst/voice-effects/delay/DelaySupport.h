@@ -26,11 +26,11 @@
 
 namespace sst::voice_effects::delay::details
 {
-struct DelayLineSupport
+template <template<int N> typename lineType> struct DelayLineSupport
 {
     static constexpr int shortestN{12}, longestN{20};
     using SincTable = sst::basic_blocks::tables::SurgeSincTableProvider;
-    template <size_t N> using LineN = sst::basic_blocks::dsp::SSESincDelayLine<1 << N>;
+    template <size_t N> using LineN = lineType<1 << N>;
 
     template <size_t N, typename MemoryPoolProvider> void preReserveLines(MemoryPoolProvider *mp)
     {
@@ -44,8 +44,16 @@ struct DelayLineSupport
         auto lp = new (lineBuffer) LineN<N>(st);
         std::get<N - shortestN>(linePointers) = lp;
     }
+    // TODO: enable_if shenanigans
+    template <size_t N, typename MemoryPoolProvider>
+    void prepareLine(MemoryPoolProvider *mp)
+    {
+        lineBuffer = mp->checkoutBlock(sizeof(LineN<N>));
+        auto lp = new (lineBuffer) LineN<N>();
+        std::get<N - shortestN>(linePointers) = lp;
+    }
 
-    template <size_t N, typename MemoryPoolProvoder> void returnLines(MemoryPoolProvoder *mp)
+    template <size_t N, typename MemoryPoolProvider> void returnLines(MemoryPoolProvider *mp)
     {
         auto *p = std::get<N - shortestN>(linePointers);
         if (p)
@@ -176,6 +184,17 @@ struct DelayLineSupport
             clearLine<N>();
         });
     }
+    void reservePrepareAndClear(size_t Nrt, auto *mp)
+    {
+        dispatch(Nrt, [this, mp](auto N) {
+            if (!hasLinePointer<N>())
+            {
+                preReserveLines<N>(mp);
+                prepareLine<N>(mp);
+            }
+            clearLine<N>();
+        });
+    }
 
   protected:
     uint8_t *lineBuffer{nullptr};
@@ -184,6 +203,12 @@ struct DelayLineSupport
                LineN<18> *, LineN<19> *, LineN<20> *>
         linePointers{nullptr, nullptr, nullptr, nullptr, nullptr,
                      nullptr, nullptr, nullptr, nullptr};
+};
+
+struct quadDelayLineSupport
+{
+  protected:
+    uint8_t *lineBuffer{nullptr};
 };
 } // namespace sst::voice_effects::delay::details
 

@@ -22,11 +22,7 @@
 #define INCLUDE_SST_VOICE_EFFECTS_MODULATION_CHORUS_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
-#include "sst/basic-blocks/dsp/QuadratureOscillators.h"
-
 #include "../VoiceEffectCore.h"
-
-#include <iostream>
 
 #include "sst/basic-blocks/mechanics/block-ops.h"
 #include "sst/basic-blocks/dsp/SSESincDelayLine.h"
@@ -219,7 +215,6 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
             }
             else
             {
-
                 LFO.applyPhaseOffset(0.f);
             }
             phaseSet = true;
@@ -370,8 +365,7 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
     size_t silentSamplesLength() const { return this->getSampleRate() * maxMiliseconds * .001f; }
 
   protected:
-    std::array<delay::details::DelayLineSupport, 2> lineSupport;
-    bool isShort{true};
+    std::array<delay::details::DelayLineSupport<sst::basic_blocks::dsp::SSESincDelayLine>, 2> lineSupport;
 
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> feedbackLerp, timeLerp[2];
 
