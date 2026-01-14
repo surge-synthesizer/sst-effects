@@ -475,8 +475,7 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
                 sine[SIMD_MM(extract_epi32)(lipsn, 3)], sine[SIMD_MM(extract_epi32)(lipsn, 2)],
                 sine[SIMD_MM(extract_epi32)(lipsn, 1)], sine[SIMD_MM(extract_epi32)(lipsn, 0)]);
 
-            lfoVals = mech::shuffle_all_ps<mech::ONCE>(
-                ADD(MUL(liv, SUB(oneSSE, lipsf)), MUL(lipsf, livn)));
+            lfoVals = mech::shuffle_all_ps<1>(ADD(MUL(liv, SUB(oneSSE, lipsf)), MUL(lipsf, livn)));
 
             quadPhase = MUL(quadPhase, halfSSE);
 
@@ -493,7 +492,7 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
                 sine[SIMD_MM(extract_epi32)(sipsn, 1)], sine[SIMD_MM(extract_epi32)(sipsn, 0)]);
 
             panL = ADD(MUL(siv, SUB(oneSSE, sipsf)), MUL(sipsf, sivn));
-            panR = mech::shuffle_all_ps<mech::TWICE>(panL);
+            panR = mech::shuffle_all_ps<2>(panL);
         }
 
         // these are similar, except do LFOval and level computations separately
@@ -519,8 +518,7 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
                 sine[SIMD_MM(extract_epi32)(lipsn, 3)], sine[SIMD_MM(extract_epi32)(lipsn, 2)],
                 sine[SIMD_MM(extract_epi32)(lipsn, 1)], sine[SIMD_MM(extract_epi32)(lipsn, 0)]);
 
-            lfoVals = mech::shuffle_all_ps<mech::ONCE>(
-                ADD(MUL(liv, SUB(oneSSE, lipsf)), MUL(lipsf, livn)));
+            lfoVals = mech::shuffle_all_ps<1>(ADD(MUL(liv, SUB(oneSSE, lipsf)), MUL(lipsf, livn)));
         }
 
         inline void monoLevels(float phase, SIMD_M128 &levelVals)
