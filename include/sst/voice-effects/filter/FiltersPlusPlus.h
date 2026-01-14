@@ -82,6 +82,8 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
             return "tripole";
         case filtersplusplus::FilterModel::OBXD_4Pole:
             return "obxd-4pole";
+        case filtersplusplus::FilterModel::OBXD_Xpander:
+            return "obxd-Xpander";
         case filtersplusplus::FilterModel::CutoffWarp:
             return "cutoffwarp";
         case filtersplusplus::FilterModel::ResonanceWarp:
@@ -194,14 +196,22 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
             this->enableKeytrack(true);
         }
 
+        // in this one case it's better UI/UX wise to have a single list
+        if constexpr (Model == fmd::OBXD_Xpander)
+        {
+            passbands = filter.availableModelConfigurations(Model, true);
+        }
+
         // For most of them just use everything. ReturnUnsupported must be true or we explode
         if (passbands.empty())
         {
-            passbands = filtersplusplus::potentialValuesFor<fpb>(Model, true);
+            if constexpr (Model != fmd::OBXD_Xpander)
+                passbands = filtersplusplus::potentialValuesFor<fpb>(Model, true);
         }
         if (slopes.empty())
         {
-            slopes = filtersplusplus::potentialValuesFor<fsl>(Model, true);
+            if constexpr (Model != fmd::OBXD_Xpander)
+                slopes = filtersplusplus::potentialValuesFor<fsl>(Model, true);
         }
         if (drives.empty())
         {
@@ -305,7 +315,18 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
 
             for (int i = 0; i < passbands.size(); ++i)
             {
-                pbm.insert({i, fpp::toString(passbands[i])});
+                if constexpr (Model == fmd::OBXD_Xpander)
+                {
+                    auto p = fpp::toString(passbands[i].pt);
+                    auto s = fpp::toString(passbands[i].st);
+                    if (s != "UNSUPPORTED")
+                        p = p + " " + s;
+                    pbm.insert({i, p});
+                }
+                else
+                {
+                    pbm.insert({i, fpp::toString(passbands[i])});
+                }
             }
             return pmd()
                 .asInt()
@@ -422,6 +443,38 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
 
     template <bool mono, bool monoCoeff> void setCoeffs(float pitch)
     {
+        if constexpr (Model == filtersplusplus::FilterModel::CytomicSVF)
+        {
+            // it's faster to just do it
+            filter.setModelConfiguration(configFilter());
+
+            auto reso = std::clamp(this->getFloatParam(fpResonance), 0.f, 1.f);
+            // Andy assumes A = pow(10, dB/40), our converter uses dB/20, hence the * .5f
+            auto extra = this->dbToLinear(
+                0.5f * std::clamp(this->getFloatParam(fpExtra), extraBounds[0], extraBounds[1]));
+
+            auto freqL = this->getFloatParam(fpCutoffL) + keytrackOn * pitch;
+
+            if constexpr (mono)
+            {
+                filter.setMono();
+                filter.makeCoefficients(0, freqL, reso, extra);
+                return;
+            }
+
+            filter.setStereo();
+            filter.makeCoefficients(0, freqL, reso, extra);
+            if constexpr (monoCoeff)
+            {
+                filter.copyCoefficientsFromVoiceToVoice(0, 1);
+                return;
+            }
+
+            auto freqR = this->getFloatParam(fpCutoffR) + keytrackOn * pitch;
+            filter.makeCoefficients(1, freqR, reso, extra);
+            return;
+        }
+
         std::array<float, numFloatParams> fp;
         std::array<int, numIntParams> ip;
         bool fDiff{false}, iDiff{false};
@@ -453,16 +506,7 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
         {
             auto reso = std::clamp(this->getFloatParam(fpResonance), 0.f, 1.f);
             auto extra = std::clamp(this->getFloatParam(fpExtra), extraBounds[0], extraBounds[1]);
-
-            if constexpr (Model == fmd::CytomicSVF)
-            {
-                // Andy assumes A = pow(10, dB/40), our converter uses dB/20, hence the * .5f
-                extra = this->dbToLinear(extra * 0.5f);
-            }
-
-            auto freqL = this->getFloatParam(fpCutoffL);
-            if (keytrackOn)
-                freqL += pitch;
+            auto freqL = this->getFloatParam(fpCutoffL) + keytrackOn * pitch;
 
             if constexpr (Model == fmd::Comb)
             {
@@ -486,9 +530,7 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
                     return;
                 }
 
-                auto freqR = this->getFloatParam(fpCutoffR);
-                if (keytrackOn)
-                    freqR += pitch;
+                auto freqR = this->getFloatParam(fpCutoffR) + keytrackOn * pitch;
                 filter.makeCoefficients(2, freqR, reso, -1.f);
                 filter.makeCoefficients(3, freqR, reso, 1.f);
             }
@@ -651,7 +693,10 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
     filtersplusplus::Filter filter = filtersplusplus::Filter();
     std::string extraName{""}, subName{""};
 
-    std::vector<filtersplusplus::Passband> passbands;
+    using passbandType =
+        std::conditional_t<Model == fmd::OBXD_Xpander, std::vector<filtersplusplus::ModelConfig>,
+                           std::vector<filtersplusplus::Passband>>;
+    passbandType passbands;
     std::vector<filtersplusplus::Slope> slopes;
     std::vector<filtersplusplus::DriveMode> drives;
     std::vector<filtersplusplus::FilterSubModel> submodels;
@@ -660,43 +705,51 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
     {
         namespace fpp = filtersplusplus;
         fpp::ModelConfig cfg{};
-        uint32_t pid{0}, sid{0}, did{0}, mid{0};
-        int ps = passbands.size();
-        int ss = slopes.size();
-        int ds = drives.size();
-        int ms = submodels.size();
-
-        if (ps > 1)
+        if constexpr (Model == fmd::OBXD_Xpander)
         {
-            pid = std::clamp(this->getIntParam(ipPassband), 0, ps - 1);
+            int id = std::clamp(this->getIntParam(ipPassband), 0, (int)passbands.size() - 1);
+            return passbands[id];
         }
-        cfg.pt = passbands[pid];
-
-        if (ss > 1)
+        else
         {
-            sid = std::clamp(this->getIntParam(ipSlope), 0, ss - 1);
-        }
-        cfg.st = slopes[sid];
+            uint32_t pid{0}, sid{0}, did{0}, mid{0};
+            int ps = passbands.size();
+            int ss = slopes.size();
+            int ds = drives.size();
+            int ms = submodels.size();
 
-        if (ds > 1)
-        {
-            did = std::clamp(this->getIntParam(ipDrive), 0, ds - 1);
-        }
-        if constexpr (Model == fpp::FilterModel::VemberClassic)
-        {
-            // in vember classic notch the second drive mode is different
-            if (pid == 3 && did == 1)
-                did += 1;
-        }
-        cfg.dt = drives[did];
+            if (ps > 1)
+            {
+                pid = std::clamp(this->getIntParam(ipPassband), 0, ps - 1);
+            }
+            cfg.pt = passbands[pid];
 
-        if (ms > 1)
-        {
-            mid = std::clamp(this->getIntParam(ipSubmodel), 0, ms - 1);
-        }
-        cfg.mt = submodels[mid];
+            if (ss > 1)
+            {
+                sid = std::clamp(this->getIntParam(ipSlope), 0, ss - 1);
+            }
+            cfg.st = slopes[sid];
 
-        return cfg;
+            if (ds > 1)
+            {
+                did = std::clamp(this->getIntParam(ipDrive), 0, ds - 1);
+            }
+            if constexpr (Model == fpp::FilterModel::VemberClassic)
+            {
+                // in vember classic notch the second drive mode is different
+                if (pid == 3 && did == 1)
+                    did += 1;
+            }
+            cfg.dt = drives[did];
+
+            if (ms > 1)
+            {
+                mid = std::clamp(this->getIntParam(ipSubmodel), 0, ms - 1);
+            }
+            cfg.mt = submodels[mid];
+
+            return cfg;
+        }
     }
 
   public:
