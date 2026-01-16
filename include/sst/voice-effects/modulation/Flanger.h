@@ -114,7 +114,7 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
         switch (idx)
         {
         case ipStereo:
-            return pmd().asStereoSwitch().withDefault(false);
+            return pmd().asStereoSwitch().withDefault(true);
         case ipPolarity:
             return pmd()
                 .asInt()

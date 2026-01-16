@@ -31,9 +31,7 @@
 #include "sst/basic-blocks/dsp/RNG.h"
 #include "sst/basic-blocks/simd/setup.h"
 #include "sst/basic-blocks/mechanics/simd-ops.h"
-#include "sst/basic-blocks/modulators/FXModControl.h"
 #include "sst/basic-blocks/tables/SimpleSineProvider.h"
-#include "sst/basic-blocks/dsp/Interpolators.h"
 #include "../delay/DelaySupport.h"
 #include "sst/filters++/api.h"
 
@@ -54,7 +52,7 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
     static constexpr float maxTotalMilliseconds{50};
 
     static constexpr int numFloatParams{2};
-    static constexpr int numIntParams{4};
+    static constexpr int numIntParams{5};
 
     basic_blocks::dsp::RNG rng;
 
@@ -69,7 +67,8 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
         ipStereo,
         ipPolarity,
         ipChord,
-        ipInversion
+        ipInversion,
+        ipJust
     };
 
     using SineTable = basic_blocks::tables::SimpleSineProvider;
@@ -109,7 +108,7 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
         switch (idx)
         {
         case ipStereo:
-            return pmd().asStereoSwitch().withDefault(false);
+            return pmd().asStereoSwitch().withDefault(true);
         case ipPolarity:
             return pmd()
                 .asInt()
@@ -146,6 +145,12 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
                     {3, "Third"},
                 })
                 .withName("Inversion");
+        case ipJust:
+            return pmd()
+                .asOnOffBool()
+                .withName("Tuning")
+                .withUnorderedMapFormatting({{false, "Equal"}, {true, "Just"}})
+                .withDefault(true);
         }
         return pmd().asInt().withName("Error");
     }
@@ -175,23 +180,6 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
         {
             leftPans = SETALL(1.f);
             rightPans = SETALL(1.f);
-        }
-
-        switch (this->getIntParam(ipInversion))
-        {
-        default:
-        case 0:
-            INVERSION = SIMD_MM(set_ps)(1.f, 1.f, 1.f, 1.f);
-            break;
-        case 1:
-            INVERSION = SIMD_MM(set_ps)(1.f, 1.f, 1.f, 2.f);
-            break;
-        case 2:
-            INVERSION = SIMD_MM(set_ps)(1.f, 1.f, 2.f, 2.f);
-            break;
-        case 3:
-            INVERSION = SIMD_MM(set_ps)(1.f, 2.f, 2.f, 2.f);
-            break;
         }
 
         SampleRateSSE = SETALL(this->getSampleRate());
@@ -233,9 +221,16 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
         }
         p += 12.f * this->getIntParam(ipPolarity);
 
-        auto freqSSE = MUL(DIV(ONE, MUL(SETALL(440 * this->note_to_pitch_ignoring_tuning(p)),
-                                        MUL(CHORDS[this->getIntParam(ipChord)].ratios, INVERSION))),
-                           SampleRateSSE);
+        auto chord = this->getIntParam(ipChord);
+        auto JI = this->getIntParam(ipJust);
+        auto inv = this->getIntParam(ipInversion);
+        auto ratios = MUL(inversions[inv], SIMD_MM(load_ps)(JI ? CHORDS[chord].JustRatios
+                                                               : CHORDS[chord].TemperedRatios));
+
+        // 1 / (root freq * ratio) * sample rate;
+        auto freqSSE =
+            MUL(SampleRateSSE,
+                DIV(ONE, MUL(SETALL(440 * this->note_to_pitch_ignoring_tuning(p)), ratios)));
 
         timeLerp.set_targets(freqSSE);
         SIMD_M128 time[VFXConfig::blockSize];
@@ -295,9 +290,16 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
         }
         p += 12.f * this->getIntParam(ipPolarity);
 
-        auto freqSSE = MUL(DIV(ONE, MUL(SETALL(440 * this->note_to_pitch_ignoring_tuning(p)),
-                                        MUL(CHORDS[this->getIntParam(ipChord)].ratios, INVERSION))),
-                           SampleRateSSE);
+        auto chord = this->getIntParam(ipChord);
+        auto JI = this->getIntParam(ipJust);
+        auto inv = this->getIntParam(ipInversion);
+        auto ratios = MUL(inversions[inv], SIMD_MM(load_ps)(JI ? CHORDS[chord].JustRatios
+                                                               : CHORDS[chord].TemperedRatios));
+
+        // 1 / (root freq * ratio) * sample rate;
+        auto freqSSE =
+            MUL(SampleRateSSE,
+                DIV(ONE, MUL(SETALL(440 * this->note_to_pitch_ignoring_tuning(p)), ratios)));
 
         timeLerp.set_targets(freqSSE);
         SIMD_M128 time[VFXConfig::blockSize];
@@ -379,6 +381,7 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
         return res;
     }
     bool getKeytrack() const { return keytrackOn; }
+    bool getKeytrackDefault() const { return true; }
     bool checkParameterConsistency() const { return true; }
 
   protected:
@@ -391,35 +394,67 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
     static constexpr int numChords{6};
     struct alignas(16) Chord
     {
-        Chord(float a, float b, float c, float d, const std::string &n)
+        constexpr Chord(const std::array<float, 4> JI, const std::array<float, 4> ET,
+                        const std::string &n)
+            : name(n)
         {
-            ratios = SIMD_MM(set_ps)(d, c, b, a);
-            name = n;
+            for (int i = 0; i < 4; ++i)
+            {
+                JustRatios[i] = JI[i];
+                TemperedRatios[i] = ET[i];
+            }
         }
-        SIMD_M128 ratios;
+
+        float JustRatios[4];
+        float TemperedRatios[4];
         std::string name;
     };
 
-    const std::array<Chord, numChords> CHORDS = {
-        Chord(1, 5.f / 4, 3.f / 2, 15.f / 8, "∆"),       // 8:10:12:15 (∆)
-        Chord(1, 5.f / 4, 3.f / 2, 7.f / 4, "7"),        // 4:5:6:7 (7)
-        Chord(1, 6.f / 5, 3.f / 2, 9.f / 5, "m7"),       // 18:15:12:10 (minor7)
-        Chord(1, 9.f / 8, 4.f / 3, 3.f / 2, "11"),       // 16:18:24:27 (11)
-        Chord(1, 7.f / 6, 7.f / 5, 7.f / 4, "half-dim"), // 7:6:5:4 (half-dim)
-        Chord(1, 75.f / 64, 45.f / 32, 5.f / 3, "dim"),  // 225:192:160:135 (dim)
-    };
-    // Many choices for a JI diminished chord...
-    // I like that 5-limit one
+    /* I use ascending numbers for harmonic/frequency relations,
+     * and descending numbers for subharmonics/wavelength ones.
+     * In other words 4:5:6:7 means
+     * 4/4
+     * 5/4
+     * 6/4
+     * 7/4
+     * Whereas 7:6:5:4 means
+     * 7/7
+     * 7/6
+     * 7/5
+     * 7/4
+     *
+     * Here's our chords expressed thusly:
+     * 8:10:12:15 (∆)
+     * 4:5:6:7 (7)
+     * 18:15:12:10 (minor7)
+     * 16:18:24:27 (11)
+     * 7:6:5:4 (half-dim)
+     * 35:30:25:21 (dim)
+     *
+     * And here they are as ratios and also rounded to equal-tempered semitones:
+     */
+    static constexpr std::array<Chord, numChords> CHORDS = {
+        Chord({1.f, 5.f / 4, 3.f / 2, 15.f / 8}, {1.f, 1.2599210f, 1.4983071f, 1.887748f}, "∆"),
+        Chord({1.f, 5.f / 4, 3.f / 2, 7.f / 4}, {1.f, 1.2599210f, 1.4983071f, 1.7817974f}, "7"),
+        Chord({1.f, 6.f / 5, 3.f / 2, 9.f / 5}, {1.f, 1.1892071f, 1.4983071f, 1.7817974f}, "m7"),
+        Chord({1.f, 9.f / 8, 4.f / 3, 3.f / 2}, {1.f, 1.1224621f, 1.3348399f, 1.4983071f}, "11"),
+        Chord({1.f, 7.f / 6, 7.f / 5, 7.f / 4}, {1.f, 1.1892071f, 1.4142136f, 1.7817974f},
+              "half-dim"),
+        Chord({1.f, 7.f / 6, 7.f / 5, 5.f / 3}, {1.f, 1.1892071f, 1.4142136f, 1.6817928f}, "dim")};
+
+    const SIMD_M128 inversions[4] = {
+        SIMD_MM(set_ps)(1.f, 1.f, 1.f, 1.f), SIMD_MM(set_ps)(1.f, 1.f, 1.f, 2.f),
+        SIMD_MM(set_ps)(1.f, 1.f, 2.f, 2.f), SIMD_MM(set_ps)(1.f, 2.f, 2.f, 2.f)};
 
     SIMD_M128 leftPans;
     SIMD_M128 rightPans;
-    SIMD_M128 INVERSION;
 
     const SIMD_M128 ONE = SETALL(1.f);
     const SIMD_M128 NEGONE = SETALL(-1.f);
     const SIMD_M128 TWO = SETALL(2.f);
     const SIMD_M128 HALF = SETALL(.5f);
     const SIMD_M128 SQRT2 = SETALL(M_SQRT2);
+    const SIMD_M128 fourfortySSE{SETALL(440.f)};
 
     SIMD_M128 SampleRateSSE{};
 
