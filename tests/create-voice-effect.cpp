@@ -37,6 +37,7 @@
 #include "sst/voice-effects/delay/Widener.h"
 #include "sst/voice-effects/delay/ShortDelay.h"
 #include "sst/voice-effects/generator/StringResonator.h"
+#include "sst/voice-effects/generator/FourVoiceResonator.h"
 #include "sst/voice-effects/filter/StaticPhaser.h"
 #include "sst/voice-effects/modulation/ShepardPhaser.h"
 #include "sst/voice-effects/modulation/Tremolo.h"
@@ -122,6 +123,11 @@ TEST_CASE("Can Create Voice FX")
     SECTION("GenCorrelatedNoise")
     {
         VTester<sst::voice_effects::generator::GenCorrelatedNoise<VTestConfig>>::TestVFX();
+    }
+    SECTION("FourVoiceRes")
+    {
+        sst::basic_blocks::tables::SimpleSineProvider s;
+        VTester<sst::voice_effects::generator::FourVoiceResonator<VTestConfig>>::TestVFX(s);
     }
     SECTION("ParmEQ")
     {

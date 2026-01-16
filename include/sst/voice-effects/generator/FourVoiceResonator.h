@@ -126,12 +126,12 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
                 .withDefault(0)
                 .withRange(0, numChords - 1)
                 .withUnorderedMapFormatting({
-                    {0, "∆"},
-                    {1, "7"},
-                    {2, "m7"},
-                    {3, "11"},
-                    {4, "half-dim"},
-                    {5, "dim"},
+                    {0, CHORDS[0].name},
+                    {1, CHORDS[1].name},
+                    {2, CHORDS[2].name},
+                    {3, CHORDS[3].name},
+                    {4, CHORDS[4].name},
+                    {5, CHORDS[5].name},
                 })
                 .withName("Chord");
         case ipInversion:
@@ -234,7 +234,7 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
         p += 12.f * this->getIntParam(ipPolarity);
 
         auto freqSSE = MUL(DIV(ONE, MUL(SETALL(440 * this->note_to_pitch_ignoring_tuning(p)),
-                                        MUL(CHORDS[this->getIntParam(ipChord)], INVERSION))),
+                                        MUL(CHORDS[this->getIntParam(ipChord)].ratios, INVERSION))),
                            SampleRateSSE);
 
         timeLerp.set_targets(freqSSE);
@@ -296,7 +296,7 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
         p += 12.f * this->getIntParam(ipPolarity);
 
         auto freqSSE = MUL(DIV(ONE, MUL(SETALL(440 * this->note_to_pitch_ignoring_tuning(p)),
-                                        MUL(CHORDS[this->getIntParam(ipChord)], INVERSION))),
+                                        MUL(CHORDS[this->getIntParam(ipChord)].ratios, INVERSION))),
                            SampleRateSSE);
 
         timeLerp.set_targets(freqSSE);
@@ -388,38 +388,32 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
     basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> feedbackLerp;
     filtersplusplus::Filter LPfilter, HPfilter;
 
-    /* Ascending numbers means harmonic series/frequency relations,
-     * descending means subharmonics/wavelength relations.
-     * Or in other words 4:5:6:8 means:
-     * 4/4
-     * 5/4
-     * 6/4
-     * 8/4
-     * Whereas 8:6:5:4 means:
-     * 8/8
-     * 8/6
-     * 8/5
-     * 8/4
-     * And remember: set_ps is backwards
-     */
     static constexpr int numChords{6};
-    const std::array<SIMD_M128, numChords> CHORDS = {
-        SIMD_MM(set_ps)(15.f / 8.f, 3.f / 2.f, 5.f / 4.f, 1.f),     // 8:10:12:15 (∆)
-        SIMD_MM(set_ps)(7.f / 4.f, 3.f / 2.f, 5.f / 4.f, 1.f),      // 4:5:6:7 (7)
-        SIMD_MM(set_ps)(9.f / 5.f, 3.f / 2.f, 6.f / 5.f, 1.f),      // 18:15:12:10 (minor7)
-        SIMD_MM(set_ps)(16.f / 9.f, 3.f / 2.f, 4.f / 3.f, 1.f),     // 16:18:24:27 (11)
-        SIMD_MM(set_ps)(7.f / 4.f, 7.f / 5.f, 7.f / 6.f, 1.f),      // 7:6:5:4 (half-dim)
-        SIMD_MM(set_ps)(5.f / 3.f, 45.f / 32.f, 75.f / 64.f, 1.f)}; // 225:192:160:135 (dim)
+    struct alignas(16) Chord
+    {
+        Chord(float a, float b, float c, float d, const std::string &n)
+        {
+            ratios = SIMD_MM(set_ps)(d, c, b, a);
+            name = n;
+        }
+        SIMD_M128 ratios;
+        std::string name;
+    };
+
+    const std::array<Chord, numChords> CHORDS = {
+        Chord(1, 5.f / 4, 3.f / 2, 15.f / 8, "∆"),       // 8:10:12:15 (∆)
+        Chord(1, 5.f / 4, 3.f / 2, 7.f / 4, "7"),        // 4:5:6:7 (7)
+        Chord(1, 6.f / 5, 3.f / 2, 9.f / 5, "m7"),       // 18:15:12:10 (minor7)
+        Chord(1, 9.f / 8, 4.f / 3, 3.f / 2, "11"),       // 16:18:24:27 (11)
+        Chord(1, 7.f / 6, 7.f / 5, 7.f / 4, "half-dim"), // 7:6:5:4 (half-dim)
+        Chord(1, 75.f / 64, 45.f / 32, 5.f / 3, "dim"),  // 225:192:160:135 (dim)
+    };
     // Many choices for a JI diminished chord...
     // I like that 5-limit one
 
     SIMD_M128 leftPans;
     SIMD_M128 rightPans;
     SIMD_M128 INVERSION;
-
-    // float lfoPhase;
-    // float monoLfoPhase;
-    // float rnd_hist[4] = {0, 0, 0, 0};
 
     const SIMD_M128 ONE = SETALL(1.f);
     const SIMD_M128 NEGONE = SETALL(-1.f);
