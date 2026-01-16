@@ -433,7 +433,7 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
      *
      * And here they are as ratios and also rounded to equal-tempered semitones:
      */
-    static constexpr std::array<Chord, numChords> CHORDS = {
+    static constexpr Chord CHORDS[numChords] = {
         Chord({1.f, 5.f / 4, 3.f / 2, 15.f / 8}, {1.f, 1.2599210f, 1.4983071f, 1.887748f}, "∆"),
         Chord({1.f, 5.f / 4, 3.f / 2, 7.f / 4}, {1.f, 1.2599210f, 1.4983071f, 1.7817974f}, "7"),
         Chord({1.f, 6.f / 5, 3.f / 2, 9.f / 5}, {1.f, 1.1892071f, 1.4983071f, 1.7817974f}, "m7"),
