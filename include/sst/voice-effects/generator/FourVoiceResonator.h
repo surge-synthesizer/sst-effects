@@ -49,7 +49,7 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
     static constexpr const char *streamingName{"four-voice-resonator"};
 
     // really we just need enough for 4 * 110Hz
-    static constexpr float maxTotalMilliseconds{50};
+    static constexpr float maxTotalMilliseconds{100};
 
     static constexpr int numFloatParams{2};
     static constexpr int numIntParams{5};
@@ -125,12 +125,12 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
                 .withDefault(0)
                 .withRange(0, numChords - 1)
                 .withUnorderedMapFormatting({
-                    {0, CHORDS[0].name},
-                    {1, CHORDS[1].name},
-                    {2, CHORDS[2].name},
-                    {3, CHORDS[3].name},
-                    {4, CHORDS[4].name},
-                    {5, CHORDS[5].name},
+                    {0, ChordNames[0]},
+                    {1, ChordNames[1]},
+                    {2, ChordNames[2]},
+                    {3, ChordNames[3]},
+                    {4, ChordNames[4]},
+                    {5, ChordNames[5]},
                 })
                 .withName("Chord");
         case ipInversion:
@@ -149,8 +149,8 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
             return pmd()
                 .asOnOffBool()
                 .withName("Tuning")
-                .withUnorderedMapFormatting({{false, "Equal"}, {true, "Just"}})
-                .withDefault(true);
+                .withUnorderedMapFormatting({{false, "Just"}, {true, "Equal"}})
+                .withDefault(false);
         }
         return pmd().asInt().withName("Error");
     }
@@ -215,7 +215,7 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
         namespace mech = sst::basic_blocks::mechanics;
 
         float p = this->getFloatParam(fpRoot) + (pitch * keytrackOn);
-        while (p < -24)
+        while (p < -36)
         {
             p += 12.f;
         }
@@ -224,8 +224,8 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
         auto chord = this->getIntParam(ipChord);
         auto JI = this->getIntParam(ipJust);
         auto inv = this->getIntParam(ipInversion);
-        auto ratios = MUL(inversions[inv], SIMD_MM(load_ps)(JI ? CHORDS[chord].JustRatios
-                                                               : CHORDS[chord].TemperedRatios));
+
+        auto ratios = MUL(inversions[inv], SIMD_MM(load_ps)(CHORDS[JI][chord]));
 
         // 1 / (root freq * ratio) * sample rate;
         auto freqSSE =
@@ -284,7 +284,7 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
         namespace mech = sst::basic_blocks::mechanics;
 
         float p = this->getFloatParam(fpRoot) + (pitch * keytrackOn);
-        while (p < -24)
+        while (p < -36)
         {
             p += 12.f;
         }
@@ -293,8 +293,7 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
         auto chord = this->getIntParam(ipChord);
         auto JI = this->getIntParam(ipJust);
         auto inv = this->getIntParam(ipInversion);
-        auto ratios = MUL(inversions[inv], SIMD_MM(load_ps)(JI ? CHORDS[chord].JustRatios
-                                                               : CHORDS[chord].TemperedRatios));
+        auto ratios = MUL(inversions[inv], SIMD_MM(load_ps)(CHORDS[JI][chord]));
 
         // 1 / (root freq * ratio) * sample rate;
         auto freqSSE =
@@ -391,25 +390,6 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
     basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> feedbackLerp;
     filtersplusplus::Filter LPfilter, HPfilter;
 
-    static constexpr int numChords{6};
-    struct alignas(16) Chord
-    {
-        constexpr Chord(const std::array<float, 4> JI, const std::array<float, 4> ET,
-                        const std::string &n)
-            : name(n)
-        {
-            for (int i = 0; i < 4; ++i)
-            {
-                JustRatios[i] = JI[i];
-                TemperedRatios[i] = ET[i];
-            }
-        }
-
-        float JustRatios[4];
-        float TemperedRatios[4];
-        std::string name;
-    };
-
     /* I use ascending numbers for harmonic/frequency relations,
      * and descending numbers for subharmonics/wavelength ones.
      * In other words 4:5:6:7 means
@@ -431,16 +411,24 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
      * 7:6:5:4 (half-dim)
      * 35:30:25:21 (dim)
      *
-     * And here they are as ratios and also rounded to equal-tempered semitones:
+     * And here are their ratios, and then the same rounded
+     * to the nearest 12-equal semitone
      */
-    static constexpr Chord CHORDS[numChords] = {
-        Chord({1.f, 5.f / 4, 3.f / 2, 15.f / 8}, {1.f, 1.2599210f, 1.4983071f, 1.887748f}, "∆"),
-        Chord({1.f, 5.f / 4, 3.f / 2, 7.f / 4}, {1.f, 1.2599210f, 1.4983071f, 1.7817974f}, "7"),
-        Chord({1.f, 6.f / 5, 3.f / 2, 9.f / 5}, {1.f, 1.1892071f, 1.4983071f, 1.7817974f}, "m7"),
-        Chord({1.f, 9.f / 8, 4.f / 3, 3.f / 2}, {1.f, 1.1224621f, 1.3348399f, 1.4983071f}, "11"),
-        Chord({1.f, 7.f / 6, 7.f / 5, 7.f / 4}, {1.f, 1.1892071f, 1.4142136f, 1.7817974f},
-              "half-dim"),
-        Chord({1.f, 7.f / 6, 7.f / 5, 5.f / 3}, {1.f, 1.1892071f, 1.4142136f, 1.6817928f}, "dim")};
+    static constexpr int numChords{6};
+    static constexpr std::string ChordNames[numChords] = {"∆", "7", "m7", "11", "half-dim", "dim"};
+    static constexpr float CHORDS alignas(16)[2][numChords][4] = {
+        {{1.f, 5.f / 4, 3.f / 2, 15.f / 8},
+         {1.f, 5.f / 4, 3.f / 2, 7.f / 4},
+         {1.f, 6.f / 5, 3.f / 2, 9.f / 5},
+         {1.f, 9.f / 8, 4.f / 3, 3.f / 2},
+         {1.f, 7.f / 6, 7.f / 5, 7.f / 4},
+         {1.f, 7.f / 6, 7.f / 5, 5.f / 3}},
+        {{1.f, 1.2599210f, 1.4983071f, 1.887748f},
+         {1.f, 1.2599210f, 1.4983071f, 1.7817974f},
+         {1.f, 1.1892071f, 1.4983071f, 1.7817974f},
+         {1.f, 1.1224621f, 1.3348399f, 1.4983071f},
+         {1.f, 1.1892071f, 1.4142136f, 1.7817974f},
+         {1.f, 1.1892071f, 1.4142136f, 1.6817928f}}};
 
     const SIMD_M128 inversions[4] = {
         SIMD_MM(set_ps)(1.f, 1.f, 1.f, 1.f), SIMD_MM(set_ps)(1.f, 1.f, 1.f, 2.f),
