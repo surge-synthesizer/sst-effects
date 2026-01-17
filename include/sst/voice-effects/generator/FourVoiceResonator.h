@@ -415,7 +415,7 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
      * to the nearest 12-equal semitone
      */
     static constexpr int numChords{6};
-    static constexpr std::string ChordNames[numChords] = {"∆", "7", "m7", "11", "half-dim", "dim"};
+    std::string ChordNames[numChords] = {"∆", "7", "m7", "11", "half-dim", "dim"};
     static constexpr float CHORDS alignas(16)[2][numChords][4] = {
         {{1.f, 5.f / 4, 3.f / 2, 15.f / 8},
          {1.f, 5.f / 4, 3.f / 2, 7.f / 4},
