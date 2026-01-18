@@ -85,7 +85,8 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
                 .asLinearDecibel()
                 .withRange(-60, 12)
                 .withName("Threshold")
-                .withDefault(0.f);
+                .withDefault(0.f)
+                .withMultiplicativeModulationOffByDefault();
         case fpThruLevel:
             return pmd().asLinearDecibel().withName("Thru Level").withDefault(0.f);
         }

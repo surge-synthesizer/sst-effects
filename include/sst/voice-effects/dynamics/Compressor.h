@@ -87,7 +87,8 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
                 .withDefault(0.f)
                 .withDecimalPlaces(2)
                 .withLinearScaleFormatting("dB")
-                .withName("Threshold");
+                .withName("Threshold")
+                .withMultiplicativeModulationOffByDefault();
         case fpRatio:
             return pmd()
                 .asFloat()

@@ -18,8 +18,8 @@
  * https://github.com/surge-synthesizer/sst-effects
  */
 
-#ifndef INCLUDE_SST_VOICE_EFFECTS_GENERATOR_FOURVOICE_H
-#define INCLUDE_SST_VOICE_EFFECTS_GENERATOR_FOURVOICE_H
+#ifndef INCLUDE_SST_VOICE_EFFECTS_GENERATOR_FOURVOICERESONATOR_H
+#define INCLUDE_SST_VOICE_EFFECTS_GENERATOR_FOURVOICERESONATOR_H
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "../VoiceEffectCore.h"
