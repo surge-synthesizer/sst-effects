@@ -44,7 +44,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
     static constexpr int numFloatParams{4};
     static constexpr int numIntParams{3};
 
-    basic_blocks::dsp::RNG rng;
+    basic_blocks::dsp::RNG &rng;
 
     // Enumerate its params
     enum FloatParams
@@ -124,7 +124,10 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
     }
 
     // And these constructors and init functions
-    Tremolo() : core::VoiceEffectTemplateBase<VFXConfig>() {}
+    Tremolo(basic_blocks::dsp::RNG &extrng)
+        : core::VoiceEffectTemplateBase<VFXConfig>(), rng(extrng)
+    {
+    }
 
     ~Tremolo() {}
 

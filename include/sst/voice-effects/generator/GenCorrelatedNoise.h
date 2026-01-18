@@ -47,7 +47,7 @@ struct GenCorrelatedNoise
     static constexpr int numFloatParams{3};
     static constexpr int numIntParams{1};
 
-    basic_blocks::dsp::RNG rng;
+    basic_blocks::dsp::RNG &rng;
 
     enum FloatParams
     {
@@ -62,7 +62,8 @@ struct GenCorrelatedNoise
     };
 
     // provide a function which is uniform bipolar float -1.f .. 1.f random values
-    GenCorrelatedNoise() : core::VoiceEffectTemplateBase<VFXConfig>()
+    GenCorrelatedNoise(basic_blocks::dsp::RNG &extrng)
+        : core::VoiceEffectTemplateBase<VFXConfig>(), rng(extrng)
     {
         // Warm up
         for (int i = 0; i < 7; ++i)

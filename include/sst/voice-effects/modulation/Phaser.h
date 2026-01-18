@@ -42,7 +42,7 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
 
     static constexpr int maxPhases{6};
 
-    basic_blocks::dsp::RNG rng;
+    basic_blocks::dsp::RNG &rng;
 
     enum FloatParams
     {
@@ -60,7 +60,9 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
         ipStereo,
     };
 
-    Phaser() : core::VoiceEffectTemplateBase<VFXConfig>() {}
+    Phaser(basic_blocks::dsp::RNG &extrng) : core::VoiceEffectTemplateBase<VFXConfig>(), rng(extrng)
+    {
+    }
 
     ~Phaser() {}
 

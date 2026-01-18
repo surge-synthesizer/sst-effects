@@ -56,7 +56,7 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
     static constexpr int numFloatParams{4};
     static constexpr int numIntParams{3};
 
-    basic_blocks::dsp::RNG rng;
+    basic_blocks::dsp::RNG &rng;
 
     enum FloatParams
     {
@@ -76,8 +76,8 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
     using SineTable = basic_blocks::tables::SimpleSineProvider;
     SineTable &sT;
 
-    VoiceFlanger(SineTable &sineTable)
-        : core::VoiceEffectTemplateBase<VFXConfig>(), sT(sineTable), quadHelper(&sT)
+    VoiceFlanger(SineTable &sineTable, basic_blocks::dsp::RNG &extrng)
+        : core::VoiceEffectTemplateBase<VFXConfig>(), sT(sineTable), quadHelper(&sT), rng(extrng)
     {
     }
     ~VoiceFlanger() { modLines.returnAll(this); }

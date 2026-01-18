@@ -19,41 +19,66 @@
  */
 
 #include "catch2.hpp"
-#include "sst/basic-blocks/simd/setup.h"
+#include "sst/basic-blocks/dsp/RNG.h"
 
-#include "sst/voice-effects/distortion/BitCrusher.h"
+// delay
 #include "sst/voice-effects/delay/Microgate.h"
+#include "sst/voice-effects/delay/ShortDelay.h"
+#include "sst/voice-effects/delay/Widener.h"
+
+// distortion
 #include "sst/voice-effects/distortion/Slewer.h"
 #include "sst/voice-effects/distortion/TreeMonster.h"
-#include "sst/voice-effects/modulation/RingMod.h"
-#include "sst/voice-effects/waveshaper/WaveShaper.h"
-#include "sst/voice-effects/modulation/FreqShiftMod.h"
-#include "sst/voice-effects/modulation/PhaseMod.h"
-#include "sst/voice-effects/generator/GenCorrelatedNoise.h"
+#include "sst/voice-effects/distortion/BitCrusher.h"
+
+// dynamics
+#include "sst/voice-effects/dynamics/Compressor.h"
+#include "sst/voice-effects/dynamics/AutoWah.h"
+
+// eq
+#include "sst/voice-effects/eq/EqGraphic6Band.h"
 #include "sst/voice-effects/eq/EqNBandParametric.h"
 #include "sst/voice-effects/eq/MorphEQ.h"
 #include "sst/voice-effects/eq/TiltEQ.h"
-#include "sst/voice-effects/eq/EqGraphic6Band.h"
-#include "sst/voice-effects/delay/Widener.h"
-#include "sst/voice-effects/delay/ShortDelay.h"
-#include "sst/voice-effects/generator/StringResonator.h"
-#include "sst/voice-effects/generator/FourVoiceResonator.h"
+
+// filter
+#include "sst/voice-effects/filter/FiltersPlusPlus.h"
 #include "sst/voice-effects/filter/StaticPhaser.h"
+#include "sst/voice-effects/filter/UtilityFilters.h"
+
+// generator
+#include "sst/voice-effects/generator/3opPhaseMod.h"
+#include "sst/voice-effects/generator/EllipticBlepWaveforms.h"
+#include "sst/voice-effects/generator/FourVoiceResonator.h"
+#include "sst/voice-effects/generator/GenCorrelatedNoise.h"
+#include "sst/voice-effects/generator/SinePlus.h"
+#include "sst/voice-effects/generator/StringResonator.h"
+#include "sst/voice-effects/generator/TiltNoise.h"
+
+// lifted_bus_effects
+#include "sst/voice-effects/lifted_bus_effects/LiftedDelay.h"
+#include "sst/voice-effects/lifted_bus_effects/LiftedReverb1.h"
+#include "sst/voice-effects/lifted_bus_effects/LiftedReverb2.h"
+
+// modulation
+#include "sst/voice-effects/modulation/Chorus.h"
+#include "sst/voice-effects/modulation/Flanger.h"
+#include "sst/voice-effects/modulation/FMFilter.h"
+#include "sst/voice-effects/modulation/FreqShiftMod.h"
+#include "sst/voice-effects/modulation/NoiseAM.h"
+#include "sst/voice-effects/modulation/PhaseMod.h"
+#include "sst/voice-effects/modulation/Phaser.h"
+#include "sst/voice-effects/modulation/RingMod.h"
 #include "sst/voice-effects/modulation/ShepardPhaser.h"
 #include "sst/voice-effects/modulation/Tremolo.h"
-#include "sst/voice-effects/modulation/Flanger.h"
-#include "sst/voice-effects/modulation/Phaser.h"
-#include "sst/voice-effects/modulation/FMFilter.h"
-#include "sst/voice-effects/generator/TiltNoise.h"
-#include "sst/voice-effects/generator/EllipticBlepWaveforms.h"
-#include "sst/voice-effects/modulation/NoiseAM.h"
+
+// utilities
 #include "sst/voice-effects/utilities/StereoTool.h"
 #include "sst/voice-effects/utilities/VolumeAndPan.h"
 #include "sst/voice-effects/utilities/GainMatrix.h"
 
-#include "sst/voice-effects/lifted_bus_effects/LiftedReverb1.h"
-#include "sst/voice-effects/lifted_bus_effects/LiftedReverb2.h"
-#include "sst/voice-effects/lifted_bus_effects/LiftedDelay.h"
+// waveshaper
+#include "sst/voice-effects/waveshaper/WaveShaper.h"
 
 struct VTestConfig
 {
@@ -92,42 +117,45 @@ template <typename T> struct VTester
 
 TEST_CASE("Can Create Voice FX")
 {
+    // delay
     SECTION("MicroGate")
     {
         sst::basic_blocks::tables::SurgeSincTableProvider s;
         VTester<sst::voice_effects::delay::MicroGate<VTestConfig>>::TestVFX(s);
     }
+    SECTION("ShortDelay")
+    {
+        sst::basic_blocks::tables::SurgeSincTableProvider s;
+        VTester<sst::voice_effects::delay::ShortDelay<VTestConfig>>::TestVFX(s);
+    }
+    SECTION("Widener")
+    {
+        sst::basic_blocks::tables::SurgeSincTableProvider s;
+        VTester<sst::voice_effects::delay::Widener<VTestConfig>>::TestVFX(s);
+    }
+
+    // distortion
+    SECTION("Slewer") { VTester<sst::voice_effects::distortion::Slewer<VTestConfig>>::TestVFX(); }
     SECTION("BitCrusher")
     {
         VTester<sst::voice_effects::distortion::BitCrusher<VTestConfig>>::TestVFX();
     }
-
-    SECTION("Slewer") { VTester<sst::voice_effects::distortion::Slewer<VTestConfig>>::TestVFX(); }
     SECTION("TreeMonster")
     {
         VTester<sst::voice_effects::distortion::TreeMonster<VTestConfig>>::TestVFX();
     }
-    SECTION("RingMod") { VTester<sst::voice_effects::modulation::RingMod<VTestConfig>>::TestVFX(); }
-    SECTION("WaveShaper")
+
+    // dynamics
+    SECTION("Compressor")
     {
-        VTester<sst::voice_effects::waveshaper::WaveShaper<VTestConfig>>::TestVFX();
+        VTester<sst::voice_effects::dynamics::Compressor<VTestConfig>>::TestVFX();
     }
-    SECTION("PitchRing")
+    SECTION("AutoWah") { VTester<sst::voice_effects::dynamics::AutoWah<VTestConfig>>::TestVFX(); }
+
+    // eq
+    SECTION("GraphicEQ")
     {
-        VTester<sst::voice_effects::modulation::FreqShiftMod<VTestConfig>>::TestVFX();
-    }
-    SECTION("GenPhaseMod")
-    {
-        VTester<sst::voice_effects::modulation::PhaseMod<VTestConfig>>::TestVFX();
-    }
-    SECTION("GenCorrelatedNoise")
-    {
-        VTester<sst::voice_effects::generator::GenCorrelatedNoise<VTestConfig>>::TestVFX();
-    }
-    SECTION("FourVoiceRes")
-    {
-        sst::basic_blocks::tables::SimpleSineProvider s;
-        VTester<sst::voice_effects::generator::FourVoiceResonator<VTestConfig>>::TestVFX(s);
+        VTester<sst::voice_effects::eq::EqGraphic6Band<VTestConfig>>::TestVFX();
     }
     SECTION("ParmEQ")
     {
@@ -137,68 +165,81 @@ TEST_CASE("Can Create Voice FX")
     }
     SECTION("MorphEQ") { VTester<sst::voice_effects::eq::MorphEQ<VTestConfig>>::TestVFX(); }
     SECTION("TiltEQ") { VTester<sst::voice_effects::eq::TiltEQ<VTestConfig>>::TestVFX(); }
-    SECTION("GraphicEQ")
-    {
-        VTester<sst::voice_effects::eq::EqGraphic6Band<VTestConfig>>::TestVFX();
-    }
 
-    SECTION("FauxStereo")
+    // filter
+    SECTION("FiltersPlusPlus")
     {
-        sst::basic_blocks::tables::SurgeSincTableProvider s;
-        VTester<sst::voice_effects::delay::Widener<VTestConfig>>::TestVFX(s);
+        using fmd = sst::filtersplusplus::FilterModel;
+        VTester<
+            sst::voice_effects::filter::FiltersPlusPlus<VTestConfig, fmd::CytomicSVF>>::TestVFX();
+        VTester<sst::voice_effects::filter::FiltersPlusPlus<VTestConfig,
+                                                            fmd::VemberClassic>>::TestVFX();
+        VTester<
+            sst::voice_effects::filter::FiltersPlusPlus<VTestConfig, fmd::DiodeLadder>>::TestVFX();
+        VTester<sst::voice_effects::filter::FiltersPlusPlus<VTestConfig, fmd::TriPole>>::TestVFX();
+        VTester<
+            sst::voice_effects::filter::FiltersPlusPlus<VTestConfig, fmd::OBXD_4Pole>>::TestVFX();
+        VTester<
+            sst::voice_effects::filter::FiltersPlusPlus<VTestConfig, fmd::OBXD_Xpander>>::TestVFX();
+        VTester<
+            sst::voice_effects::filter::FiltersPlusPlus<VTestConfig, fmd::CutoffWarp>>::TestVFX();
+        VTester<sst::voice_effects::filter::FiltersPlusPlus<VTestConfig,
+                                                            fmd::ResonanceWarp>>::TestVFX();
+        VTester<sst::voice_effects::filter::FiltersPlusPlus<VTestConfig,
+                                                            fmd::SampleAndHold>>::TestVFX();
+        VTester<sst::voice_effects::filter::FiltersPlusPlus<VTestConfig, fmd::K35>>::TestVFX();
+        VTester<sst::voice_effects::filter::FiltersPlusPlus<VTestConfig, fmd::Comb>>::TestVFX();
+        VTester<sst::voice_effects::filter::FiltersPlusPlus<VTestConfig,
+                                                            fmd::VintageLadder>>::TestVFX();
     }
-
-    SECTION("ShortDelay")
-    {
-        sst::basic_blocks::tables::SurgeSincTableProvider s;
-        VTester<sst::voice_effects::delay::ShortDelay<VTestConfig>>::TestVFX(s);
-    }
-
-    SECTION("StringExciter")
-    {
-        sst::basic_blocks::tables::SurgeSincTableProvider s;
-        VTester<sst::voice_effects::generator::StringResonator<VTestConfig>>::TestVFX(s);
-    }
-
     SECTION("Static Phaser")
     {
         VTester<sst::voice_effects::filter::StaticPhaser<VTestConfig>>::TestVFX();
     }
-    SECTION("Shepard Phaser")
+    SECTION("Utility Filters")
     {
-        VTester<sst::voice_effects::modulation::ShepardPhaser<VTestConfig>>::TestVFX();
+        VTester<sst::voice_effects::filter::UtilityFilters<VTestConfig>>::TestVFX();
     }
-    SECTION("Tremolo") { VTester<sst::voice_effects::modulation::Tremolo<VTestConfig>>::TestVFX(); }
-    SECTION("Phaser") { VTester<sst::voice_effects::modulation::Phaser<VTestConfig>>::TestVFX(); }
-    SECTION("FM Filter")
+
+    // generator
+    SECTION("3-op PM")
     {
-        VTester<sst::voice_effects::modulation::FMFilter<VTestConfig>>::TestVFX();
+        sst::basic_blocks::tables::TwoToTheXProvider t;
+        sst::basic_blocks::tables::SixSinesWaveProvider s(false);
+        VTester<sst::voice_effects::generator::ThreeOpPhaseMod<VTestConfig>>::TestVFX(t, s);
+    }
+    SECTION("Elliptic Blep Waveforms")
+    {
+        sst::basic_blocks::dsp::RNG rng;
+        VTester<sst::voice_effects::generator::EllipticBlepWaveforms<VTestConfig>>::TestVFX(rng);
+    }
+    SECTION("FourVoiceRes")
+    {
+        sst::basic_blocks::tables::SimpleSineProvider s;
+        sst::basic_blocks::dsp::RNG rng;
+        VTester<sst::voice_effects::generator::FourVoiceResonator<VTestConfig>>::TestVFX(s, rng);
+    }
+    SECTION("GenCorrelatedNoise")
+    {
+        sst::basic_blocks::dsp::RNG rng;
+        VTester<sst::voice_effects::generator::GenCorrelatedNoise<VTestConfig>>::TestVFX(rng);
+    }
+    SECTION("Sine Plus")
+    {
+        VTester<sst::voice_effects::generator::SinePlus<VTestConfig>>::TestVFX();
+    }
+    SECTION("StringResonator")
+    {
+        sst::basic_blocks::tables::SurgeSincTableProvider s;
+        VTester<sst::voice_effects::generator::StringResonator<VTestConfig>>::TestVFX(s);
     }
     SECTION("Tilt Noise")
     {
-        VTester<sst::voice_effects::generator::TiltNoise<VTestConfig>>::TestVFX();
+        sst::basic_blocks::dsp::RNG rng;
+        VTester<sst::voice_effects::generator::TiltNoise<VTestConfig>>::TestVFX(rng);
     }
 
-    SECTION("Elliptic Blep Waveforms")
-    {
-        VTester<sst::voice_effects::generator::EllipticBlepWaveforms<VTestConfig>>::TestVFX();
-    }
-    SECTION("Noise AM")
-    {
-        VTester<sst::voice_effects::modulation::NoiseAM<VTestConfig>>::TestVFX();
-    }
-    SECTION("VolumeAndPan")
-    {
-        VTester<sst::voice_effects::utilities::VolumeAndPan<VTestConfig>>::TestVFX();
-    }
-    SECTION("StereoTool")
-    {
-        VTester<sst::voice_effects::utilities::StereoTool<VTestConfig>>::TestVFX();
-    }
-    SECTION("GainMatrix")
-    {
-        VTester<sst::voice_effects::utilities::GainMatrix<VTestConfig>>::TestVFX();
-    }
+    // lifted_bus_effects
     SECTION("Lifted Reverb 1")
     {
         VTester<sst::voice_effects::liftbus::LiftedReverb1<VTestConfig>>::TestVFX();
@@ -211,9 +252,71 @@ TEST_CASE("Can Create Voice FX")
     {
         VTester<sst::voice_effects::liftbus::LiftedDelay<VTestConfig>>::TestVFX();
     }
+
+    // modulation
+    SECTION("Chorus")
+    {
+        sst::basic_blocks::tables::SurgeSincTableProvider s;
+        sst::basic_blocks::dsp::RNG rng;
+        VTester<sst::voice_effects::modulation::Chorus<VTestConfig>>::TestVFX(s, rng);
+    }
     SECTION("Voice Flanger")
     {
         sst::basic_blocks::tables::SimpleSineProvider s;
-        VTester<sst::voice_effects::modulation::VoiceFlanger<VTestConfig>>::TestVFX(s);
+        sst::basic_blocks::dsp::RNG rng;
+        VTester<sst::voice_effects::modulation::VoiceFlanger<VTestConfig>>::TestVFX(s, rng);
+    }
+    SECTION("FM Filter")
+    {
+        VTester<sst::voice_effects::modulation::FMFilter<VTestConfig>>::TestVFX();
+    }
+    SECTION("FreqShiftMod")
+    {
+        VTester<sst::voice_effects::modulation::FreqShiftMod<VTestConfig>>::TestVFX();
+    }
+    SECTION("Noise AM")
+    {
+        sst::basic_blocks::dsp::RNG rng;
+        VTester<sst::voice_effects::modulation::NoiseAM<VTestConfig>>::TestVFX(rng);
+    }
+    SECTION("Phase Mod")
+    {
+        VTester<sst::voice_effects::modulation::PhaseMod<VTestConfig>>::TestVFX();
+    }
+    SECTION("Phaser")
+    {
+        sst::basic_blocks::dsp::RNG rng;
+        VTester<sst::voice_effects::modulation::Phaser<VTestConfig>>::TestVFX(rng);
+    }
+    SECTION("RingMod") { VTester<sst::voice_effects::modulation::RingMod<VTestConfig>>::TestVFX(); }
+    SECTION("Shepard Phaser")
+    {
+        sst::basic_blocks::dsp::RNG rng;
+        VTester<sst::voice_effects::modulation::ShepardPhaser<VTestConfig>>::TestVFX(rng);
+    }
+    SECTION("Tremolo")
+    {
+        sst::basic_blocks::dsp::RNG rng;
+        VTester<sst::voice_effects::modulation::Tremolo<VTestConfig>>::TestVFX(rng);
+    }
+
+    // utilities
+    SECTION("VolumeAndPan")
+    {
+        VTester<sst::voice_effects::utilities::VolumeAndPan<VTestConfig>>::TestVFX();
+    }
+    SECTION("StereoTool")
+    {
+        VTester<sst::voice_effects::utilities::StereoTool<VTestConfig>>::TestVFX();
+    }
+    SECTION("GainMatrix")
+    {
+        VTester<sst::voice_effects::utilities::GainMatrix<VTestConfig>>::TestVFX();
+    }
+
+    // waveshaper
+    SECTION("WaveShaper")
+    {
+        VTester<sst::voice_effects::waveshaper::WaveShaper<VTestConfig>>::TestVFX();
     }
 }

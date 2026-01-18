@@ -54,7 +54,7 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
     static constexpr int numFloatParams{2};
     static constexpr int numIntParams{5};
 
-    basic_blocks::dsp::RNG rng;
+    basic_blocks::dsp::RNG &rng;
 
     enum FloatParams
     {
@@ -74,8 +74,8 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
     using SineTable = basic_blocks::tables::SimpleSineProvider;
     SineTable &sT;
 
-    FourVoiceResonator(SineTable &sineTable)
-        : core::VoiceEffectTemplateBase<VFXConfig>(), sT(sineTable), panHelper(&sT)
+    FourVoiceResonator(SineTable &sineTable, basic_blocks::dsp::RNG &extrng)
+        : core::VoiceEffectTemplateBase<VFXConfig>(), sT(sineTable), panHelper(&sT), rng(extrng)
     {
     }
     ~FourVoiceResonator() { voices.returnAll(this); }
