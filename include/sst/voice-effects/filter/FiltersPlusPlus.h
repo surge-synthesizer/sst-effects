@@ -34,6 +34,12 @@
 
 namespace sst::voice_effects::filter
 {
+// to add a filter model from the filtersplusplus API:
+// - add a streaming name for it in the switch
+// - add it to the section in /tests/create-voice-effect
+// - if desired, decide in the constructor which configs to expose
+// by emplace_back()'ing the options you want into the right vector
+// - it should "just work"
 template <typename VFXConfig, filtersplusplus::FilterModel Model>
 struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
 {

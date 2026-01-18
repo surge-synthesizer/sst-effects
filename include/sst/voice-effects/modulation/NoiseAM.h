@@ -43,7 +43,7 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
     static constexpr int numFloatParams{3};
     static constexpr int numIntParams{2};
 
-    basic_blocks::dsp::RNG rng;
+    basic_blocks::dsp::RNG &rng;
 
     enum FloatParams
     {
@@ -58,7 +58,10 @@ template <typename VFXConfig> struct NoiseAM : core::VoiceEffectTemplateBase<VFX
         ipStereo
     };
 
-    NoiseAM() : core::VoiceEffectTemplateBase<VFXConfig>(), FiltersL(*this), FiltersR(*this) {}
+    NoiseAM(basic_blocks::dsp::RNG &extrng)
+        : core::VoiceEffectTemplateBase<VFXConfig>(), FiltersL(*this), FiltersR(*this), rng(extrng)
+    {
+    }
 
     ~NoiseAM() {}
 

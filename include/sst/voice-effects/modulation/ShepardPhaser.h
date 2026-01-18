@@ -40,7 +40,7 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
     static constexpr int numFloatParams{4};
     static constexpr int numIntParams{2};
 
-    basic_blocks::dsp::RNG rng;
+    basic_blocks::dsp::RNG &rng;
 
     enum FloatParams
     {
@@ -56,7 +56,10 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
         ipPeaks
     };
 
-    ShepardPhaser() : core::VoiceEffectTemplateBase<VFXConfig>() {}
+    ShepardPhaser(basic_blocks::dsp::RNG &extrng)
+        : core::VoiceEffectTemplateBase<VFXConfig>(), rng(extrng)
+    {
+    }
 
     ~ShepardPhaser() {}
 

@@ -48,7 +48,7 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
     using SincTable = sst::basic_blocks::tables::SurgeSincTableProvider;
     const SincTable &sSincTable;
 
-    basic_blocks::dsp::RNG rng;
+    basic_blocks::dsp::RNG &rng;
 
     enum FloatParams
     {
@@ -64,7 +64,10 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
         ipStereo,
     };
 
-    Chorus(const SincTable &st) : sSincTable(st), core::VoiceEffectTemplateBase<VFXConfig>() {}
+    Chorus(const SincTable &st, basic_blocks::dsp::RNG &extrng)
+        : core::VoiceEffectTemplateBase<VFXConfig>(), sSincTable(st), rng(extrng)
+    {
+    }
 
     ~Chorus()
     {

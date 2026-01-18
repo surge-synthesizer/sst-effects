@@ -45,7 +45,7 @@ struct TiltNoise : core::VoiceEffectTemplateBase<VFXConfig>,
     static constexpr int numFloatParams{3};
     static constexpr int numIntParams{1};
 
-    basic_blocks::dsp::RNG rng;
+    basic_blocks::dsp::RNG &rng;
 
     enum FloatParams
     {
@@ -59,7 +59,10 @@ struct TiltNoise : core::VoiceEffectTemplateBase<VFXConfig>,
         ipStereo,
     };
 
-    TiltNoise() : core::VoiceEffectTemplateBase<VFXConfig>(), FiltersL(*this), FiltersR(*this) {}
+    TiltNoise(basic_blocks::dsp::RNG &extrng)
+        : core::VoiceEffectTemplateBase<VFXConfig>(), FiltersL(*this), FiltersR(*this), rng(extrng)
+    {
+    }
 
     ~TiltNoise() {}
 

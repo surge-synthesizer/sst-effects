@@ -150,7 +150,10 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
         return pmd().withName("error");
     }
 
-    EllipticBlepWaveforms() : core::VoiceEffectTemplateBase<VFXConfig>(), uni(1) {}
+    EllipticBlepWaveforms(basic_blocks::dsp::RNG &extrng)
+        : core::VoiceEffectTemplateBase<VFXConfig>(), uni(1), rng(extrng)
+    {
+    }
     ~EllipticBlepWaveforms() = default;
 
     void initVoiceEffect()
@@ -370,7 +373,7 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
     float lastUniPanWidth{-10000.f};
     bool uniPanValid{false};
 
-    sst::basic_blocks::dsp::RNG rng;
+    sst::basic_blocks::dsp::RNG &rng;
 
   public:
     static constexpr int16_t streamingVersion{1};
