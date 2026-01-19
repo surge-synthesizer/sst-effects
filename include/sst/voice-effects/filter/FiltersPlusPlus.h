@@ -449,38 +449,6 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
 
     template <bool mono, bool monoCoeff> void setCoeffs(float pitch)
     {
-        if constexpr (Model == filtersplusplus::FilterModel::CytomicSVF)
-        {
-            // it's faster to just do it
-            filter.setModelConfiguration(configFilter());
-
-            auto reso = std::clamp(this->getFloatParam(fpResonance), 0.f, 1.f);
-            // Andy assumes A = pow(10, dB/40), our converter uses dB/20, hence the * .5f
-            auto extra = this->dbToLinear(
-                0.5f * std::clamp(this->getFloatParam(fpExtra), extraBounds[0], extraBounds[1]));
-
-            auto freqL = this->getFloatParam(fpCutoffL) + keytrackOn * pitch;
-
-            if constexpr (mono)
-            {
-                filter.setMono();
-                filter.makeCoefficients(0, freqL, reso, extra);
-                return;
-            }
-
-            filter.setStereo();
-            filter.makeCoefficients(0, freqL, reso, extra);
-            if constexpr (monoCoeff)
-            {
-                filter.copyCoefficientsFromVoiceToVoice(0, 1);
-                return;
-            }
-
-            auto freqR = this->getFloatParam(fpCutoffR) + keytrackOn * pitch;
-            filter.makeCoefficients(1, freqR, reso, extra);
-            return;
-        }
-
         std::array<float, numFloatParams> fp;
         std::array<int, numIntParams> ip;
         bool fDiff{false}, iDiff{false};
@@ -513,6 +481,12 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
             auto reso = std::clamp(this->getFloatParam(fpResonance), 0.f, 1.f);
             auto extra = std::clamp(this->getFloatParam(fpExtra), extraBounds[0], extraBounds[1]);
             auto freqL = this->getFloatParam(fpCutoffL) + keytrackOn * pitch;
+
+            if constexpr (Model == fmd::CytomicSVF)
+            {
+                // Andy assumes A = pow(10, dB/40), our converter uses dB/20, hence the * .5f
+                extra = this->dbToLinear(extra * 0.5f);
+            }
 
             if constexpr (Model == fmd::Comb)
             {
