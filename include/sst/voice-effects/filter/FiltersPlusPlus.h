@@ -482,6 +482,12 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
             auto extra = std::clamp(this->getFloatParam(fpExtra), extraBounds[0], extraBounds[1]);
             auto freqL = this->getFloatParam(fpCutoffL) + keytrackOn * pitch;
 
+            if constexpr (Model == fmd::CytomicSVF)
+            {
+                // Andy assumes A = pow(10, dB/40), our converter uses dB/20, hence the * .5f
+                extra = this->dbToLinear(extra * 0.5f);
+            }
+
             if constexpr (Model == fmd::Comb)
             {
                 reso = std::pow(reso, .25);
