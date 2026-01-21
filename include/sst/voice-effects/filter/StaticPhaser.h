@@ -77,7 +77,7 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
                 .asInt()
                 .withRange(1, maxPhases)
                 .withName("Stages")
-                .withLinearScaleFormatting("Stage")
+                .withLinearScaleFormatting("")
                 .withDefault(4);
         case ipStereo:
             return pmd().asStereoSwitch().withDefault(false);
