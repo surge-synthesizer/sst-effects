@@ -65,7 +65,7 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
     };
 
     Chorus(const SincTable &st, basic_blocks::dsp::RNG &extrng)
-        : core::VoiceEffectTemplateBase<VFXConfig>(), sSincTable(st), rng(extrng)
+        : core::VoiceEffectTemplateBase<VFXConfig>(), sSincTable(st), rng(extrng), LFO(this, rng)
     {
     }
 
@@ -159,7 +159,7 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     using lfo_t = sst::basic_blocks::modulators::SimpleLFO<Chorus, VFXConfig::blockSize>;
-    lfo_t LFO{this};
+    lfo_t LFO;
     typename lfo_t::Shape lfoShape = lfo_t::Shape::SINE;
 
     void shapeCheck()
