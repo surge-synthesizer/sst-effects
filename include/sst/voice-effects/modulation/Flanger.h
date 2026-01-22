@@ -25,13 +25,11 @@
 #include "../VoiceEffectCore.h"
 
 #include <cmath>
-#include <array>
 
 #include "sst/basic-blocks/dsp/BlockInterpolators.h"
 #include "sst/basic-blocks/dsp/RNG.h"
 #include "sst/basic-blocks/simd/setup.h"
 #include "sst/basic-blocks/mechanics/simd-ops.h"
-#include "sst/basic-blocks/modulators/FXModControl.h"
 #include "sst/basic-blocks/tables/SimpleSineProvider.h"
 #include "sst/basic-blocks/dsp/Interpolators.h"
 #include "../delay/DelaySupport.h"
@@ -161,19 +159,7 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
         }
 
         SampleRateSSE = SETALL(this->getSampleRate());
-        float p = this->getFloatParam(fpRoot); // TODO: pitch awareness
-        while (p < -24)
-        {
-            p += 12.f;
-        }
-        auto freqSSE =
-            MUL(DIV(ONE, MUL(SETALL(440 * this->note_to_pitch_ignoring_tuning(p)), COMBSPACE)),
-                SampleRateSSE);
 
-        // same time calculations as in the impl, using the LFO values at phase == 0
-        modTimeLerp.set_initial_targets(
-            ADD(freqSSE, MUL(MUL(SIMD_MM(set_ps)(0.f, -1.f, 0.f, 1.f), freqSSE),
-                             SETALL(.95f * std::clamp(this->getFloatParam(fpDepth), 0.f, 1.f)))));
         leftLerp.set_initial_targets(SIMD_MM(set_ps)(0.707f, 1.f, 0.707f, 0.f));
         rightLerp.set_initial_targets(SIMD_MM(set_ps)(0.707f, 0.f, 0.707f, 1.f));
         feedbackLerp.set_target_instant(this->getFloatParam(fpFeedback));
@@ -199,6 +185,22 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
             LPfilter.copyCoefficientsFromVoiceToVoice(0, i);
             DCblocker.copyCoefficientsFromVoiceToVoice(0, i);
         }
+    }
+    void initVoiceEffectPitch(float pitch)
+    {
+        float p = this->getFloatParam(fpRoot) + (pitch * keytrackOn);
+        while (p < -24)
+        {
+            p += 12.f;
+        }
+        auto freqSSE =
+            MUL(DIV(ONE, MUL(SETALL(440 * this->note_to_pitch_ignoring_tuning(p)), COMBSPACE)),
+                SampleRateSSE);
+
+        // lfo values at phase 0
+        auto lfoVals = SIMD_MM(set_ps)(0.f, -1.f, 0.f, 1.f);
+        auto depth = .95f * std::clamp(this->getFloatParam(fpDepth), 0.f, 1.f);
+        modTimeLerp.set_initial_targets(ADD(freqSSE, MUL(MUL(lfoVals, freqSSE), SETALL(depth))));
     }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 

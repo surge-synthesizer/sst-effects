@@ -133,6 +133,18 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
     }
 
     void initVoiceEffect() {}
+    void initVoiceEffectPitch(float pitch)
+    {
+        auto hp = 440 * this->note_to_pitch_ignoring_tuning(
+                            this->getFloatParam((int)WaveShaperFloatParams::highpass) +
+                            pitch * keytrackOn);
+        auto lp = 440 * this->note_to_pitch_ignoring_tuning(
+                            this->getFloatParam((int)WaveShaperFloatParams::lowpass) +
+                            pitch * keytrackOn);
+
+        filters[0].setCoeff(filters::CytomicSVF::Mode::Highpass, hp, 0.f, this->getSampleRate());
+        filters[1].setCoeff(filters::CytomicSVF::Mode::Lowpass, lp, 0.f, this->getSampleRate());
+    }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     template <bool stereo>
@@ -178,16 +190,18 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
 
     void setCoeffsHighpass(float pitch)
     {
-        auto hpParam = this->getFloatParam((int)WaveShaperFloatParams::highpass);
-        auto hpFreq =
-            440.f * this->note_to_pitch_ignoring_tuning((keytrackOn) ? pitch + hpParam : hpParam);
+        auto hpParam =
+            this->getFloatParam((int)WaveShaperFloatParams::highpass) + pitch * keytrackOn;
 
-        if (hpFreq != hpFreqPrior)
+        if (hpParam != hpParamPrior)
         {
+            auto hpFreq = 440.f * this->note_to_pitch_ignoring_tuning(hpParam);
+
             filters[0].template setCoeffForBlock<VFXConfig::blockSize>(
                 sst::filters::CytomicSVF::Mode::Highpass, hpFreq, 0.5f,
                 VFXConfig::getSampleRateInv(this), 0.f);
-            hpFreqPrior = hpFreq;
+
+            hpParamPrior = hpParam;
         }
         else
         {
@@ -197,16 +211,18 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
 
     void setCoeffsLowpass(float pitch)
     {
-        auto lpParam = this->getFloatParam((int)WaveShaperFloatParams::lowpass);
-        auto lpFreq =
-            440.f * this->note_to_pitch_ignoring_tuning((keytrackOn) ? pitch + lpParam : lpParam);
+        auto lpParam =
+            this->getFloatParam((int)WaveShaperFloatParams::lowpass) + pitch * keytrackOn;
 
-        if (lpFreq != lpFreqPrior)
+        if (lpParam != lpParamPrior)
         {
+            auto lpFreq = 440.f * this->note_to_pitch_ignoring_tuning(lpParam);
+
             filters[1].template setCoeffForBlock<VFXConfig::blockSize>(
                 sst::filters::CytomicSVF::Mode::Lowpass, lpFreq, 0.5f,
                 VFXConfig::getSampleRateInv(this), 0.f);
-            lpFreqPrior = lpFreq;
+
+            lpParamPrior = lpParam;
         }
         else
         {
@@ -315,8 +331,8 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
 
   protected:
     bool keytrackOn{false};
-    float hpFreqPrior = -9999.f;
-    float lpFreqPrior = -9999.f;
+    float hpParamPrior = -9999.f;
+    float lpParamPrior = -9999.f;
     int mTypeParamVal{-1};
     sst::waveshapers::WaveshaperType mWSType;
     sst::waveshapers::QuadWaveshaperState mWss;

@@ -125,7 +125,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
 
     // And these constructors and init functions
     Tremolo(basic_blocks::dsp::RNG &extrng)
-        : core::VoiceEffectTemplateBase<VFXConfig>(), rng(extrng)
+        : core::VoiceEffectTemplateBase<VFXConfig>(), rng(extrng), LFO(this, rng)
     {
     }
 
@@ -143,7 +143,7 @@ template <typename VFXConfig> struct Tremolo : core::VoiceEffectTemplateBase<VFX
     // which we have a simpleLFO class for. Let's introduce that here with an alias.
     using lfo_t = sst::basic_blocks::modulators::SimpleLFO<Tremolo, VFXConfig::blockSize>;
     // create one...
-    lfo_t LFO{this};
+    lfo_t LFO;
     // ...set up a variable for lfo shape.
     typename lfo_t::Shape lfoShape = lfo_t::Shape::SINE;
 

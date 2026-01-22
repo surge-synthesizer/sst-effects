@@ -22,14 +22,12 @@
 #define INCLUDE_SST_VOICE_EFFECTS_DYNAMICS_COMPRESSOR_H
 
 #include "../VoiceEffectCore.h"
-
-#include <iostream>
-
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/FollowSlewAndSmooth.h"
+#include "sst/filters/CytomicTilt.h"
 
-// This compressor is based on the VCV module "pressor" by Bog audio.
-// Many thanks to Matt Demanett for making it.
+// This compressor is based on the VCV module "pressor" by Bog audio (thx Matt!),
+// and a ballistics calculation by Jatin Chowdhury (thx Jatin)
 
 namespace sst::voice_effects::dynamics
 {
@@ -181,7 +179,12 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
             RA.setStorage(rmsBlock, rmsBufferSize);
         }
     }
-
+    void initVoiceEffectPitch(float pitch)
+    {
+        float freq = 440 * this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpSCTiltFreq) +
+                                                               pitch * keytrackOn);
+        tilter.setCoeff(freq, .07f, this->getSampleRateInv());
+    }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     static float decibelsToAmplitude(float db) { return powf(10.0f, db * 0.05f); }
@@ -246,8 +249,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
             auto outputR = datainR[i];
 
             float sidechain = (outputL + outputR) / 2;
-            filters[0].processBlockStep(sidechain);
-            filters[1].processBlockStep(sidechain);
+            tilter.processBlockStep(sidechain);
             float env = fabsf(sidechain);
 
             if (RMS)
@@ -299,8 +301,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
             float output = datain[i];
 
             float sidechain = output;
-            filters[0].processBlockStep(sidechain);
-            filters[1].processBlockStep(sidechain);
+            tilter.processBlockStep(sidechain);
             float env = fabsf(sidechain);
 
             if (RMS)
@@ -327,33 +328,12 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
 
     void setTiltCoeffs(float pitch)
     {
-        auto freqParam = this->getFloatParam(fpSCTiltFreq);
-        if (keytrackOn)
-        {
-            freqParam += pitch;
-        }
+        auto freqParam = this->getFloatParam(fpSCTiltFreq) + pitch * keytrackOn;
         float freq = 440 * this->note_to_pitch_ignoring_tuning(freqParam);
-        float slope = this->getFloatParam(fpSCTiltAmt) / 2;
-        float posGain = this->dbToLinear(slope);
-        float negGain = this->dbToLinear(-1 * slope);
-        float res = .07f;
+        float slope = this->dbToLinear(this->getFloatParam(fpSCTiltAmt) / 2);
 
-        if (slope == priorSlope && freq == priorFreq)
-        {
-            for (int i = 0; i < 2; i++)
-            {
-                filters[i].template retainCoeffForBlock<VFXConfig::blockSize>();
-            }
-        }
-        else
-        {
-            filters[0].template setCoeffForBlock<VFXConfig::blockSize>(
-                filters::CytomicSVF::Mode::LowShelf, freq, res, this->getSampleRateInv(), negGain);
-            filters[1].template setCoeffForBlock<VFXConfig::blockSize>(
-                filters::CytomicSVF::Mode::HighShelf, freq, res, this->getSampleRateInv(), posGain);
-            priorSlope = slope;
-            priorFreq = freq;
-        }
+        tilter.template setCoeffForBlock<VFXConfig::blockSize>(freq, .07f, this->getSampleRateInv(),
+                                                               slope);
     }
 
     bool enableKeytrack(bool b)
@@ -373,10 +353,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
     sst::basic_blocks::dsp::RunningAverage RA;
 
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, false> gainLerp;
-
-    std::array<sst::filters::CytomicSVF, 2> filters;
-    float priorSlope = -123456.f;
-    float priorFreq = -123456.f;
+    sst::filters::CytomicTilt tilter;
 
   public:
     static constexpr int16_t streamingVersion{1};

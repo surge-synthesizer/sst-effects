@@ -165,23 +165,22 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
             sinOscs[i].setSampleRate(this->getSampleRate());
             triOscs[i].setSampleRate(this->getSampleRate());
             pulseOscs[i].setSampleRate(this->getSampleRate());
+
+            driftLFOs[i].init(true);
         }
         if (this->getIntParam(ipRandomPhaseAtOutset))
         {
             auto sr = this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpSync));
 
-            for (int i = 0; i < maxUnison; ++i)
+            for (int i = 0; i < this->getIntParam(ipUnisonVoices); ++i)
             {
-                sawOscs[i].setInitialPhase(rng.unif01(), sr);
-                semisinOscs[i].setInitialPhase(rng.unif01(), sr);
-                sinOscs[i].setInitialPhase(rng.unif01(), sr);
-                triOscs[i].setInitialPhase(rng.unif01(), sr);
-                pulseOscs[i].setInitialPhase(rng.unif01(), sr);
+                auto rand = rng.unif01();
+                sawOscs[i].setInitialPhase(rand, sr);
+                semisinOscs[i].setInitialPhase(rand, sr);
+                sinOscs[i].setInitialPhase(rand, sr);
+                triOscs[i].setInitialPhase(rand, sr);
+                pulseOscs[i].setInitialPhase(rand, sr);
             }
-        }
-        for (int i = 0; i < maxUnison; ++i)
-        {
-            driftLFOs[i].init(true);
         }
     }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
