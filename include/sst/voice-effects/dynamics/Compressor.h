@@ -22,15 +22,12 @@
 #define INCLUDE_SST_VOICE_EFFECTS_DYNAMICS_COMPRESSOR_H
 
 #include "../VoiceEffectCore.h"
-
-#include <iostream>
-
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/FollowSlewAndSmooth.h"
+#include "sst/filters/CytomicTilt.h"
 
-// This compressor is based on the VCV module "pressor" by Bog audio,
-// with the ballistics calculation made by
-// Many thanks to Matt Demanett for making it.
+// This compressor is based on the VCV module "pressor" by Bog audio (thx Matt!),
+// and a ballistics calculation by Jatin Chowdhury (thx Jatin)
 
 namespace sst::voice_effects::dynamics
 {
