@@ -147,8 +147,38 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
     {
         lipolFb.set_target_instant(
             std::sqrt(std::clamp(this->getFloatParam(fpFeedback), 0.f, 1.f)));
-        shelf.init();
-        hpf.init();
+        hpf.setCoeff(sst::filters::CytomicSVF::Mode::Highpass, 35.f, .25f,
+                     this->getSampleRateInv());
+        hpf.retainCoeffForBlock<VFXConfig::blockSize>();
+    }
+    void initVoiceEffectPitch(float pitch)
+    {
+        auto pitchL = this->getFloatParam(fpCenterFrequencyL) + pitch * keytrackOn;
+        auto pitchR = this->getFloatParam(fpCenterFrequencyR) + pitch * keytrackOn;
+        auto freqL = 440.0 * this->note_to_pitch_ignoring_tuning(pitchL);
+        auto freqR = this->getIntParam(ipStereo)
+                         ? 440.0 * this->note_to_pitch_ignoring_tuning(pitchR)
+                         : freqL;
+
+        auto freqInc = 0.0;
+        if (this->getIntParam(ipStages) > 1)
+        {
+            freqInc =
+                440.0 * this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpSpacing) /
+                                                            (this->getIntParam(ipStages) - 1));
+        }
+
+        auto res = std::clamp(this->getFloatParam(fpResonance), 0.f, 1.f);
+        auto sg = 1 - this->getFloatParam(fpFeedback) * 0.05;
+
+        for (int i = 0; i < this->getIntParam(ipStages); ++i)
+        {
+            apfs[i].setCoeff(allpass, freqL, freqR, res, res, this->getSampleRateInv(), 1.f, 1.f);
+            freqL += freqInc;
+            freqR += freqInc;
+        }
+        shelf.setCoeff(sst::filters::CytomicSVF::Mode::HighShelf, freqL, freqR, 0.f, 0.f,
+                       this->getSampleRateInv(), sg, sg);
     }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
@@ -303,7 +333,6 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
             for (int i = 0; i < iparam[ipStages]; ++i)
                 apfs[i].template retainCoeffForBlock<VFXConfig::blockSize>();
             shelf.retainCoeffForBlock<VFXConfig::blockSize>();
-            hpf.retainCoeffForBlock<VFXConfig::blockSize>();
         }
     }
     bool enableKeytrack(bool b)

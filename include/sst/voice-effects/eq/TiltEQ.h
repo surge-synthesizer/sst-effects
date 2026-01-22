@@ -85,6 +85,12 @@ template <typename VFXConfig> struct TiltEQ : core::VoiceEffectTemplateBase<VFXC
         priorFreq = -9999.f;
         priorSlope = -9999.f;
     }
+    void initVoiceEffectPitch(float pitch)
+    {
+        float freq = 440 * this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpFreq) +
+                                                               pitch * keytrackOn);
+        tilter.setCoeff(freq, .07f, this->getSampleRateInv(), 1.f);
+    }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
@@ -102,9 +108,8 @@ template <typename VFXConfig> struct TiltEQ : core::VoiceEffectTemplateBase<VFXC
 
     void setCoeffs(float pitch)
     {
-        float freq = 440 * this->note_to_pitch_ignoring_tuning(
-                               keytrackOn ? pitch + this->getFloatParam(fpFreq)
-                                          : this->getFloatParam(fpFreq));
+        float freq = 440 * this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpFreq) +
+                                                               pitch * keytrackOn);
         float slope = this->dbToLinear(std::clamp(this->getFloatParam(fpTilt), -18.f, 18.f) * .5f);
 
         if (slope != priorSlope || freq != priorFreq || keytrackOn != wasKeytrackOn)

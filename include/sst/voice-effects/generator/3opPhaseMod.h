@@ -137,6 +137,26 @@ template <typename VFXConfig> struct ThreeOpPhaseMod : core::VoiceEffectTemplate
         DCBlocker.setCoeff(filters::CytomicSVF::Mode::Highpass, 15, 0.f, this->getSampleRateInv());
         DCBlocker.template retainCoeffForBlock<VFXConfig::blockSize>();
     }
+    void initVoiceEffectPitch(float pitch)
+    {
+        auto fp2{220.f}, fp3{220.f};
+
+        if (keytrackOn)
+        {
+            fp2 *= this->note_to_pitch_ignoring_tuning(pitch) *
+                   sTwoToTheXTable.twoToThe(this->getFloatParam(fpRatio2));
+            fp3 *= this->note_to_pitch_ignoring_tuning(pitch) *
+                   sTwoToTheXTable.twoToThe(this->getFloatParam(fpRatio3));
+        }
+        else
+        {
+            fp2 *= this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpRatio2));
+            fp3 *= this->note_to_pitch_ignoring_tuning(this->getFloatParam(fpRatio3));
+        }
+
+        freq2Lerp.set_target_instant(fp2);
+        freq3Lerp.set_target_instant(fp3);
+    }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,

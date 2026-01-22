@@ -191,6 +191,19 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
             lineSupport[i].reservePrepareAndClear(lineSize(), this, sSincTable);
         }
     }
+    void initVoiceEffectPitch(float pitch)
+    {
+        auto freqOne = this->getFloatParam(fpOffsetOne) + pitch * keytrackOn;
+        auto freqTwo = this->getFloatParam(fpOffsetTwo) + pitch * keytrackOn;
+        freqOne += pitchAdjustmentForStiffness();
+        freqTwo += pitchAdjustmentForStiffness();
+        freqOne = this->getSampleRate() / 440 * this->note_to_pitch_ignoring_tuning(freqOne);
+        freqTwo = this->getSampleRate() / 440 * this->note_to_pitch_ignoring_tuning(freqTwo);
+        pitchLerpOne.set_target_instant(freqOne);
+        pitchLerpTwo.set_target_instant(freqTwo);
+
+        decayLerp.instantize();
+    }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     float equalPowerFormula(float theta)
@@ -253,13 +266,8 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
         panLerpOne.set_target(panParamOne);
         panLerpTwo.set_target(panParamTwo);
 
-        auto pitchParamOne = this->getFloatParam(fpOffsetOne);
-        auto pitchParamTwo = this->getFloatParam(fpOffsetTwo);
-        if (keytrackOn)
-        {
-            pitchParamOne += pitch;
-            pitchParamTwo += pitch;
-        }
+        auto pitchParamOne = this->getFloatParam(fpOffsetOne) + pitch * keytrackOn;
+        auto pitchParamTwo = this->getFloatParam(fpOffsetTwo) + pitch * keytrackOn;
         pitchParamOne += pitchAdjustmentForStiffness();
         pitchParamTwo += pitchAdjustmentForStiffness();
         setupFilters(pitchParamOne);
@@ -272,16 +280,6 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
         auto decayParam = std::clamp(this->getFloatParam(fpDecay), 0.f, 1.f) * 0.12 + 0.88;
         decayParam = std::min(sqrt(decayParam), 0.99999);
         decayLerp.set_target(decayParam);
-
-        if (firstPitch)
-        {
-            pitchLerpOne.instantize();
-            pitchLerpTwo.instantize();
-            decayLerp.instantize();
-            panLerpOne.instantize();
-            panLerpTwo.instantize();
-            firstPitch = false;
-        }
 
         float levelOne alignas(16)[VFXConfig::blockSize];
         float levelTwo alignas(16)[VFXConfig::blockSize];
@@ -363,11 +361,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
         }
         panLerpOne.set_target(panParam);
 
-        auto pitchParam = this->getFloatParam(fpOffsetOne);
-        if (keytrackOn)
-        {
-            pitchParam += pitch;
-        }
+        auto pitchParam = this->getFloatParam(fpOffsetOne) + pitch * keytrackOn;
         pitchParam += pitchAdjustmentForStiffness();
         setupFilters(pitchParam);
         pitchLerpOne.set_target(this->getSampleRate() /
@@ -376,14 +370,6 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
         auto decayParam = std::clamp(this->getFloatParam(fpDecay), 0.f, 1.f) * 0.12 + 0.88;
         decayParam = std::min(sqrt(decayParam), 0.99999);
         decayLerp.set_target(decayParam);
-
-        if (firstPitch)
-        {
-            pitchLerpOne.instantize();
-            decayLerp.instantize();
-            panLerpOne.instantize();
-            firstPitch = false;
-        }
 
         float level alignas(16)[VFXConfig::blockSize];
         float pan alignas(16)[VFXConfig::blockSize];
@@ -444,13 +430,8 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
         levelLerpOne.set_target(levelParamOne);
         levelLerpTwo.set_target(levelParamTwo);
 
-        auto pitchParamOne = this->getFloatParam(fpOffsetOne);
-        auto pitchParamTwo = this->getFloatParam(fpOffsetTwo);
-        if (keytrackOn)
-        {
-            pitchParamOne += pitch;
-            pitchParamTwo += pitch;
-        }
+        auto pitchParamOne = this->getFloatParam(fpOffsetOne) + pitch * keytrackOn;
+        auto pitchParamTwo = this->getFloatParam(fpOffsetTwo) + pitch * keytrackOn;
         pitchParamOne += pitchAdjustmentForStiffness();
         pitchParamTwo += pitchAdjustmentForStiffness();
         setupFilters(pitchParamOne);
@@ -464,13 +445,6 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
         auto decayParam = std::clamp(this->getFloatParam(fpDecay), 0.f, 1.f) * 0.12 + 0.88;
         decayParam = std::min(sqrt(decayParam), 0.99999);
         decayLerp.set_target(decayParam);
-        if (firstPitch)
-        {
-            pitchLerpOne.instantize();
-            pitchLerpTwo.instantize();
-            decayLerp.instantize();
-            firstPitch = false;
-        }
 
         float levelOne alignas(16)[VFXConfig::blockSize];
         float levelTwo alignas(16)[VFXConfig::blockSize];
@@ -524,11 +498,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
         auto levelParam = std::clamp(this->getFloatParam(fpLevelOne), 0.f, 1.f);
         levelLerpOne.set_target(levelParam);
 
-        auto pitchParam = this->getFloatParam(fpOffsetOne);
-        if (keytrackOn)
-        {
-            pitchParam += pitch;
-        }
+        auto pitchParam = this->getFloatParam(fpOffsetOne) + pitch * keytrackOn;
         pitchParam += pitchAdjustmentForStiffness();
         setupFilters(pitchParam);
 
@@ -538,12 +508,6 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
         auto decayParam = std::clamp(this->getFloatParam(fpDecay), 0.f, 1.f) * 0.12 + 0.88;
         decayParam = std::min(sqrt(decayParam), 0.99999);
         decayLerp.set_target(decayParam);
-        if (firstPitch)
-        {
-            pitchLerpOne.instantize();
-            decayLerp.instantize();
-            firstPitch = false;
-        }
 
         float level alignas(16)[VFXConfig::blockSize];
         float frequency alignas(16)[VFXConfig::blockSize];

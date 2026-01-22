@@ -160,9 +160,7 @@ template <typename VFXConfig> struct SinePlus : core::VoiceEffectTemplateBase<VF
 
     void processMonoToMono(const float *const datain, float *dataout, float pitch)
     {
-        auto freq = this->getFloatParam(fpBaseFrequency);
-        if (keytrackOn)
-            freq += pitch;
+        auto freq = this->getFloatParam(fpBaseFrequency) + pitch * keytrackOn;
 
         float refA{440};
         float refB{440};

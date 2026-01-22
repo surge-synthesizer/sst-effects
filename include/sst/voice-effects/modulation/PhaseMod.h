@@ -92,6 +92,12 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
     }
 
     void initVoiceEffect() { lpf.init(); }
+    void initVoiceEffectPitch(float pitch)
+    {
+        auto freq = this->getFloatParam(fpTranspose) + pitch * keytrackOn;
+        omegaLerp.set_target_instant(440 * this->note_to_pitch_ignoring_tuning(freq) * M_PI_2 *
+                                     this->getSampleRateInv());
+    }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
@@ -101,13 +107,8 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
         namespace mech = sst::basic_blocks::mechanics;
         using mode = sst::filters::CytomicSVF::Mode;
 
-        auto freq = this->getFloatParam(fpTranspose);
-        auto lpfreq = this->getFloatParam(fpLowpass);
-        if (keytrackOn)
-        {
-            freq += pitch;
-            lpfreq += pitch;
-        }
+        auto freq = this->getFloatParam(fpTranspose) + pitch * keytrackOn;
+        auto lpfreq = this->getFloatParam(fpLowpass) + pitch * keytrackOn;
 
         float modulator alignas(16)[2][VFXConfig::blockSize];
 
@@ -178,13 +179,8 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
         namespace mech = sst::basic_blocks::mechanics;
         using mode = sst::filters::CytomicSVF::Mode;
 
-        auto freq = this->getFloatParam(fpTranspose);
-        auto lpfreq = this->getFloatParam(fpLowpass);
-        if (keytrackOn)
-        {
-            freq += pitch;
-            lpfreq += pitch;
-        }
+        auto freq = this->getFloatParam(fpTranspose) + pitch * keytrackOn;
+        auto lpfreq = this->getFloatParam(fpLowpass) + pitch * keytrackOn;
 
         float modulator alignas(16)[VFXConfig::blockSize];
 

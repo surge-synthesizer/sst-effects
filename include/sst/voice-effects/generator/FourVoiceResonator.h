@@ -206,6 +206,28 @@ template <typename VFXConfig> struct FourVoiceResonator : core::VoiceEffectTempl
             LPfilter.copyCoefficientsFromVoiceToVoice(0, i);
         }
     }
+    void initVoiceEffectPitch(float pitch)
+    {
+        float p = this->getFloatParam(fpRoot) + (pitch * keytrackOn);
+        while (p < -36)
+        {
+            p += 12.f;
+        }
+        p += 12.f * this->getIntParam(ipPolarity);
+
+        auto chord = this->getIntParam(ipChord);
+        auto JI = this->getIntParam(ipJust);
+        auto inv = this->getIntParam(ipInversion);
+
+        auto ratios = MUL(inversions[inv], SIMD_MM(load_ps)(CHORDS[JI][chord]));
+
+        // 1 / (root freq * ratio) * sample rate;
+        auto freqSSE =
+            MUL(SampleRateSSE,
+                DIV(ONE, MUL(SETALL(440 * this->note_to_pitch_ignoring_tuning(p)), ratios)));
+
+        timeLerp.set_initial_targets(freqSSE);
+    }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
     template <typename T>
