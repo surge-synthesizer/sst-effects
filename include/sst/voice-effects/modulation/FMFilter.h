@@ -137,15 +137,55 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
 
     void initVoiceEffect()
     {
-        DCfilter.template setCoeffForBlock<VFXConfig::blockSize>(
-            sst::filters::CytomicSVF::Mode::Highpass, 18.f, 18.f, 0.5f, 0.5f,
-            VFXConfig::getSampleRateInv(this), 0.f, 0.f);
+        depthLerp.set_target_instant(std::clamp(this->getFloatParam(fpDepth), 0.f, 1.f));
+        resLerp.set_target_instant(std::clamp(this->getFloatParam(fpRes), 0.f, 1.f));
+
+        DCfilter.setCoeff(sst::filters::CytomicSVF::Mode::Highpass, 18.f, 18.f, 0.5f, 0.5f,
+                          VFXConfig::getSampleRateInv(this), 0.f, 0.f);
+        DCfilter.retainCoeffForBlock<VFXConfig::blockSize>();
+    }
+    void initVoiceEffectPitch(float pitch)
+    {
+        auto freqL = this->getFloatParam(fpFreqL) + pitch * keytrackOn;
+        auto freqR = this->getFloatParam((this->getIntParam(ipStereo)) ? fpFreqR : fpFreqL) +
+                     pitch * keytrackOn;
+        freqL = 440.0f * this->note_to_pitch_ignoring_tuning(freqL);
+        freqR = 440.0f * this->note_to_pitch_ignoring_tuning(freqR);
+
+        freqLerpL.set_target_instant(freqL);
+        freqLerpR.set_target_instant(freqR);
     }
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
-    void whatMode()
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
     {
+        bool stereo = this->getIntParam(ipStereo);
+
+        resLerp.set_target(std::clamp(this->getFloatParam(fpRes), 0.f, 1.f));
+        float res alignas(16)[VFXConfig::blockSize];
+        resLerp.store_block(res);
+
+        depthLerp.set_target(std::clamp(this->getFloatParam(fpDepth), 0.f, 1.f));
+        float depth alignas(16)[VFXConfig::blockSize];
+        depthLerp.store_block(depth);
+
+        auto fL = this->getFloatParam(fpFreqL) + pitch * keytrackOn;
+        auto fR = this->getFloatParam((stereo) ? fpFreqR : fpFreqL) + pitch * keytrackOn;
+        fL = 440.0f * this->note_to_pitch_ignoring_tuning(fL);
+        fR = 440.0f * this->note_to_pitch_ignoring_tuning(fR);
+        freqLerpL.set_target(fL);
+        freqLerpR.set_target(fR);
+        float freqL alignas(16)[VFXConfig::blockSize];
+        float freqR alignas(16)[VFXConfig::blockSize];
+        freqLerpL.store_block(freqL);
+        freqLerpR.store_block(freqR);
+
+        auto tune = this->getFloatParam(fpModFreq);
+        mSinOsc.setRate(440.0 * 2 * M_PI * this->note_to_pitch_ignoring_tuning(pitch + tune) *
+                        this->getSampleRateInv());
+
         switch (this->getIntParam(ipMode))
         {
         case 0:
@@ -164,39 +204,7 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
             mode = sst::filters::CytomicSVF::Mode::Allpass;
             break;
         }
-    }
 
-    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
-                       float *dataoutR, float pitch)
-    {
-        DCfilter.retainCoeffForBlock<VFXConfig::blockSize>();
-
-        auto res = std::clamp(this->getFloatParam(fpRes), 0.f, 1.f);
-        bool stereo = this->getIntParam(ipStereo);
-        auto depth = this->getFloatParam(fpDepth);
-
-        auto freqL = this->getFloatParam(fpFreqL);
-        auto freqR = this->getFloatParam((stereo) ? fpFreqR : fpFreqL);
-        if (keytrackOn)
-        {
-            freqL += pitch;
-            freqR += pitch;
-        }
-        freqL = 440.0f * this->note_to_pitch_ignoring_tuning(freqL);
-        freqR = 440.0f * this->note_to_pitch_ignoring_tuning(freqR);
-
-        auto tune = this->getFloatParam(fpModFreq);
-        mSinOsc.setRate(440.0 * 2 * M_PI * this->note_to_pitch_ignoring_tuning(pitch + tune) *
-                        this->getSampleRateInv());
-
-        auto outputL = 0.f;
-        auto outputR = 0.f;
-
-        if (this->getIntParam(ipMode) != priorMode)
-        {
-            whatMode();
-            priorMode = this->getIntParam(ipMode);
-        }
         for (auto i = 0; i < VFXConfig::blockSize; ++i)
         {
             float inL = datainL[i];
@@ -204,13 +212,13 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
 
             mSinOsc.step();
 
-            float modL = mSinOsc.v * freqL * 3 * depth;
-            float modR = mSinOsc.v * freqR * 3 * depth;
-            auto modFreqL = freqL + modL;
-            auto modFreqR = freqR + modR;
+            float modL = mSinOsc.v * freqL[i] * 3 * depth[i];
+            float modR = mSinOsc.v * freqR[i] * 3 * depth[i];
+            auto modFreqL = freqL[i] + modL;
+            auto modFreqR = freqR[i] + modR;
 
-            filter.setCoeff(mode, modFreqL, modFreqR, res, res, VFXConfig::getSampleRateInv(this),
-                            0.f, 0.f);
+            filter.setCoeff(mode, modFreqL, modFreqR, res[i], res[i],
+                            VFXConfig::getSampleRateInv(this), 0.f, 0.f);
             sst::filters::CytomicSVF::step(filter, inL, inR);
 
             DCfilter.processBlockStep(inL, inR);
@@ -222,37 +230,53 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
 
     void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
     {
-        DCfilter.retainCoeffForBlock<VFXConfig::blockSize>();
+        resLerp.set_target(std::clamp(this->getFloatParam(fpRes), 0.f, 1.f));
+        float res alignas(16)[VFXConfig::blockSize];
+        resLerp.store_block(res);
 
-        auto res = std::clamp(this->getFloatParam(fpRes), 0.f, 1.f);
-        auto depth = std::clamp(this->getFloatParam(fpDepth), 0.f, 1.f);
+        depthLerp.set_target(std::clamp(this->getFloatParam(fpDepth), 0.f, 1.f));
+        float depth alignas(16)[VFXConfig::blockSize];
+        depthLerp.store_block(depth);
 
-        auto freq = this->getFloatParam(fpFreqL);
-        if (keytrackOn)
-        {
-            freq += pitch;
-        }
-        freq = 440.0f * this->note_to_pitch_ignoring_tuning(freq);
+        auto f = this->getFloatParam(fpFreqL) + pitch * keytrackOn;
+        f = 440.0f * this->note_to_pitch_ignoring_tuning(f);
+        freqLerpL.set_target(f);
+        float freq alignas(16)[VFXConfig::blockSize];
+        freqLerpL.store_block(freq);
 
         auto tune = this->getFloatParam(fpModFreq);
         mSinOsc.setRate(440.0 * 2 * M_PI * this->note_to_pitch_ignoring_tuning(tune + pitch) *
                         this->getSampleRateInv());
 
-        if (this->getIntParam(ipMode) != priorMode)
+        switch (this->getIntParam(ipMode))
         {
-            whatMode();
-            priorMode = this->getIntParam(ipMode);
+        case 0:
+            mode = sst::filters::CytomicSVF::Mode::Lowpass;
+            break;
+        case 1:
+            mode = sst::filters::CytomicSVF::Mode::Highpass;
+            break;
+        case 2:
+            mode = sst::filters::CytomicSVF::Mode::Bandpass;
+            break;
+        case 3:
+            mode = sst::filters::CytomicSVF::Mode::Notch;
+            break;
+        case 4:
+            mode = sst::filters::CytomicSVF::Mode::Allpass;
+            break;
         }
+
         for (auto i = 0; i < VFXConfig::blockSize; ++i)
         {
             float input = datainL[i];
 
             mSinOsc.step();
 
-            float mod = mSinOsc.v * freq * 3 * depth;
-            auto modFreq = mod + freq;
+            float mod = mSinOsc.v * freq[i] * 3 * depth[i];
+            auto modFreq = mod + freq[i];
 
-            filter.setCoeff(mode, modFreq, res, VFXConfig::getSampleRateInv(this), 0.f);
+            filter.setCoeff(mode, modFreq, res[i], VFXConfig::getSampleRateInv(this), 0.f);
             auto dummyR = 0.f;
             sst::filters::CytomicSVF::step(filter, input, dummyR);
 
@@ -277,6 +301,7 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
         return res;
     }
     bool getKeytrack() const { return keytrackOn; }
+    bool getKeytrackDefault() const { return true; }
     bool checkParameterConsistency() const { return true; }
     size_t silentSamplesLength() const { return 10; }
 
@@ -285,6 +310,8 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
     sst::filters::CytomicSVF filter;
     sst::filters::CytomicSVF DCfilter;
     sst::basic_blocks::dsp::QuadratureOscillator<float> mSinOsc;
+    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, false> freqLerpL, freqLerpR, resLerp,
+        depthLerp, tuneLerp;
 
     sst::filters::CytomicSVF::Mode mode{filters::CytomicSVF::Mode::Lowpass};
     int priorMode{-1};
