@@ -300,7 +300,7 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
 
         if (streamedFrom < 2)
         {
-            std::swap(fparam[3], fparam[4];
+            std::swap(fparam[3], fparam[4]);
         }
     }
 };
