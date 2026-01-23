@@ -23,6 +23,7 @@
 
 #include "../VoiceEffectCore.h"
 #include "sst/basic-blocks/params/ParamMetadata.h"
+#include <utility>
 
 namespace sst::voice_effects::filter
 {
@@ -39,8 +40,8 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
         fpHPFreq,
         fpLPFreq,
         fpLSFreq,
-        fpLSGain,
         fpHSFreq,
+        fpLSGain,
         fpHSGain,
         fpHPRes,
         fpLPRes
@@ -291,13 +292,16 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
     std::array<sst::filters::CytomicSVF, 4> CySVFs;
 
   public:
-    static constexpr int16_t streamingVersion{1};
+    static constexpr int16_t streamingVersion{2};
     static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
                                                    int *const iparam)
     {
-        // base implementation - we have never updated streaming
-        // input is parameters from stream version
-        assert(streamedFrom == 1);
+        assert(streamedFrom <= streamingVersion);
+
+        if (streamedFrom < 2)
+        {
+            std::swap(fparam[3], fparam[4]);
+        }
     }
 };
 } // namespace sst::voice_effects::filter
