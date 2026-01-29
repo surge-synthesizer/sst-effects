@@ -169,15 +169,15 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
 
     void setCoeffs(float pitch)
     {
-
         float hpFreq = this->getFloatParam(fpHPFreq) + pitch * keytrackOn;
+        float hpRes = this->getFloatParam(fpHPRes);
         if (hpFreq != priorFP[0])
         {
             priorFP[0] = hpFreq;
             hpFreq = 440.f * this->note_to_pitch_ignoring_tuning(hpFreq);
 
             CySVFs[0].template setCoeffForBlock<VFXConfig::blockSize>(
-                filters::CytomicSVF::Mode::Highpass, hpFreq, 0.5f,
+                filters::CytomicSVF::Mode::Highpass, hpFreq, hpRes,
                 VFXConfig::getSampleRateInv(this), 0.f);
         }
         else
@@ -186,14 +186,15 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
         }
 
         float lpFreq = this->getFloatParam(fpLPFreq) + pitch * keytrackOn;
+        float lpRes = this->getFloatParam(fpLPRes);
         if (lpFreq != priorFP[1])
         {
             priorFP[1] = lpFreq;
             lpFreq = 440.f * this->note_to_pitch_ignoring_tuning(lpFreq);
 
             CySVFs[1].template setCoeffForBlock<VFXConfig::blockSize>(
-                filters::CytomicSVF::Mode::Lowpass, lpFreq, 0.5f, VFXConfig::getSampleRateInv(this),
-                0.f);
+                filters::CytomicSVF::Mode::Lowpass, lpFreq, lpRes,
+                VFXConfig::getSampleRateInv(this), 0.f);
         }
         else
         {
