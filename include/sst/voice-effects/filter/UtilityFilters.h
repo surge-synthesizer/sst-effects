@@ -171,9 +171,10 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
     {
         float hpFreq = this->getFloatParam(fpHPFreq) + pitch * keytrackOn;
         float hpRes = this->getFloatParam(fpHPRes);
-        if (hpFreq != priorFP[0])
+        if (hpFreq != priorFP[0] || hpRes != priorFP[6])
         {
             priorFP[0] = hpFreq;
+            priorFP[6] = hpRes;
             hpFreq = 440.f * this->note_to_pitch_ignoring_tuning(hpFreq);
 
             CySVFs[0].template setCoeffForBlock<VFXConfig::blockSize>(
@@ -187,9 +188,10 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
 
         float lpFreq = this->getFloatParam(fpLPFreq) + pitch * keytrackOn;
         float lpRes = this->getFloatParam(fpLPRes);
-        if (lpFreq != priorFP[1])
+        if (lpFreq != priorFP[1] || lpRes != priorFP[7])
         {
             priorFP[1] = lpFreq;
+            priorFP[7] = lpRes;
             lpFreq = 440.f * this->note_to_pitch_ignoring_tuning(lpFreq);
 
             CySVFs[1].template setCoeffForBlock<VFXConfig::blockSize>(
