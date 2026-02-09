@@ -58,8 +58,8 @@ if (${SST_EFFECTS_BUILD_TESTS})
     if (NOT TARGET fmt)
         CPMAddPackage(NAME fmt
                 GITHUB_REPOSITORY fmtlib/fmt
-                GIT_TAG master
-                )
+                GIT_TAG 10.2.1
+        )
     endif ()
 
     if (NOT TARGET eurorack)

@@ -78,6 +78,7 @@ template <typename VFXConfig> struct TreeMonster : core::VoiceEffectTemplateBase
                 .withRange(-60.f, 60.f)
                 .withName("Pitch")
                 .withDefault(0.f)
+                .withFeature(pmd::Features::ALLOW_TUNING_FRACTION_TYPEINS)
                 .withLinearScaleFormatting("keys");
         case tmvRingMix:
             return pmd().asPercent().withDefault(0.5f).withName("Ring Modulation");
