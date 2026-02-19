@@ -23,12 +23,11 @@
 
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "../VoiceEffectCore.h"
-
-#include <iostream>
-
 #include "sst/basic-blocks/mechanics/block-ops.h"
-#include "sst/basic-blocks/modulators/SimpleLFO.h"
 #include "sst/basic-blocks/dsp/RNG.h"
+#include "sst/basic-blocks/simd/setup.h"
+
+#include <cmath>
 
 namespace sst::voice_effects::modulation
 {
@@ -103,169 +102,159 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
 
     void initVoiceEffect()
     {
-        for (int i = 0; i < 24; ++i)
+        for (auto &f : filtersL)
         {
-            filters[i].init();
-            if (i < 12)
+            f.init();
+        }
+        for (auto &f : filtersR)
+        {
+            f.init();
+        }
+
+        int peaks = this->getIntParam(ipPeaks);
+        quadsToProcess = std::ceil((float)peaks / 4.f);
+        halfway = 0.5 / static_cast<double>(peaks);
+        logOfPeaks = std::log2f(static_cast<float>(peaks));
+        gainScale = 1 / logOfPeaks;
+        priorPeaks = peaks;
+
+        phasorValue = rng.unif01();
+        for (int i = 0; i < peaks; ++i)
+        {
+            auto offset = static_cast<double>(i) / static_cast<double>(peaks);
+            auto pL = phasorValue + offset;
+            phaseL[i] = pL - (int)pL;
+
+            if (this->getIntParam(ipStereo))
             {
-                priorLevelL[i] = -12345.f;
-                priorLevelR[i] = -12345.f;
+                auto pR = phasorValue + offset + halfway;
+                phaseR[i] = pR - (int)pR;
             }
+            else
+            {
+                phaseR[i] = phaseL[i];
+            }
+
+            // triangle for amplitude
+            auto iTriL = triangle(phaseL[i]);
+            auto iTriR = triangle(phaseR[i]);
+            levelLerpL[i].set_target_instant(iTriL);
+            levelLerpR[i].set_target_instant(iTriR);
+        }
+        for (int i = peaks; i < 12; ++i)
+        {
+            levelLerpL[i].set_target_instant(0.f);
+            levelLerpR[i].set_target_instant(0.f);
+            freqsL[i] = 0.00001f;
+            freqsR[i] = 0.00001f;
         }
     }
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
-    using lfo_t = sst::basic_blocks::modulators::SimpleLFO<ShepardPhaser, VFXConfig::blockSize>;
-    lfo_t phasor{this};
-
-    float triangle(const float &p)
+    float triangle(const float p)
     {
-        auto res = 0.f;
-        if (p < 0.5)
-        {
-            res = 4 * p - 1.f;
-        }
-        else
-        {
-            res = (1.f - 4 * (p - 0.5));
-        }
-        return res * .5 + .5;
+        auto res = -(std::fabs(-2 * p + 1)) + 1;
+        return res * res * res;
     }
 
-    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
-                       float *dataoutR, float pitch)
+#define MUL(a, b) SIMD_MM(mul_ps)(a, b)
+#define ADD(a, b) SIMD_MM(add_ps)(a, b)
+    SIMD_M128 triangle(const SIMD_M128 p)
     {
-        auto stereo = this->getIntParam(ipStereo);
+        namespace mech = sst::basic_blocks::mechanics;
+        //  -(abs(-2 * p + 1)) + 1
+        auto res = ADD(MUL(negOneSSE, mech::abs_ps(ADD(MUL(negTwoSSE, p), oneSSE))), oneSSE);
+        // goes 0...1...0 as phase goes 0...1
+        // then cube that
+        return MUL(res, MUL(res, res));
+    }
+#undef MUL
+#undef ADD
+
+    template <bool stereo>
+    void processStereoImpl(const float *const datainL, const float *const datainR, float *dataoutL,
+                           float *dataoutR, float pitch)
+    {
         auto range = std::clamp(this->getFloatParam(fpEndFreq), -60.f, 70.f) -
                      std::clamp(this->getFloatParam(fpStartFreq), -60.f, 70.f);
         auto res = std::clamp(this->getFloatParam(fpResonance) * .08f + .9f, 0.f, .98f);
         int peaks = this->getIntParam(ipPeaks);
         if (peaks != priorPeaks)
         {
-            logOfPeaks = std::log2f(peaks);
-            gainScale = 1 / logOfPeaks;
-            priorPeaks = peaks;
+            this->initVoiceEffect();
         }
-        auto lfoRate = this->getFloatParam(fpRate) - logOfPeaks;
 
-        if (isFirst)
-        {
-            phasor.applyPhaseOffset(rng.unif01());
-            isFirst = false;
-        }
-        phasor.process_block(lfoRate, 0.f, lfo_t::RAMP);
-        auto phasorValue = phasor.lastTarget * .5f + .5f;
+        auto phaseInc =
+            this->envelope_rate_linear_nowrap(-(this->getFloatParam(fpRate) - logOfPeaks));
+        phasorValue += phaseInc;
+        phasorValue -= (int)phasorValue;
 
         namespace mech = sst::basic_blocks::mechanics;
         mech::clear_block<VFXConfig::blockSize>(dataoutL);
         mech::clear_block<VFXConfig::blockSize>(dataoutR);
 
-        if (stereo)
+        for (int i = 0; i < peaks; ++i)
         {
-            for (int i = 0; i < peaks; ++i)
+            auto offset = static_cast<double>(i) / static_cast<double>(peaks);
+            auto pL = phasorValue + offset;
+            phaseL[i] = pL - (int)pL;
+            freqsL[i] = 440.f * this->note_to_pitch_ignoring_tuning(
+                                    this->getFloatParam(fpStartFreq) + (range * phaseL[i]));
+
+            if constexpr (stereo)
             {
-                auto offset = static_cast<double>(i) / static_cast<double>(peaks);
-                auto halfway = 0.5 / static_cast<double>(peaks);
-
-                // ramp for frequency
-                auto iPhaseL = std::fmod(phasorValue + offset, 1.0);
-                auto iPhaseR = std::fmod(phasorValue + offset + halfway, 1.0);
-
-                // triangle for amplitude
-                auto iTriL = triangle(iPhaseL);
-                auto iTriR = triangle(iPhaseR);
-                iTriL = iTriL * iTriL * iTriL;
-                iTriR = iTriR * iTriR * iTriR;
-                if (priorLevelL[i] < 0) // true on first block
-                {
-                    priorLevelL[i] = iTriL; // start from the first value
-                }
-                if (priorLevelR[i] < 0) // same for the right side
-                {
-                    priorLevelR[i] = iTriR;
-                }
-                // set the smoothers to start on the prior value
-                levelLerpL.set_target_instant(priorLevelL[i]);
-                levelLerpR.set_target_instant(priorLevelR[i]);
-                // and aim for the current value
-                levelLerpL.set_target(iTriL);
-                levelLerpR.set_target(iTriR);
-                // and save the index's value to start from on the next block
-                priorLevelL[i] = iTriL;
-                priorLevelR[i] = iTriR;
-                // A float per filter is a lot less memory than a lipol_sse per filter
-
-                auto freqL = 440.f * this->note_to_pitch_ignoring_tuning(
-                                         this->getFloatParam(fpStartFreq) + (range * iPhaseL));
-                auto freqR = 440.f * this->note_to_pitch_ignoring_tuning(
-                                         this->getFloatParam(fpStartFreq) + (range * iPhaseR));
-
-                filters[i].template setCoeffForBlock<VFXConfig::blockSize>(
-                    sst::filters::CytomicSVF::Mode::Bandpass, freqL, freqR, res, res,
-                    this->getSampleRateInv(), 1.f, 1.f);
-
-                float tmpL alignas(16)[VFXConfig::blockSize];
-                float tmpR alignas(16)[VFXConfig::blockSize];
-                mech::copy_from_to<VFXConfig::blockSize>(datainL, tmpL);
-                mech::copy_from_to<VFXConfig::blockSize>(datainR, tmpR);
-
-                for (int k = 0; k < VFXConfig::blockSize; ++k)
-                {
-                    filters[i].processBlockStep(tmpL[k], tmpR[k]);
-                }
-
-                levelLerpL.multiply_block(tmpL);
-                levelLerpR.multiply_block(tmpR);
-
-                mech::scale_accumulate_from_to<VFXConfig::blockSize>(tmpL, tmpR, gainScale,
-                                                                     dataoutL, dataoutR);
+                auto pR = phasorValue + offset + halfway;
+                phaseR[i] = pR - (int)pR;
+                freqsR[i] = 440.f * this->note_to_pitch_ignoring_tuning(
+                                        this->getFloatParam(fpStartFreq) + (range * phaseR[i]));
+            }
+            else
+            {
+                phaseR[i] = phaseL[i];
+                freqsR[i] = freqsL[i];
             }
         }
-        else
+
+        float outL alignas(16)[12][VFXConfig::blockSize];
+        float outR alignas(16)[12][VFXConfig::blockSize];
+        float triL alignas(16)[12];
+        float triR alignas(16)[12];
+        for (int i = 0; i < quadsToProcess; ++i)
         {
-            for (int i = 0; i < peaks; ++i)
-            {
-                auto offset = static_cast<double>(i) / static_cast<double>(peaks);
-                auto halfway = 0.5 / static_cast<double>(peaks);
-                auto iPhase = std::fmod(phasorValue + offset, 1.0);
+            int regidx = i * 4;
 
-                auto iTri = triangle(iPhase);
-                iTri = iTri * iTri * iTri;
-                if (priorLevelL[i] < 0)
-                {
-                    priorLevelL[i] = iTri;
-                }
-                levelLerpL.set_target_instant(priorLevelL[i]);
-                levelLerpL.set_target(iTri);
-                priorLevelL[i] = iTri;
+            auto tL = triangle(SIMD_MM(set_ps)(phaseL[3 + regidx], phaseL[2 + regidx],
+                                               phaseL[1 + regidx], phaseL[0 + regidx]));
+            auto tR = triangle(SIMD_MM(set_ps)(phaseR[3 + regidx], phaseR[2 + regidx],
+                                               phaseR[1 + regidx], phaseR[0 + regidx]));
+            SIMD_MM(store_ps)(&triL[regidx], tL);
+            SIMD_MM(store_ps)(&triR[regidx], tR);
 
-                auto freq = 440.f * this->note_to_pitch_ignoring_tuning(
-                                        this->getFloatParam(fpStartFreq) + (range * iPhase));
+            filtersL[i].template setCoeffForBlockQuadBandpass<VFXConfig::blockSize>(
+                &freqsL[regidx], res, this->getSampleRateInv());
+            filtersR[i].template setCoeffForBlockQuadBandpass<VFXConfig::blockSize>(
+                &freqsR[regidx], res, this->getSampleRateInv());
 
-                filters[i].template setCoeffForBlock<VFXConfig::blockSize>(
-                    sst::filters::CytomicSVF::Mode::Bandpass, freq, freq, res, res,
-                    this->getSampleRateInv(), 1.f, 1.f);
+            filtersL[i].template processBlockQuad<VFXConfig::blockSize>(
+                datainL, outL[0 + regidx], outL[1 + regidx], outL[2 + regidx], outL[3 + regidx]);
+            filtersR[i].template processBlockQuad<VFXConfig::blockSize>(
+                datainR, outR[0 + regidx], outR[1 + regidx], outR[2 + regidx], outR[3 + regidx]);
+        }
 
-                float tmpL alignas(16)[VFXConfig::blockSize];
-                float tmpR alignas(16)[VFXConfig::blockSize];
-                mech::copy_from_to<VFXConfig::blockSize>(datainL, tmpL);
-                mech::copy_from_to<VFXConfig::blockSize>(datainR, tmpR);
+        for (int i = 0; i < peaks; ++i)
+        {
+            levelLerpL[i].set_target(triL[i]);
+            levelLerpR[i].set_target(triR[i]);
+            levelLerpL[i].multiply_block(outL[i]);
+            levelLerpR[i].multiply_block(outR[i]);
 
-                for (int k = 0; k < VFXConfig::blockSize; ++k)
-                {
-                    filters[i].processBlockStep(tmpL[k], tmpR[k]);
-                }
-
-                levelLerpL.multiply_2_blocks(tmpL, tmpR);
-
-                mech::scale_accumulate_from_to<VFXConfig::blockSize>(tmpL, tmpR, gainScale,
-                                                                     dataoutL, dataoutR);
-            }
+            mech::scale_accumulate_from_to<VFXConfig::blockSize>(outL[i], outR[i], gainScale,
+                                                                 dataoutL, dataoutR);
         }
     }
 
-    void processMonoToMono(const float *const datainL, float *dataoutL, float pitch)
+    void processMonoToMono(const float *const datain, float *dataout, float pitch)
     {
         auto range = std::clamp(this->getFloatParam(fpEndFreq), -60.f, 70.f) -
                      std::clamp(this->getFloatParam(fpStartFreq), -60.f, 70.f);
@@ -273,83 +262,90 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
         int peaks = this->getIntParam(ipPeaks);
         if (peaks != priorPeaks)
         {
-            logOfPeaks = std::log2f(peaks);
-            gainScale = 1 / logOfPeaks;
-            priorPeaks = peaks;
+            this->initVoiceEffect();
         }
-        auto lfoRate = this->getFloatParam(fpRate) - logOfPeaks;
 
-        if (isFirst)
-        {
-            phasor.applyPhaseOffset(rng.unif01());
-            isFirst = false;
-        }
-        phasor.process_block(lfoRate, 0.f, lfo_t::RAMP);
-        auto phasorValue = phasor.lastTarget * .5f + .5f;
+        auto phaseInc =
+            this->envelope_rate_linear_nowrap(-(this->getFloatParam(fpRate) - logOfPeaks));
+        phasorValue += phaseInc;
+        phasorValue -= (int)phasorValue;
 
         namespace mech = sst::basic_blocks::mechanics;
-        mech::clear_block<VFXConfig::blockSize>(dataoutL);
+        mech::clear_block<VFXConfig::blockSize>(dataout);
 
         for (int i = 0; i < peaks; ++i)
         {
             auto offset = static_cast<double>(i) / static_cast<double>(peaks);
-            auto iPhase = std::fmod(phasorValue + offset, 1.0);
+            auto pL = phasorValue + offset;
+            phaseL[i] = pL - (int)pL;
+            freqsL[i] = 440.f * this->note_to_pitch_ignoring_tuning(
+                                    this->getFloatParam(fpStartFreq) + (range * phaseL[i]));
+        }
 
-            float iTri = triangle(iPhase);
-            iTri = iTri * iTri * iTri;
+        float out alignas(16)[12][VFXConfig::blockSize];
+        float tri alignas(16)[12];
+        for (int i = 0; i < quadsToProcess; ++i)
+        {
+            int regidx = i * 4;
 
-            if (isFirst)
-            {
-                priorLevelL[i] = iTri;
-                if (i == peaks - 1)
-                {
-                    isFirst = false;
-                }
-            }
-            levelLerpL.set_target_instant(priorLevelL[i]);
-            levelLerpL.set_target(iTri);
-            priorLevelL[i] = iTri;
+            auto t = triangle(SIMD_MM(set_ps)(phaseL[3 + regidx], phaseL[2 + regidx],
+                                              phaseL[1 + regidx], phaseL[0 + regidx]));
+            SIMD_MM(store_ps)(&tri[regidx], t);
 
-            auto freqMod = this->getFloatParam(fpStartFreq) + (range * iPhase);
-            auto freq = 440.f * this->note_to_pitch_ignoring_tuning(freqMod);
-            filters[i].template setCoeffForBlock<VFXConfig::blockSize>(
-                sst::filters::CytomicSVF::Mode::Bandpass, freq, res, this->getSampleRateInv(), 1.f);
+            filtersL[i].template setCoeffForBlockQuadBandpass<VFXConfig::blockSize>(
+                &freqsL[regidx], res, this->getSampleRateInv());
 
-            float tmp alignas(16)[VFXConfig::blockSize];
-            mech::copy_from_to<VFXConfig::blockSize>(datainL, tmp);
+            filtersL[i].template processBlockQuad<VFXConfig::blockSize>(
+                datain, out[0 + regidx], out[1 + regidx], out[2 + regidx], out[3 + regidx]);
+        }
 
-            for (int k = 0; k < VFXConfig::blockSize; ++k)
-            {
-                filters[i].processBlockStep(tmp[k]);
-            }
+        for (int i = 0; i < peaks; ++i)
+        {
+            levelLerpL[i].set_target(tri[i]);
+            levelLerpL[i].multiply_block(out[i]);
 
-            levelLerpL.multiply_block(tmp);
+            mech::scale_accumulate_from_to<VFXConfig::blockSize>(out[i], gainScale, dataout);
+        }
+    }
 
-            mech::scale_accumulate_from_to<VFXConfig::blockSize>(tmp, gainScale, dataoutL);
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
+    {
+        if (this->getIntParam(ipStereo))
+        {
+            processStereoImpl<true>(datainL, datainL, dataoutL, dataoutR, pitch);
+        }
+        else
+        {
+            processStereoImpl<false>(datainL, datainL, dataoutL, dataoutR, pitch);
         }
     }
 
     void processMonoToStereo(const float *const datainL, float *dataoutL, float *dataoutR,
                              float pitch)
     {
-        processStereo(datainL, datainL, dataoutL, dataoutR, pitch);
+        processStereoImpl<true>(datainL, datainL, dataoutL, dataoutR, pitch);
     }
 
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
     size_t silentSamplesLength() const { return 10; }
 
   protected:
-    std::array<sst::filters::CytomicSVF, 12> filters;
+    std::array<sst::filters::CytomicSVF, 3> filtersL, filtersR;
+    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, false> levelLerpL[12], levelLerpR[12];
 
-    sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> levelLerpL, levelLerpR;
-    float priorLevelL[12];
-    float priorLevelR[12];
+    float phaseL[12], phaseR[12], freqsL[12], freqsR[12];
 
     int priorPeaks{0};
+    double halfway{1.f};
     float logOfPeaks{0.f};
     float gainScale{1.f};
+    double phasorValue{0.f};
+    int quadsToProcess{1};
 
-    bool isFirst{true};
+    const SIMD_M128 oneSSE = SIMD_MM(set1_ps(1.f));
+    const SIMD_M128 negOneSSE = SIMD_MM(set1_ps(-1.f));
+    const SIMD_M128 negTwoSSE = SIMD_MM(set1_ps(-2.f));
 
   public:
     static constexpr int16_t streamingVersion{1};
