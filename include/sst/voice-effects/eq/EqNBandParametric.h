@@ -53,11 +53,10 @@ struct EqNBandParametric : core::VoiceEffectTemplateBase<VFXConfig>
     static constexpr const char *streamingName{streamingNameByBand()};
 
     static constexpr int numFloatParams{3 * NBands};
-    static constexpr int numIntParams{NBands};
+    static constexpr int numIntParams{0};
 
     EqNBandParametric() : core::VoiceEffectTemplateBase<VFXConfig>()
     {
-        std::fill(mLastIParam.begin(), mLastIParam.end(), -1);
         std::fill(mLastParam.begin(), mLastParam.end(), -188888.f);
         std::fill(mParametric.begin(), mParametric.end(), this);
     }
@@ -89,7 +88,7 @@ struct EqNBandParametric : core::VoiceEffectTemplateBase<VFXConfig>
                 .asFloat()
                 .withName("BW " + std::to_string(which + 1))
                 .withDefault(1)
-                .withRange(0, 5)
+                .withRange(.0833333, 5)
                 .withLinearScaleFormatting("octaves");
 
         default:
@@ -97,18 +96,6 @@ struct EqNBandParametric : core::VoiceEffectTemplateBase<VFXConfig>
         }
 
         return pmd().withName("Unknown " + std::to_string(idx)).asPercent();
-    }
-
-    basic_blocks::params::ParamMetaData intParamAt(int idx) const
-    {
-        using pmd = basic_blocks::params::ParamMetaData;
-
-        return pmd()
-            .asInt()
-            .withRange(0, 1)
-            .withName("Type" + std::to_string(idx))
-            .withUnorderedMapFormatting({{0, "A"}, {1, "B"}})
-            .withDefault(0);
     }
 
     void initVoiceEffect() {}
@@ -139,35 +126,16 @@ struct EqNBandParametric : core::VoiceEffectTemplateBase<VFXConfig>
         }
     }
 
-    float calc_GB_type_B(bool b, float x)
-    {
-        if (b && (fabs(x) > 6))
-        {
-            if (x > 0)
-                x = 3;
-            else
-                x = -3;
-        }
-        else
-            x *= 0.5;
-
-        return this->dbToLinear(x);
-    }
+    float calc_GB(float x) { return this->dbToLinear(x * .5f); }
 
     void calc_coeffs()
     {
         std::array<float, NBands * 3> param;
-        std::array<int, NBands> iparam;
         bool diff{false};
         for (int i = 0; i < NBands * 3; i++)
         {
             param[i] = this->getFloatParam(i);
             diff = diff || (mLastParam[i] != param[i]);
-        }
-        for (int i = 0; i < NBands; ++i)
-        {
-            iparam[i] = this->getIntParam(i);
-            diff = diff || (mLastIParam[i] != iparam[i]);
         }
 
         if (diff)
@@ -177,10 +145,9 @@ struct EqNBandParametric : core::VoiceEffectTemplateBase<VFXConfig>
                 auto bs = i * 3;
                 mParametric[i].coeff_orfanidisEQ(mParametric[i].calc_omega(param[1 + bs] / 12.f),
                                                  param[2 + bs], this->dbToLinear(param[0 + bs]),
-                                                 calc_GB_type_B(iparam[0 + i], param[0 + bs]), 1);
+                                                 calc_GB(param[0 + bs]), 1);
             }
             mLastParam = param;
-            mLastIParam = iparam;
         }
     }
 
@@ -198,18 +165,27 @@ struct EqNBandParametric : core::VoiceEffectTemplateBase<VFXConfig>
 
   protected:
     std::array<float, NBands * 3> mLastParam{};
-    std::array<int, NBands> mLastIParam{};
     std::array<typename core::VoiceEffectTemplateBase<VFXConfig>::BiquadFilterType, NBands>
         mParametric;
 
   public:
-    static constexpr int16_t streamingVersion{1};
+    static constexpr int16_t streamingVersion{2};
     static void remapParametersForStreamingVersion(int16_t streamedFrom, float *const fparam,
                                                    int *const iparam)
     {
         // base implementation - we have never updated streaming
         // input is parameters from stream version
-        assert(streamedFrom == 1);
+        assert(streamedFrom < streamingVersion);
+        if (streamedFrom < 2)
+        {
+            for (int i = 0; i < NBands; ++i)
+            {
+                if (iparam[i] == 1)
+                {
+                    fparam[i * 3 + 2] /= 3.f;
+                }
+            }
+        }
     }
 };
 
