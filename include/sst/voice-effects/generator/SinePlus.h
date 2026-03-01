@@ -30,7 +30,8 @@
 
 namespace sst::voice_effects::generator
 {
-template <typename VFXConfig> struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
+template <typename VFXConfig, bool forDisplay = false>
+struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
 {
     static constexpr const char *displayName{"Sine Plus"};
     static constexpr const char *streamingName{"osc-sineplus"};
@@ -196,36 +197,64 @@ template <typename VFXConfig> struct SinePlus : core::VoiceEffectTemplateBase<VF
 
         namespace pan = basic_blocks::dsp::pan_laws;
 
+        float mainLevel alignas(16)[VFXConfig::blockSize];
+        float overtoneLevel alignas(16)[VFXConfig::blockSize];
+        float aLevel alignas(16)[VFXConfig::blockSize];
+        float bLevel alignas(16)[VFXConfig::blockSize];
+
         auto levT = std::clamp(this->getFloatParam(fpLevel), 0.f, 1.f);
         levT = levT * levT * levT;
 
         pan::stereoEqualPower((this->getFloatParam(fpMainBalance) + 1) * .5f, matrix);
-        mainLerp.set_target(matrix[0] * levT);
-        overtoneLerp.set_target(matrix[1] * levT);
-        float mainLevel alignas(16)[VFXConfig::blockSize];
-        float overtoneLevel alignas(16)[VFXConfig::blockSize];
-        mainLerp.store_block(mainLevel);
-        overtoneLerp.store_block(overtoneLevel);
+        if constexpr (forDisplay)
+        {
+            // for display we draw at full amplitude and don't smooth
+            mainLevel[0] = matrix[0];
+            overtoneLevel[0] = matrix[1];
+        }
+        else
+        {
+            mainLerp.set_target(matrix[0] * levT);
+            overtoneLerp.set_target(matrix[1] * levT);
+            mainLerp.store_block(mainLevel);
+            overtoneLerp.store_block(overtoneLevel);
+        }
 
         pan::stereoEqualPower((this->getFloatParam(fpOvertoneBalance) + 1) * .5f, matrix);
-        aLerp.set_target(matrix[0]);
-        bLerp.set_target(matrix[1]);
-        float aLevel alignas(16)[VFXConfig::blockSize];
-        float bLevel alignas(16)[VFXConfig::blockSize];
-        aLerp.store_block(aLevel);
-        bLerp.store_block(bLevel);
+        if constexpr (forDisplay)
+        {
+            aLevel[0] = matrix[0];
+            bLevel[0] = matrix[1];
+        }
+        else
+        {
+            aLerp.set_target(matrix[0]);
+            bLerp.set_target(matrix[1]);
+            aLerp.store_block(aLevel);
+            bLerp.store_block(bLevel);
+        }
 
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
-            auto window = (sineOsc1.u + 1) * -0.5f;
+            auto window = (-sineOsc1.u + 1) * 0.5f;
             window = window * window * window;
 
-            auto A = sineOsc2.v * aLevel[i] * window;
-            auto B = sineOsc3.v * bLevel[i] * window;
+            float A, B, main, overtones;
 
-            auto main = sineOsc1.v * mainLevel[i];
-
-            auto overtones = (A + B) * overtoneLevel[i];
+            if constexpr (forDisplay)
+            {
+                A = sineOsc2.v * aLevel[0] * window;
+                B = sineOsc3.v * bLevel[0] * window;
+                main = sineOsc1.v * mainLevel[0];
+                overtones = (A + B) * overtoneLevel[0];
+            }
+            else
+            {
+                A = sineOsc2.v * aLevel[i] * window;
+                B = sineOsc3.v * bLevel[i] * window;
+                main = sineOsc1.v * mainLevel[i];
+                overtones = (A + B) * overtoneLevel[i];
+            }
 
             dataout[i] = main + overtones;
 
@@ -233,6 +262,13 @@ template <typename VFXConfig> struct SinePlus : core::VoiceEffectTemplateBase<VF
             sineOsc2.step();
             sineOsc3.step();
         }
+    }
+
+    void resetPhase()
+    {
+        sineOsc1.resetPhase();
+        sineOsc2.resetPhase();
+        sineOsc3.resetPhase();
     }
 
     bool enableKeytrack(bool b)
