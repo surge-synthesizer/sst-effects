@@ -117,9 +117,9 @@ struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
                 .withDefault(43.02f)
                 .withSemitoneFormatting();
         case fpMainBalance:
-            return pmd().asPercentBipolar().withDefault(-.5f).withName("Main Balance");
+            return pmd().asPercentBipolar().withDefault(-.5f).withName("Root<>Overtones Blend");
         case fpOvertoneBalance:
-            return pmd().asPercentBipolar().withDefault(-.5f).withName("Overtone Balance");
+            return pmd().asPercentBipolar().withDefault(-.5f).withName("Overtone A<>B Blend");
         case fpLevel:
             return pmd().asCubicDecibelAttenuation().withDefault(1.f).withName("Level");
         }
