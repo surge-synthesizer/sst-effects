@@ -107,7 +107,6 @@ struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
                     .withName("Tune B")
                     .withRange(2, 24)
                     .withDefault(12)
-                    .withDefault(2)
                     .withQuantizedStepCount(22)
                     .withHarmonicSeriesFormatting();
             }
