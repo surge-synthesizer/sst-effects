@@ -92,7 +92,8 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
                 .asFloat()
                 .withRange(1.f, 12.f)
                 .withDefault(2.f)
-                .withLinearScaleFormatting(": 1")
+                .withLinearScaleFormatting("1")
+                .withUnitSeparator(":")
                 .withDecimalPlaces(2)
                 .withName("Ratio");
         case fpAttack:
@@ -136,28 +137,6 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
     basic_blocks::params::ParamMetaData intParamAt(int idx) const
     {
         using pmd = basic_blocks::params::ParamMetaData;
-
-        //        switch (idx)
-        //        {
-        //        case ipKnee:
-        //            return pmd()
-        //                .asBool()
-        //                .withUnorderedMapFormatting({
-        //                    {false, "hard"},
-        //                    {true, "soft"},
-        //                })
-        //                .withDefault(false)
-        //                .withName("Knee");
-        //        case ipDetector:
-        //            return pmd()
-        //                .asBool()
-        //                .withUnorderedMapFormatting({
-        //                    {false, "Peak"},
-        //                    {true, "RMS"},
-        //                })
-        //                .withDefault(false)
-        //                .withName("Detector");
-        //        }
 
         return pmd()
             .asBool()

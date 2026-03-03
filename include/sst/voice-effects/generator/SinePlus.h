@@ -91,15 +91,13 @@ struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
                     .withRange(2, 24)
                     .withDefault(2)
                     .withQuantizedStepCount(22)
-                    .withDecimalPlaces(0)
-                    .withUnitSeparator("")
-                    .withLinearScaleFormatting("th Harmonic");
+                    .withHarmonicSeriesFormatting();
             }
             return pmd()
                 .asFloat()
                 .withName("Tune A")
                 .withRange(12, 55.02)
-                .withDefault(2)
+                .withDefault(12.0f)
                 .withSemitoneFormatting();
         case fpOffsetB:
             if (quantB)
@@ -109,16 +107,15 @@ struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
                     .withName("Tune B")
                     .withRange(2, 24)
                     .withDefault(12)
+                    .withDefault(2)
                     .withQuantizedStepCount(22)
-                    .withDecimalPlaces(0)
-                    .withUnitSeparator("")
-                    .withLinearScaleFormatting("th Harmonic");
+                    .withHarmonicSeriesFormatting();
             }
             return pmd()
                 .asFloat()
                 .withName("Tune B")
                 .withRange(12, 55.02)
-                .withDefault(12)
+                .withDefault(43.02f)
                 .withSemitoneFormatting();
         case fpMainBalance:
             return pmd().asPercentBipolar().withDefault(-.5f).withName("Main Balance");
