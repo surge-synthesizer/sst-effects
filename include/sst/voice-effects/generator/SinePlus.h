@@ -185,7 +185,8 @@ struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
     {
         if constexpr (forDisplay)
         {
-            processForDisplay(dataout);
+            float dummy[VFXConfig::blockSize];
+            processForDisplay(dataout, dummy);
             return;
         }
 
@@ -202,55 +203,26 @@ struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
         levT = levT * levT * levT;
 
         pan::stereoEqualPower((this->getFloatParam(fpMainBalance) + 1) * .5f, matrix);
-        if constexpr (forDisplay)
-        {
-            // for display we draw at full amplitude and don't smooth
-            mainLevel[0] = matrix[0];
-            overtoneLevel[0] = matrix[1];
-        }
-        else
-        {
-            mainLerp.set_target(matrix[0] * levT);
-            overtoneLerp.set_target(matrix[1] * levT);
-            mainLerp.store_block(mainLevel);
-            overtoneLerp.store_block(overtoneLevel);
-        }
+        mainLerp.set_target(matrix[0] * levT);
+        overtoneLerp.set_target(matrix[1] * levT);
+        mainLerp.store_block(mainLevel);
+        overtoneLerp.store_block(overtoneLevel);
 
         pan::stereoEqualPower((this->getFloatParam(fpOvertoneBalance) + 1) * .5f, matrix);
-        if constexpr (forDisplay)
-        {
-            aLevel[0] = matrix[0];
-            bLevel[0] = matrix[1];
-        }
-        else
-        {
-            aLerp.set_target(matrix[0]);
-            bLerp.set_target(matrix[1]);
-            aLerp.store_block(aLevel);
-            bLerp.store_block(bLevel);
-        }
+        aLerp.set_target(matrix[0]);
+        bLerp.set_target(matrix[1]);
+        aLerp.store_block(aLevel);
+        bLerp.store_block(bLevel);
 
         for (int i = 0; i < VFXConfig::blockSize; i++)
         {
             auto window = (-sineOscMain.u + 1) * 0.5f;
             window = window * window * window;
 
-            float A, B, main, overtones;
-
-            if constexpr (forDisplay)
-            {
-                A = sineOscA.v * aLevel[0] * window;
-                B = sineOscB.v * bLevel[0] * window;
-                main = sineOscMain.v * mainLevel[0];
-                overtones = (A + B) * overtoneLevel[0];
-            }
-            else
-            {
-                A = sineOscA.v * aLevel[i] * window;
-                B = sineOscB.v * bLevel[i] * window;
-                main = sineOscMain.v * mainLevel[i];
-                overtones = (A + B) * overtoneLevel[i];
-            }
+            float A = sineOscA.v * aLevel[i] * window;
+            float B = sineOscB.v * bLevel[i] * window;
+            float main = sineOscMain.v * mainLevel[i];
+            float overtones = (A + B) * overtoneLevel[i];
 
             dataout[i] = main + overtones;
 
@@ -272,6 +244,12 @@ struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
         }
         else
         {
+            if constexpr (forDisplay)
+            {
+                processForDisplay(dataoutL, dataoutR);
+                return;
+            }
+
             setFrequencies(pitch);
 
             namespace pan = basic_blocks::dsp::pan_laws;
@@ -303,11 +281,9 @@ struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
                 auto window = (-sineOscMain.u + 1) * 0.5f;
                 window = window * window * window;
 
-                float A, B, main;
-
-                A = sineOscA.v * aLevel[i] * window * overtoneLevel[i];
-                B = sineOscB.v * bLevel[i] * window * overtoneLevel[i];
-                main = sineOscMain.v * mainLevel[i];
+                float A = sineOscA.v * aLevel[i] * window * overtoneLevel[i];
+                float B = sineOscB.v * bLevel[i] * window * overtoneLevel[i];
+                float main = sineOscMain.v * mainLevel[i];
 
                 dataoutL[i] = main + A;
                 dataoutR[i] = main + B;
@@ -319,12 +295,6 @@ struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
                 pitchLagB.process();
             }
         }
-    }
-
-    void processMonoToStereo(const float *const datain, float *dataoutL, float *dataoutR,
-                             float pitch)
-    {
-        processStereo(datain, datain, dataoutL, dataoutR, pitch);
     }
 
     void setFrequencies(float pitch)
@@ -411,7 +381,6 @@ struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
     }
     bool getKeytrack() const { return keytrackOn; }
     bool getKeytrackDefault() const { return true; }
-    bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
     bool checkParameterConsistency() const { return true; }
 
   protected:
@@ -424,7 +393,7 @@ struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
     basic_blocks::dsp::lipol_sse<VFXConfig::blockSize> mainLerp, overtoneLerp, aLerp, bLerp;
     basic_blocks::dsp::pan_laws::panmatrix_t matrix{1, 1, 0, 0};
 
-    void processForDisplay(float *out)
+    void processForDisplay(float *outL, float *outR)
     {
         auto freq = this->getFloatParam(fpBaseFrequency);
 
@@ -476,9 +445,18 @@ struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
             float A = sineOscA.v * aLevel * window;
             float B = sineOscB.v * bLevel * window;
             float main = sineOscMain.v * mainLevel;
-            float overtones = (A + B) * overtoneLevel;
 
-            out[i] = main + overtones;
+            if (this->getIntParam(ipStereo) > 0)
+            {
+                outL[i] = main + A * overtoneLevel;
+                outR[i] = main + B * overtoneLevel;
+            }
+            else
+            {
+                float overtones = (A + B) * overtoneLevel;
+
+                outL[i] = main + overtones;
+            }
 
             sineOscMain.step();
             sineOscA.step();
