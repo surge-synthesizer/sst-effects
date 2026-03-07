@@ -22,6 +22,7 @@
 #define INCLUDE_SST_VOICE_EFFECTS_DYNAMICS_COMPRESSOR_H
 
 #include "../VoiceEffectCore.h"
+#include "sst/basic-blocks/dsp/Ballistics.h"
 #include "sst/basic-blocks/params/ParamMetadata.h"
 #include "sst/basic-blocks/dsp/FollowSlewAndSmooth.h"
 #include "sst/filters/CytomicTilt.h"
@@ -36,7 +37,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
     static constexpr const char *displayName{"Compressor"};
     static constexpr const char *streamingName{"compressor"};
 
-    static constexpr size_t rmsBufferSize{1024}; // TODO: SR invariance...
+    static constexpr size_t rmsBufferSize{1024};
     float *rmsBlock{nullptr};
 
     static constexpr int numFloatParams{7};
@@ -150,13 +151,26 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
 
     void initVoiceEffect()
     {
+        if (rmsBlock)
+        {
+            VFXConfig::returnBlock(this, (uint8_t *)rmsBlock,
+                                   bufferSizeAtSampleRate * sizeof(float));
+            rmsBlock = nullptr;
+        }
         if (!rmsBlock)
         {
-            auto block = VFXConfig::checkoutBlock(this, rmsBufferSize * sizeof(float));
+            // So the RMS size used to always be 1024 samples which is obviously wrong.
+            // I am keeping it the same at the very common shortcircuit case of 48k host
+            // rate and the internal oversampling on.
+            bufferSizeAtSampleRate =
+                rmsBufferSize * static_cast<int>(this->getSampleRate() / 96000);
+            auto block = VFXConfig::checkoutBlock(this, bufferSizeAtSampleRate * sizeof(float));
             memset(block, 0, rmsBufferSize * sizeof(float));
             rmsBlock = (float *)block;
             RA.setStorage(rmsBlock, rmsBufferSize);
         }
+        RA.reset();
+        ballistics.setSampleRate(this->getSampleRate());
     }
     void initVoiceEffectPitch(float pitch)
     {
@@ -165,8 +179,6 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
         tilter.setCoeff(freq, .07f, this->getSampleRateInv());
     }
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
-
-    static float decibelsToAmplitude(float db) { return powf(10.0f, db * 0.05f); }
 
     static float amplitudeToDecibels(float amplitude)
     {
@@ -177,48 +189,18 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
         return 20.0f * log10f(amplitude);
     }
 
-    struct BallisticCoeffs
-    {
-        float a1{};
-        float b0{};
-    };
-
-    static BallisticCoeffs computeBallisticCoeffs(float time_seconds, float T)
-    {
-        BallisticCoeffs coeffs{};
-        coeffs.a1 = std::exp(-T / time_seconds);
-        coeffs.b0 = 1.0f - coeffs.a1;
-        return coeffs;
-    }
-
-    static float setBallistics(float abs_x, float &z, BallisticCoeffs attack_coeffs,
-                               BallisticCoeffs release_coeffs)
-    {
-        const auto b0 = abs_x > z ? attack_coeffs.b0 : release_coeffs.b0;
-        z += b0 * (abs_x - z);
-        return z;
-    }
-
     void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
                        float *dataoutR, float pitch)
     {
-        auto makeup = decibelsToAmplitude(this->getFloatParam(fpMakeUp));
+        auto makeup = this->dbToLinear(this->getFloatParam(fpMakeUp));
         gainLerp.set_target(makeup);
 
         bool RMS = this->getIntParam(ipDetector);
         auto threshold_db = this->getFloatParam(fpThreshold);
         auto ratio_recip = 1 / this->getFloatParam(fpRatio);
 
-        const auto T = this->getSampleRateInv();
-        auto attack_coeffs = computeBallisticCoeffs(this->getFloatParam(fpAttack), T);
-        auto release_coeffs = computeBallisticCoeffs(this->getFloatParam(fpRelease), T);
-
-        if (first)
-        {
-            lastEnv = 0.f;
-            RA.reset();
-            first = false;
-        }
+        ballistics.set_attack(this->getFloatParam(fpAttack));
+        ballistics.set_release(this->getFloatParam(fpRelease));
 
         setTiltCoeffs(pitch);
 
@@ -235,7 +217,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
             {
                 env = RA.step(env);
             }
-            env = setBallistics(env, lastEnv, attack_coeffs, release_coeffs);
+            env = ballistics.process(env);
             env = amplitudeToDecibels(env);
 
             auto over = env - threshold_db;
@@ -244,7 +226,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
             {
                 reductionFactorDB = threshold_db + over * ratio_recip - env;
             }
-            float reductionFactor = decibelsToAmplitude(reductionFactorDB);
+            float reductionFactor = this->dbToLinear(reductionFactorDB);
             outputL *= reductionFactor;
             outputR *= reductionFactor;
 
@@ -256,22 +238,15 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
 
     void processMonoToMono(const float *const datain, float *dataout, float pitch)
     {
-        auto makeup = decibelsToAmplitude(this->getFloatParam(fpMakeUp));
+        auto makeup = this->dbToLinear(this->getFloatParam(fpMakeUp));
         gainLerp.set_target(makeup);
 
         bool RMS = this->getIntParam(ipDetector);
         auto threshold_db = this->getFloatParam(fpThreshold);
         auto ratio_recip = 1 / this->getFloatParam(fpRatio);
 
-        const auto T = this->getSampleRateInv();
-        auto attack_coeffs = computeBallisticCoeffs(this->getFloatParam(fpAttack), T);
-        auto release_coeffs = computeBallisticCoeffs(this->getFloatParam(fpRelease), T);
-
-        if (first)
-        {
-            lastEnv = 0.f;
-            first = false;
-        }
+        ballistics.set_attack(this->getFloatParam(fpAttack));
+        ballistics.set_release(this->getFloatParam(fpRelease));
 
         setTiltCoeffs(pitch);
 
@@ -287,7 +262,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
             {
                 env = RA.step(env);
             }
-            env = setBallistics(env, lastEnv, attack_coeffs, release_coeffs);
+            env = ballistics.process(env);
             env = amplitudeToDecibels(env);
 
             auto over = env - threshold_db;
@@ -296,7 +271,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
             {
                 reductionFactorDB = threshold_db + over * ratio_recip - env;
             }
-            float reductionFactor = decibelsToAmplitude(reductionFactorDB);
+            float reductionFactor = this->dbToLinear(reductionFactorDB);
 
             output *= reductionFactor;
 
@@ -324,14 +299,12 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
     bool getKeytrack() const { return keytrackOn; }
 
   protected:
-    std::array<float, numFloatParams> mLastParam{};
-    std::array<int, numIntParams> mLastIParam{};
-    bool first = true;
     bool keytrackOn = false;
-    float lastEnv = -1.f;
     sst::basic_blocks::dsp::RunningAverage RA;
+    int bufferSizeAtSampleRate{2};
 
     sst::basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, false> gainLerp;
+    sst::basic_blocks::dsp::Ballistics ballistics;
     sst::filters::CytomicTilt tilter;
 
   public:
