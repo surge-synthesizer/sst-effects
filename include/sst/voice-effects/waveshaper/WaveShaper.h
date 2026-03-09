@@ -132,7 +132,11 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
         return pmd().asInt().withRange(0, 1).withName("Error");
     }
 
-    void initVoiceEffect() {}
+    void initVoiceEffect()
+    {
+        hpParamPrior = -9999.f;
+        lpParamPrior = -9999.f;
+    }
     void initVoiceEffectPitch(float pitch)
     {
         auto hp = 440 * this->note_to_pitch_ignoring_tuning(
