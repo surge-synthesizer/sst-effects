@@ -59,17 +59,14 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
         ipDetector
     };
 
-    Compressor() : core::VoiceEffectTemplateBase<VFXConfig>()
-    {
-        bufferSizeAtSampleRate = rmsBufferSize * static_cast<int>(this->getSampleRate() / 96000);
-        this->preReservePool(bufferSizeAtSampleRate * sizeof(float));
-    }
+    Compressor() : core::VoiceEffectTemplateBase<VFXConfig>() {}
 
     ~Compressor()
     {
         if (rmsBlock)
         {
-            VFXConfig::returnBlock(this, (uint8_t *)rmsBlock, rmsBufferSize * sizeof(float));
+            VFXConfig::returnBlock(this, (uint8_t *)rmsBlock,
+                                   bufferSizeAtSampleRate * sizeof(float));
             rmsBlock = nullptr;
         }
     }
@@ -152,23 +149,18 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
 
     void initVoiceEffect()
     {
-        if (rmsBlock)
-        {
-            VFXConfig::returnBlock(this, (uint8_t *)rmsBlock,
-                                   bufferSizeAtSampleRate * sizeof(float));
-            rmsBlock = nullptr;
-        }
+        // So the RMS size used to always be 1024 samples which is obviously wrong.
+        // I am keeping it the same at the very common shortcircuit case of 48k host
+        // rate and the internal oversampling on.
+        bufferSizeAtSampleRate = static_cast<int>(rmsBufferSize * this->getSampleRate() / 96000);
+        this->preReservePool(bufferSizeAtSampleRate * sizeof(float));
+
         if (!rmsBlock)
         {
-            // So the RMS size used to always be 1024 samples which is obviously wrong.
-            // I am keeping it the same at the very common shortcircuit case of 48k host
-            // rate and the internal oversampling on.
-            bufferSizeAtSampleRate =
-                rmsBufferSize * static_cast<int>(this->getSampleRate() / 96000);
             auto block = VFXConfig::checkoutBlock(this, bufferSizeAtSampleRate * sizeof(float));
-            memset(block, 0, rmsBufferSize * sizeof(float));
+            memset(block, 0, bufferSizeAtSampleRate * sizeof(float));
             rmsBlock = (float *)block;
-            RA.setStorage(rmsBlock, rmsBufferSize);
+            RA.setStorage(rmsBlock, bufferSizeAtSampleRate);
         }
         RA.reset();
         ballistics.setSampleRate(this->getSampleRate());
