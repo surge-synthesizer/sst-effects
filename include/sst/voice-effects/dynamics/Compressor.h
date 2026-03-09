@@ -61,7 +61,8 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
 
     Compressor() : core::VoiceEffectTemplateBase<VFXConfig>()
     {
-        this->preReservePool(rmsBufferSize * sizeof(float));
+        bufferSizeAtSampleRate = rmsBufferSize * static_cast<int>(this->getSampleRate() / 96000);
+        this->preReservePool(bufferSizeAtSampleRate * sizeof(float));
     }
 
     ~Compressor()
