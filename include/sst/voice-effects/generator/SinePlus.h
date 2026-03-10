@@ -181,15 +181,8 @@ struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
         }
     }
 
-    void processMonoToMono(const float *const datain, float *dataout, float pitch)
+    template <bool stereo> void processImpl(float *dataoutL, float *dataoutR, float pitch)
     {
-        if constexpr (forDisplay)
-        {
-            float dummy[VFXConfig::blockSize];
-            processForDisplay(dataout, dummy);
-            return;
-        }
-
         setFrequencies(pitch);
 
         namespace pan = basic_blocks::dsp::pan_laws;
@@ -203,12 +196,14 @@ struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
         levT = levT * levT * levT;
 
         pan::stereoEqualPower((this->getFloatParam(fpMainBalance) + 1) * .5f, matrix);
+
         mainLerp.set_target(matrix[0] * levT);
         overtoneLerp.set_target(matrix[1] * levT);
         mainLerp.store_block(mainLevel);
         overtoneLerp.store_block(overtoneLevel);
 
         pan::stereoEqualPower((this->getFloatParam(fpOvertoneBalance) + 1) * .5f, matrix);
+
         aLerp.set_target(matrix[0]);
         bLerp.set_target(matrix[1]);
         aLerp.store_block(aLevel);
@@ -219,81 +214,26 @@ struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
             auto window = (-sineOscMain.u + 1) * 0.5f;
             window = window * window * window;
 
-            float A = sineOscA.v * aLevel[i] * window;
-            float B = sineOscB.v * bLevel[i] * window;
+            float A = sineOscA.v * aLevel[i] * window * overtoneLevel[i];
+            float B = sineOscB.v * bLevel[i] * window * overtoneLevel[i];
             float main = sineOscMain.v * mainLevel[i];
-            float overtones = (A + B) * overtoneLevel[i];
 
-            dataout[i] = main + overtones;
+            if constexpr (stereo)
+            {
+                dataoutL[i] = main + A;
+                dataoutR[i] = main + B;
+            }
+            else
+            {
+                dataoutL[i] = main + A + B;
+                dataoutR[i] = main + A + B;
+            }
 
             sineOscMain.blockStep();
             sineOscA.blockStep();
             sineOscB.blockStep();
             pitchLagA.process();
             pitchLagB.process();
-        }
-    }
-
-    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
-                       float *dataoutR, float pitch)
-    {
-        if (!this->getIntParam(ipStereo))
-        {
-            processMonoToMono(datainL, dataoutL, pitch);
-            basic_blocks::mechanics::copy_from_to<VFXConfig::blockSize>(dataoutL, dataoutR);
-        }
-        else
-        {
-            if constexpr (forDisplay)
-            {
-                processForDisplay(dataoutL, dataoutR);
-                return;
-            }
-
-            setFrequencies(pitch);
-
-            namespace pan = basic_blocks::dsp::pan_laws;
-
-            float mainLevel alignas(16)[VFXConfig::blockSize];
-            float overtoneLevel alignas(16)[VFXConfig::blockSize];
-            float aLevel alignas(16)[VFXConfig::blockSize];
-            float bLevel alignas(16)[VFXConfig::blockSize];
-
-            auto levT = std::clamp(this->getFloatParam(fpLevel), 0.f, 1.f);
-            levT = levT * levT * levT;
-
-            pan::stereoEqualPower((this->getFloatParam(fpMainBalance) + 1) * .5f, matrix);
-
-            mainLerp.set_target(matrix[0] * levT);
-            overtoneLerp.set_target(matrix[1] * levT);
-            mainLerp.store_block(mainLevel);
-            overtoneLerp.store_block(overtoneLevel);
-
-            pan::stereoEqualPower((this->getFloatParam(fpOvertoneBalance) + 1) * .5f, matrix);
-
-            aLerp.set_target(matrix[0]);
-            bLerp.set_target(matrix[1]);
-            aLerp.store_block(aLevel);
-            bLerp.store_block(bLevel);
-
-            for (int i = 0; i < VFXConfig::blockSize; i++)
-            {
-                auto window = (-sineOscMain.u + 1) * 0.5f;
-                window = window * window * window;
-
-                float A = sineOscA.v * aLevel[i] * window * overtoneLevel[i];
-                float B = sineOscB.v * bLevel[i] * window * overtoneLevel[i];
-                float main = sineOscMain.v * mainLevel[i];
-
-                dataoutL[i] = main + A;
-                dataoutR[i] = main + B;
-
-                sineOscMain.blockStep();
-                sineOscA.blockStep();
-                sineOscB.blockStep();
-                pitchLagA.process();
-                pitchLagB.process();
-            }
         }
     }
 
@@ -366,6 +306,51 @@ struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
                                  this->getSampleRateInv());
     }
 
+    void processMonoToMono(const float *const datain, float *dataout, float pitch)
+    {
+        if constexpr (forDisplay)
+        {
+            processForDisplay(dataout, dummyR);
+        }
+        else
+        {
+            processImpl<false>(dataout, dummyR, pitch);
+        }
+    }
+
+    void processStereo(const float *const datainL, const float *const datainR, float *dataoutL,
+                       float *dataoutR, float pitch)
+    {
+        if constexpr (forDisplay)
+        {
+            processForDisplay(dataoutL, dataoutR);
+        }
+        else
+        {
+            if (this->getIntParam(ipStereo) > 0)
+            {
+                processImpl<true>(dataoutL, dataoutR, pitch);
+            }
+            else
+            {
+                processImpl<false>(dataoutL, dataoutR, pitch);
+            }
+        }
+    }
+
+    void processMonoToStereo(const float *const datain, float *dataoutL, float *dataoutR,
+                             float pitch)
+    {
+        if constexpr (forDisplay)
+        {
+            processForDisplay(dataoutL, dataoutR);
+        }
+        else
+        {
+            processImpl<true>(dataoutL, dataoutR, pitch);
+        }
+    }
+
     void resetPhase()
     {
         sineOscMain.resetPhase();
@@ -382,6 +367,7 @@ struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
     bool getKeytrack() const { return keytrackOn; }
     bool getKeytrackDefault() const { return true; }
     bool checkParameterConsistency() const { return true; }
+    bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
 
   protected:
     bool keytrackOn{true};
@@ -389,6 +375,8 @@ struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
         sineOscB;
     basic_blocks::dsp::LinearLag<float, false> pitchLagA, pitchLagB;
     float priorMain{-12354.6789}, priorA{-12354.6789}, priorB{-12354.6789};
+
+    float dummyR alignas(16)[VFXConfig::blockSize];
 
     basic_blocks::dsp::lipol_sse<VFXConfig::blockSize> mainLerp, overtoneLerp, aLerp, bLerp;
     basic_blocks::dsp::pan_laws::panmatrix_t matrix{1, 1, 0, 0};

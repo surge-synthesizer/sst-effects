@@ -151,16 +151,16 @@ template <VoiceEffectConfig VFXConfig> struct VoiceEffectTemplateBase : public V
 
     template <typename T> void initToParamMetadataDefault(T *that)
     {
-        for (int i = 0; i < T::numFloatParams; ++i)
-        {
-            that->setFloatParam(i, that->paramAt(i).defaultVal);
-        }
         if constexpr (T::numIntParams > 0)
         {
             for (int i = 0; i < T::numIntParams; ++i)
             {
                 that->setIntParam(i, that->intParamAt(i).defaultVal);
             }
+        }
+        for (int i = 0; i < T::numFloatParams; ++i)
+        {
+            that->setFloatParam(i, that->paramAt(i).defaultVal);
         }
     }
 
