@@ -210,7 +210,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
             {
                 env = RA.step(env);
             }
-            env = ballistics.process(env);
+            ballistics.process_sample(env, env);
             env = amplitudeToDecibels(env);
 
             auto over = env - threshold_db;
@@ -255,7 +255,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
             {
                 env = RA.step(env);
             }
-            env = ballistics.process(env);
+            ballistics.process_sample(env, env);
             env = amplitudeToDecibels(env);
 
             auto over = env - threshold_db;
