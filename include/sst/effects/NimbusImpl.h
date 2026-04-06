@@ -54,7 +54,7 @@ Nimbus<FXConfig>::Nimbus(typename FXConfig::GlobalStorage *s, typename FXConfig:
     processor = new clouds::GranularProcessor();
 #if EURORACK_CLOUDS_IS_SUPERPARASITES
 #else
-    memset(processor, 0, sizeof(*processor));
+    memset((void *)processor, 0, sizeof(*processor));
 #endif
 
     processor->Init(block_mem, memLen, block_ccm, ccmLen);
