@@ -21,6 +21,8 @@
 #ifndef INCLUDE_SST_EFFECTS_NIMBUSIMPL_H
 #define INCLUDE_SST_EFFECTS_NIMBUSIMPL_H
 
+#include <new>
+
 #include "Nimbus.h"
 
 #if SST_EFFECTS_EURORACK
@@ -52,11 +54,13 @@ Nimbus<FXConfig>::Nimbus(typename FXConfig::GlobalStorage *s, typename FXConfig:
     const int ccmLen = 65536 - 128;
     block_mem = new uint8_t[memLen]();
     block_ccm = new uint8_t[ccmLen]();
-    processor = new clouds::GranularProcessor();
-#if EURORACK_CLOUDS_IS_SUPERPARASITES
-#else
-    memset((void *)processor, 0, sizeof(*processor));
-#endif
+    // Zero buffer then placement-new: trivially-init members start at 0,
+    // non-trivial ones get properly constructed on top. Avoids memsetting
+    // already-constructed non-trivial members (UB on supercell's processor).
+    auto *raw = ::operator new(sizeof(clouds::GranularProcessor),
+                               std::align_val_t{alignof(clouds::GranularProcessor)});
+    std::memset(raw, 0, sizeof(clouds::GranularProcessor));
+    processor = new (raw) clouds::GranularProcessor();
 
     processor->Init(block_mem, memLen, block_ccm, ccmLen);
     mix.set_blocksize(FXConfig::blockSize);
@@ -66,7 +70,8 @@ template <typename FXConfig> Nimbus<FXConfig>::~Nimbus()
 {
     delete[] block_mem;
     delete[] block_ccm;
-    delete processor;
+    processor->~GranularProcessor();
+    ::operator delete(processor, std::align_val_t{alignof(clouds::GranularProcessor)});
 }
 
 template <typename FXConfig> void Nimbus<FXConfig>::initialize()
