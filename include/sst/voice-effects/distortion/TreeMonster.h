@@ -30,6 +30,7 @@ namespace sst::voice_effects::distortion
 template <typename VFXConfig> struct TreeMonster : core::VoiceEffectTemplateBase<VFXConfig>
 {
     static constexpr const char *displayName{"Treemonster"};
+    static constexpr const char *displayNameShort{"TREE"};
     static constexpr const char *streamingName{"treemonster-voice"};
 
     static constexpr int numFloatParams{4};
@@ -81,7 +82,11 @@ template <typename VFXConfig> struct TreeMonster : core::VoiceEffectTemplateBase
                 .withFeature(pmd::Features::ALLOW_TUNING_FRACTION_TYPEINS)
                 .withLinearScaleFormatting("keys");
         case tmvRingMix:
-            return pmd().asPercent().withDefault(0.5f).withName("Ring Modulation");
+            return pmd()
+                .asPercent()
+                .withDefault(0.5f)
+                .withName("Ring Modulation Amount")
+                .withShortName("Amount");
 
         default:
             break;
