@@ -72,7 +72,8 @@ struct ConcreteConfig
 
     static inline float envelopeRateLinear(GlobalStorage *s, float f)
     {
-        return 1.f * blockSize / (s->sampleRate) * pow(-2, f);
+        // envelope rate linear is 2^f normalized for sample frequency over the block
+        return pow(2.f, -f) * (blockSize / (s->sampleRate));
     }
 
     static inline float temposyncRatio(GlobalStorage *s, EffectStorage *e, int idx) { return 1; }
@@ -97,7 +98,7 @@ struct ConcreteConfig
         return 1.0 / noteToPitch(s, p);
     }
 
-    static inline float dbToLinear(GlobalStorage *s, float f) { return 1; }
+    static inline float dbToLinear(GlobalStorage *s, float f) { return powf(10.f, f / 20.f); }
 };
 } // namespace sst::effects::core
 
