@@ -73,7 +73,7 @@ struct ConcreteConfig
     static inline float envelopeRateLinear(GlobalStorage *s, float f)
     {
         // Must use positive base: pow(-2, non-integer) = NaN; pow(-2, odd) = negative.
-        return 1.f * blockSize / (s->sampleRate) * powf(2.f, f);
+        return pow(2.f, -f) * blockSize / (s->sampleRate);
     }
 
     static inline float temposyncRatio(GlobalStorage *s, EffectStorage *e, int idx) { return 1; }
