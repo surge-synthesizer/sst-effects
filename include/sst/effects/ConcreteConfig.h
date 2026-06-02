@@ -72,8 +72,8 @@ struct ConcreteConfig
 
     static inline float envelopeRateLinear(GlobalStorage *s, float f)
     {
-        // Must use positive base: pow(-2, non-integer) = NaN; pow(-2, odd) = negative.
-        return pow(2.f, -f) * blockSize / (s->sampleRate);
+        // envelope rate linear is 2^f normalized for sample frequency over the block
+        return pow(2.f, -f) * (blockSize / (s->sampleRate));
     }
 
     static inline float temposyncRatio(GlobalStorage *s, EffectStorage *e, int idx) { return 1; }
