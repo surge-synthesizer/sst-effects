@@ -11,7 +11,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        os: [ ubuntu-latest, macos-latest, windows-2022 ]
         include:
           - os: ubuntu-latest
             name: linux
@@ -19,7 +19,7 @@ jobs:
           - os: macos-latest
             name: mac
 
-          - os: windows-latest
+          - os: windows-2022
             name: win
 
     steps:
