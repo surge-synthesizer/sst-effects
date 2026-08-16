@@ -722,9 +722,7 @@ template <size_t blockSize> inline void blockabs(float *src)
     }
 }
 
-// The multiply overflows int32_t for all but a handful of inputs, and signed overflow
-// is undefined. An LCG wants modular arithmetic anyway, so do the step unsigned, where
-// the wrap is defined, and convert the result back.
+// step unsigned so the LCG wrap is defined rather than signed overflow
 inline int32_t super_simple_noise(int32_t last)
 {
     return (int32_t)((uint32_t)last * 1103515245u + 12345u);
