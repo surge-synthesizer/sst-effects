@@ -58,7 +58,7 @@ if (${SST_EFFECTS_BUILD_TESTS})
     if (NOT TARGET fmt)
         CPMAddPackage(NAME fmt
                 GITHUB_REPOSITORY fmtlib/fmt
-                GIT_TAG 10.2.1
+                GIT_TAG 12.1.0
         )
     endif ()
 
