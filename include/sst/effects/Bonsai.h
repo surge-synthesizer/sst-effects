@@ -722,7 +722,11 @@ template <size_t blockSize> inline void blockabs(float *src)
     }
 }
 
-inline int32_t super_simple_noise(int32_t last) { return last * 1103515245 + 12345; }
+// step unsigned so the LCG wrap is defined rather than signed overflow
+inline int32_t super_simple_noise(int32_t last)
+{
+    return (int32_t)((uint32_t)last * 1103515245u + 12345u);
+}
 template <size_t blockSize> inline void noise(float &last, float *__restrict dst)
 {
     int32_t temp alignas(16)[blockSize] = {};
