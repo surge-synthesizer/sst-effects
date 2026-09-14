@@ -225,6 +225,12 @@ template <typename FXConfig> inline void Flanger<FXConfig>::initialize()
     longphase[0] = 0;
     longphase[1] = 0.5;
 
+    // Clear everything that recirculates, so that a suspend really silences the effect
+    idels[0].reset();
+    idels[1].reset();
+    lpaL = 0.f;
+    lpaR = 0.f;
+
     for (int i = 0; i < LFO_TABLE_SIZE; ++i)
     {
         sin_lfo_table[i] = sin(2.0 * M_PI * i / LFO_TABLE_SIZE);
