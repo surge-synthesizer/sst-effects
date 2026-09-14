@@ -234,6 +234,7 @@ struct TiltNoise : core::VoiceEffectTemplateBase<VFXConfig>,
         levelLerp.multiply_2_blocks(dataoutL, dataoutR);
     }
 
+    bool checkParameterConsistency() const { return true; }
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
 
   protected:

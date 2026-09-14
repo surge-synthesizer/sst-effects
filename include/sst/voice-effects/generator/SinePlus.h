@@ -369,6 +369,32 @@ struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
     bool checkParameterConsistency() const { return true; }
     bool getMonoToStereoSetting() const { return this->getIntParam(ipStereo) > 0; }
 
+    // quantize swaps harmonic number and semitones; carry the heard pitch across
+    void updateFloatParamsOnIntParamChange(size_t intIndex, int oldValue, float *const fparam)
+    {
+        int fp;
+        switch (intIndex)
+        {
+        case ipQuantA:
+            fp = fpOffsetA;
+            break;
+        case ipQuantB:
+            fp = fpOffsetB;
+            break;
+        default:
+            return;
+        }
+
+        auto quantized = this->getIntParam(intIndex) != 0;
+        if (quantized == (oldValue != 0))
+            return;
+
+        if (quantized)
+            fparam[fp] = std::max(std::round(std::pow(2.f, fparam[fp] / 12.f)), 1.f);
+        else
+            fparam[fp] = 12.f * std::log2(std::max(std::round(fparam[fp]), 1.f));
+    }
+
   protected:
     bool keytrackOn{true};
     basic_blocks::dsp::QuadratureOscillator<float, VFXConfig::blockSize> sineOscMain, sineOscA,
