@@ -62,6 +62,14 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
         dly_num_params,
     };
 
+    enum delay_line_modes
+    {
+        dly_line_tape,
+        dly_line_clean,
+
+        num_dly_line_modes,
+    };
+
     enum delay_clipping_modes
     {
         dly_clipping_off,
@@ -118,10 +126,16 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
         switch (idx)
         {
         case dly_time_left:
-            return pmd().withName("Left").asEnvelopeTime();
+            return pmd().withName("Left").asEnvelopeTime().deformable().withDeformationCount(
+                num_dly_line_modes);
 
         case dly_time_right:
-            return pmd().withName("Right").asEnvelopeTime().deactivatable();
+            return pmd()
+                .withName("Right")
+                .asEnvelopeTime()
+                .deactivatable()
+                .deformable()
+                .withDeformationCount(num_dly_line_modes);
 
         case dly_feedback:
             return pmd()
@@ -186,6 +200,143 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
 
         return x * x * x;
     }
+
+    /*
+     * Repositioning the base delay time splices two unrelated points of the delay line
+     * together, so it is done as a crossfade between the outgoing and the incoming tap.
+     *
+     * The crossfade cannot be made transparent. Where the two taps hold correlated
+     * material the resultant amplitude across the fade is A * sqrt(1 + sin(2t) cos(p)),
+     * p being the phase difference between the taps, so a pair that lands in antiphase
+     * cancels at the midpoint no matter how long or short the fade is. What can be
+     * controlled is how often that happens, and that is set here by the geometry of the
+     * line rather than by a tuned threshold.
+     *
+     * The fade runs for half of the delay it is fading across, and a request arriving
+     * while a fade is in flight is ignored. Those two facts together are the whole
+     * policy: a retime is allowed immediately, but the next one cannot begin until the
+     * previous fade has run, so retimes under a sweep end up spaced by half a lap of the
+     * line. That falls out as roughly one retime per circulation, which both keeps the
+     * splices far apart and scales them with the delay, since a long delay can afford a
+     * graceful fade where the same fade over a 10 ms delay would swamp it.
+     *
+     * Nothing is swallowed by this: a small deliberate adjustment retimes at once, it
+     * just cannot be followed by another for a lap. setvars runs every block, so the
+     * first block after a fade completes picks up the newest base time anyway.
+     *
+     * Below about 20 ms of delay the lap stops being a useful rate limit, since retiming
+     * every few milliseconds chews the signal, so the fade length stops shrinking with it
+     * and holds at a floor instead.
+     */
+    struct CleanRetime
+    {
+        float active{0.f};
+        float outgoing{0.f};
+        int fadeRemaining{0};
+        float fadeWeight{1.f};
+        float fadeStep{0.f};
+
+        void instantize(float base)
+        {
+            active = base;
+            outgoing = base;
+            fadeRemaining = 0;
+            fadeWeight = 1.f;
+            fadeStep = 0.f;
+        }
+
+        void requestTarget(float base, int fadeLength)
+        {
+            if (fadeRemaining > 0)
+            {
+                return;
+            }
+
+            // don't retrigger on sub-sample jitter from tempo or modulation
+            if (std::fabs(base - active) < 0.5f)
+            {
+                return;
+            }
+
+            outgoing = active;
+            active = base;
+            fadeRemaining = fadeLength;
+            fadeWeight = 0.f;
+            fadeStep = 1.f / (float)fadeLength;
+        }
+    };
+
+    static constexpr float cleanFadeFraction{0.5f};
+    static constexpr float cleanFadeMinSeconds{0.01f};
+    static constexpr float cleanFadeMaxSeconds{0.5f};
+
+    // half a lap of the line, floored so very short delays don't retime every block
+    inline int cleanFadeSamples(float delaySamples) const
+    {
+        auto floorSamples = (int)(this->sampleRate() * cleanFadeMinSeconds);
+        auto cap = (int)(this->sampleRate() * cleanFadeMaxSeconds);
+
+        return std::clamp((int)(cleanFadeFraction * std::fabs(delaySamples)),
+                          std::max((int)FXConfig::blockSize, floorSamples), cap);
+    }
+
+    inline float readTap(const float *__restrict buf, float time, int k)
+    {
+        int i_dtime =
+            std::max((int)FXConfig::blockSize,
+                     std::min((int)time, (int)(max_delay_length - sincTable.FIRipol_N - 1)));
+        int rp = ((wpos - i_dtime + k) - sincTable.FIRipol_N) & (max_delay_length - 1);
+        int sincOffset = sincTable.FIRipol_N *
+                         std::clamp((int)(sincTable.FIRipol_M * (float(i_dtime + 1) - time)), 0,
+                                    sincTable.FIRipol_M - 1);
+
+        auto S = SIMD_MM(mul_ps)(SIMD_MM(load_ps)(&sincTable.sinctable1X[sincOffset]),
+                                 SIMD_MM(loadu_ps)(&buf[rp]));
+        S = SIMD_MM(add_ps)(
+            S, SIMD_MM(mul_ps)(SIMD_MM(load_ps)(&sincTable.sinctable1X[sincOffset + 4]),
+                               SIMD_MM(loadu_ps)(&buf[rp + 4])));
+        S = SIMD_MM(add_ps)(
+            S, SIMD_MM(mul_ps)(SIMD_MM(load_ps)(&sincTable.sinctable1X[sincOffset + 8]),
+                               SIMD_MM(loadu_ps)(&buf[rp + 8])));
+        S = mech::sum_ps_to_ss(S);
+
+        float res;
+        SIMD_MM(store_ss)(&res, S);
+
+        return res;
+    }
+
+    inline float tapValue(int channel, int lineMode, float tapeTime, CleanRetime &clean,
+                          float modOffset, int k)
+    {
+        if (lineMode != dly_line_clean)
+        {
+            return readTap(buffer[channel], tapeTime, k);
+        }
+
+        if (clean.fadeRemaining <= 0)
+        {
+            return readTap(buffer[channel], clean.active + modOffset, k);
+        }
+
+        /*
+         * A linear fade rather than an equal power one. Equal power is the right law for
+         * uncorrelated signals, but the two taps here are reading the same source from
+         * one line, so they are correlated: their sum is A * |g1 e^ip1 + g2 e^ip2|, which
+         * for a linear fade holds at A when the taps are in phase and for an equal power
+         * fade rises to A * sqrt(2). Since small retimes leave the taps nearly in phase,
+         * equal power would put a level bump on almost every one of them.
+         */
+        auto gainIn = clean.fadeWeight;
+        auto gainOut = 1.f - clean.fadeWeight;
+
+        clean.fadeWeight += clean.fadeStep;
+        clean.fadeRemaining--;
+
+        return gainIn * readTap(buffer[channel], clean.active + modOffset, k) +
+               gainOut * readTap(buffer[channel], clean.outgoing + modOffset, k);
+    }
+
     void setvars(bool b);
 
     /*
@@ -204,6 +355,20 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
         16)[2][max_delay_length + sst::basic_blocks::tables::SurgeSincTableProvider::FIRipol_N];
 
     sst::basic_blocks::dsp::SurgeLag<float, true> timeL{0.0001}, timeR{0.0001};
+
+    /*
+     * Clean mode splits the tap position into a base delay time, which is repositioned
+     * immediately when it changes, and the mod LFO offset, which keeps gliding so that
+     * Rate and Depth still produce chorus and flange. Since the lag is linear,
+     * lag(base + offset) == lag(base) + lag(offset), so running the offset through a lag
+     * at the same rate as timeL leaves the vibrato identical to Tape mode.
+     */
+    sst::basic_blocks::dsp::SurgeLag<float, true> modOffsetL{0.0001}, modOffsetR{0.0001};
+
+    CleanRetime cleanL, cleanR;
+
+    int lineModeL{dly_line_tape}, lineModeR{dly_line_tape};
+
     bool inithadtempo;
     float envf;
     int wpos;
@@ -294,17 +459,59 @@ template <typename FXConfig> inline void Delay<FXConfig>::setvars(bool init)
 
     constexpr int FIRoffset{sst::basic_blocks::tables::SurgeSincTableProvider::FIRipol_N >> 1};
 
-    timeL.newValue(this->sampleRate() * this->temposyncRatioInv(dly_time_left) *
-                       this->noteToPitchIgnoringTuning(12 * this->floatValue(dly_time_left)) +
-                   LFOval - FIRoffset);
-    timeR.newValue(this->sampleRate() * this->temposyncRatioInv(isLinked) *
-                       this->noteToPitchIgnoringTuning(12 * this->floatValue(isLinked)) -
-                   LFOval - FIRoffset);
+    auto baseL = this->sampleRate() * this->temposyncRatioInv(dly_time_left) *
+                 this->noteToPitchIgnoringTuning(12 * this->floatValue(dly_time_left));
+    auto baseR = this->sampleRate() * this->temposyncRatioInv(isLinked) *
+                 this->noteToPitchIgnoringTuning(12 * this->floatValue(isLinked));
+
+    timeL.newValue(baseL + LFOval - FIRoffset);
+    timeR.newValue(baseR - LFOval - FIRoffset);
+
+    modOffsetL.newValue(LFOval);
+    modOffsetR.newValue(-LFOval);
+
+    // when Right is linked to Left it follows Left's line mode, the same way it follows
+    // Left's delay time
+    auto modeL = this->deformType(dly_time_left);
+    auto modeR = this->deformType(isLinked);
+
+    // entering Clean mode picks up wherever the gliding tap currently sits, so that
+    // choosing the mode crossfades from there instead of jumping
+    if (modeL != lineModeL && modeL == dly_line_clean)
+    {
+        cleanL.instantize(timeL.v - modOffsetL.v);
+    }
+
+    if (modeR != lineModeR && modeR == dly_line_clean)
+    {
+        cleanR.instantize(timeR.v - modOffsetR.v);
+    }
+
+    lineModeL = modeL;
+    lineModeR = modeR;
+
+    if (init)
+    {
+        cleanL.instantize(baseL - FIRoffset);
+        cleanR.instantize(baseR - FIRoffset);
+    }
+    else
+    {
+        float targetL = baseL - FIRoffset;
+        float targetR = baseR - FIRoffset;
+
+        // sized by the delay being moved to, since that is the lap the next retime has
+        // to wait out
+        cleanL.requestTarget(targetL, cleanFadeSamples(targetL));
+        cleanR.requestTarget(targetR, cleanFadeSamples(targetR));
+    }
 
     if (init)
     {
         timeL.instantize();
         timeR.instantize();
+        modOffsetL.instantize();
+        modOffsetR.instantize();
     }
 
     mix.set_target_smoothed(this->floatValue(dly_mix));
@@ -318,6 +525,8 @@ template <typename FXConfig> inline void Delay<FXConfig>::setvars(bool init)
     {
         timeL.instantize();
         timeR.instantize();
+        modOffsetL.instantize();
+        modOffsetR.instantize();
         feedback.instantize();
         crossfeed.instantize();
         mix.instantize();
@@ -343,42 +552,11 @@ template <typename FXConfig> inline void Delay<FXConfig>::processBlock(float *da
     {
         timeL.process();
         timeR.process();
+        modOffsetL.process();
+        modOffsetR.process();
 
-        int i_dtimeL =
-            std::max((int)FXConfig::blockSize,
-                     std::min((int)timeL.v, (int)(max_delay_length - sincTable.FIRipol_N - 1)));
-        int i_dtimeR =
-            std::max((int)FXConfig::blockSize,
-                     std::min((int)timeR.v, (int)(max_delay_length - sincTable.FIRipol_N - 1)));
-
-        int rpL = ((wpos - i_dtimeL + k) - sincTable.FIRipol_N) & (max_delay_length - 1);
-        int rpR = ((wpos - i_dtimeR + k) - sincTable.FIRipol_N) & (max_delay_length - 1);
-
-        int sincL = sincTable.FIRipol_N *
-                    std::clamp((int)(sincTable.FIRipol_M * (float(i_dtimeL + 1) - timeL.v)), 0,
-                               sincTable.FIRipol_M - 1);
-        int sincR = sincTable.FIRipol_N *
-                    std::clamp((int)(sincTable.FIRipol_M * (float(i_dtimeR + 1) - timeR.v)), 0,
-                               sincTable.FIRipol_M - 1);
-
-        SIMD_M128 L, R;
-        L = SIMD_MM(mul_ps)(SIMD_MM(load_ps)(&sincTable.sinctable1X[sincL]),
-                            SIMD_MM(loadu_ps)(&buffer[0][rpL]));
-        L = SIMD_MM(add_ps)(L, SIMD_MM(mul_ps)(SIMD_MM(load_ps)(&sincTable.sinctable1X[sincL + 4]),
-                                               SIMD_MM(loadu_ps)(&buffer[0][rpL + 4])));
-        L = SIMD_MM(add_ps)(L, SIMD_MM(mul_ps)(SIMD_MM(load_ps)(&sincTable.sinctable1X[sincL + 8]),
-                                               SIMD_MM(loadu_ps)(&buffer[0][rpL + 8])));
-        L = sst::basic_blocks::mechanics::sum_ps_to_ss(L);
-        R = SIMD_MM(mul_ps)(SIMD_MM(load_ps)(&sincTable.sinctable1X[sincR]),
-                            SIMD_MM(loadu_ps)(&buffer[1][rpR]));
-        R = SIMD_MM(add_ps)(R, SIMD_MM(mul_ps)(SIMD_MM(load_ps)(&sincTable.sinctable1X[sincR + 4]),
-                                               SIMD_MM(loadu_ps)(&buffer[1][rpR + 4])));
-        R = SIMD_MM(add_ps)(R, SIMD_MM(mul_ps)(SIMD_MM(load_ps)(&sincTable.sinctable1X[sincR + 8]),
-                                               SIMD_MM(loadu_ps)(&buffer[1][rpR + 8])));
-        R = sst::basic_blocks::mechanics::sum_ps_to_ss(R);
-
-        SIMD_MM(store_ss)(&tbufferL[k], L);
-        SIMD_MM(store_ss)(&tbufferR[k], R);
+        tbufferL[k] = tapValue(0, lineModeL, timeL.v, cleanL, modOffsetL.v, k);
+        tbufferR[k] = tapValue(1, lineModeR, timeR.v, cleanR, modOffsetR.v, k);
     }
 
     // negative feedback
