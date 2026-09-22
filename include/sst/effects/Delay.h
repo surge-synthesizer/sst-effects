@@ -306,35 +306,86 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
         return res;
     }
 
-    inline float tapValue(int channel, int lineMode, float tapeTime, CleanRetime &clean,
-                          float modOffset, int k)
+    enum tap_runs
+    {
+        tap_run_tape,
+        tap_run_clean,
+        tap_run_clean_fading,
+    };
+
+    /*
+     * Which of the three a sample needs is fixed for a whole run, so the choice is made
+     * once per block and the loop body carries no branch. The channel is a template
+     * parameter rather than an argument so that the lag and fade state stay reachable
+     * through this, which is what lets the compiler keep them in registers across the
+     * loop instead of reloading them behind the write to out.
+     */
+    template <int CH, int RUN> inline void readRun(int from, int to, float *__restrict out)
+    {
+        auto &time = (CH == 0) ? timeL : timeR;
+        auto &modOffset = (CH == 0) ? modOffsetL : modOffsetR;
+        auto &clean = (CH == 0) ? cleanL : cleanR;
+        const float *__restrict buf = buffer[CH];
+
+        for (int k = from; k < to; ++k)
+        {
+            time.process();
+            modOffset.process();
+
+            if constexpr (RUN == tap_run_tape)
+            {
+                out[k] = readTap(buf, time.v, k);
+            }
+            else if constexpr (RUN == tap_run_clean)
+            {
+                out[k] = readTap(buf, clean.active + modOffset.v, k);
+            }
+            else
+            {
+                /*
+                 * A linear fade rather than an equal power one. Equal power is the right
+                 * law for uncorrelated signals, but the two taps here read the same source
+                 * from one line, so they are correlated: their sum is
+                 * A * |g1 e^ip1 + g2 e^ip2|, which for a linear fade holds at A when the
+                 * taps are in phase and for an equal power fade rises to A * sqrt(2).
+                 * Since small retimes leave the taps nearly in phase, equal power would
+                 * put a level bump on almost every one of them.
+                 */
+                auto gainIn = clean.fadeWeight;
+                auto gainOut = 1.f - clean.fadeWeight;
+
+                clean.fadeWeight += clean.fadeStep;
+                clean.fadeRemaining--;
+
+                out[k] = gainIn * readTap(buf, clean.active + modOffset.v, k) +
+                         gainOut * readTap(buf, clean.outgoing + modOffset.v, k);
+            }
+        }
+    }
+
+    template <int CH> inline void readChannel(int lineMode, float *__restrict out)
     {
         if (lineMode != dly_line_clean)
         {
-            return readTap(buffer[channel], tapeTime, k);
+            readRun<CH, tap_run_tape>(0, FXConfig::blockSize, out);
+
+            return;
         }
 
-        if (clean.fadeRemaining <= 0)
+        auto &clean = (CH == 0) ? cleanL : cleanR;
+
+        // a fade can run out part way through a block, so the block splits at that point
+        auto fading = std::clamp(clean.fadeRemaining, 0, (int)FXConfig::blockSize);
+
+        if (fading > 0)
         {
-            return readTap(buffer[channel], clean.active + modOffset, k);
+            readRun<CH, tap_run_clean_fading>(0, fading, out);
         }
 
-        /*
-         * A linear fade rather than an equal power one. Equal power is the right law for
-         * uncorrelated signals, but the two taps here are reading the same source from
-         * one line, so they are correlated: their sum is A * |g1 e^ip1 + g2 e^ip2|, which
-         * for a linear fade holds at A when the taps are in phase and for an equal power
-         * fade rises to A * sqrt(2). Since small retimes leave the taps nearly in phase,
-         * equal power would put a level bump on almost every one of them.
-         */
-        auto gainIn = clean.fadeWeight;
-        auto gainOut = 1.f - clean.fadeWeight;
-
-        clean.fadeWeight += clean.fadeStep;
-        clean.fadeRemaining--;
-
-        return gainIn * readTap(buffer[channel], clean.active + modOffset, k) +
-               gainOut * readTap(buffer[channel], clean.outgoing + modOffset, k);
+        if (fading < FXConfig::blockSize)
+        {
+            readRun<CH, tap_run_clean>(fading, FXConfig::blockSize, out);
+        }
     }
 
     void setvars(bool b);
@@ -548,16 +599,8 @@ template <typename FXConfig> inline void Delay<FXConfig>::processBlock(float *da
         wbL alignas(16)[FXConfig::blockSize]; // wb = write-buffer
     float tbufferR alignas(16)[FXConfig::blockSize], wbR alignas(16)[FXConfig::blockSize];
 
-    for (k = 0; k < FXConfig::blockSize; k++)
-    {
-        timeL.process();
-        timeR.process();
-        modOffsetL.process();
-        modOffsetR.process();
-
-        tbufferL[k] = tapValue(0, lineModeL, timeL.v, cleanL, modOffsetL.v, k);
-        tbufferR[k] = tapValue(1, lineModeR, timeR.v, cleanR, modOffsetR.v, k);
-    }
+    readChannel<0>(lineModeL, tbufferL);
+    readChannel<1>(lineModeR, tbufferR);
 
     // negative feedback
     if (FBsign)
