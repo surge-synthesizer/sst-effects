@@ -62,6 +62,11 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
         dly_num_params,
     };
 
+    /*
+     * How the read tap behaves when the delay time changes, chosen per tap by the host
+     * and streamed as the time parameter's deform type. Distinct from TapRead below,
+     * which is an internal detail of how a single block is read.
+     */
     enum delay_line_modes
     {
         dly_line_tape,
@@ -306,11 +311,17 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
         return res;
     }
 
-    enum tap_runs
+    /*
+     * What the read loop does for one run of samples. This is not the line mode: Clean
+     * needs two of these, because a retime crossfade covers part of a block and the rest
+     * of it reads a single tap. Scoped so that it cannot be confused with, or assigned
+     * to, a delay_line_modes value.
+     */
+    enum class TapRead
     {
-        tap_run_tape,
-        tap_run_clean,
-        tap_run_clean_fading,
+        Tape,
+        CleanSteady,
+        CleanFading,
     };
 
     /*
@@ -324,7 +335,7 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
      * and in the fading body, which already does two sinc reads, that measured 45% slower
      * than simply leaving the branch in the loop.
      */
-    template <int CH, int RUN> inline void readRun(int from, int to, float *__restrict out)
+    template <int CH, TapRead RUN> inline void readRun(int from, int to, float *__restrict out)
     {
         auto &time = (CH == 0) ? timeL : timeR;
         auto &modOffset = (CH == 0) ? modOffsetL : modOffsetR;
@@ -336,11 +347,11 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
             time.process();
             modOffset.process();
 
-            if constexpr (RUN == tap_run_tape)
+            if constexpr (RUN == TapRead::Tape)
             {
                 out[k] = readTap(buf, time.v, k);
             }
-            else if constexpr (RUN == tap_run_clean)
+            else if constexpr (RUN == TapRead::CleanSteady)
             {
                 out[k] = readTap(buf, clean.active + modOffset.v, k);
             }
@@ -367,11 +378,18 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
         }
     }
 
-    template <int CH> inline void readChannel(int lineMode, float *__restrict out)
+    template <int CH> inline void readChannel(delay_line_modes lineMode, float *__restrict out)
     {
-        if (lineMode != dly_line_clean)
+        // switched rather than tested against Clean, so that adding a line mode is a
+        // compiler warning here rather than a silent fall into Tape
+        switch (lineMode)
         {
-            readRun<CH, tap_run_tape>(0, FXConfig::blockSize, out);
+        case dly_line_clean:
+            break;
+
+        case dly_line_tape:
+        case num_dly_line_modes:
+            readRun<CH, TapRead::Tape>(0, FXConfig::blockSize, out);
 
             return;
         }
@@ -383,12 +401,12 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
 
         if (fading > 0)
         {
-            readRun<CH, tap_run_clean_fading>(0, fading, out);
+            readRun<CH, TapRead::CleanFading>(0, fading, out);
         }
 
         if (fading < FXConfig::blockSize)
         {
-            readRun<CH, tap_run_clean>(fading, FXConfig::blockSize, out);
+            readRun<CH, TapRead::CleanSteady>(fading, FXConfig::blockSize, out);
         }
     }
 
@@ -422,7 +440,7 @@ template <typename FXConfig> struct Delay : core::EffectTemplateBase<FXConfig>
 
     CleanRetime cleanL, cleanR;
 
-    int lineModeL{dly_line_tape}, lineModeR{dly_line_tape};
+    delay_line_modes lineModeL{dly_line_tape}, lineModeR{dly_line_tape};
 
     bool inithadtempo;
     float envf;
@@ -525,10 +543,25 @@ template <typename FXConfig> inline void Delay<FXConfig>::setvars(bool init)
     modOffsetL.newValue(LFOval);
     modOffsetR.newValue(-LFOval);
 
-    // when Right is linked to Left it follows Left's line mode, the same way it follows
-    // Left's delay time
-    auto modeL = this->deformType(dly_time_left);
-    auto modeR = this->deformType(isLinked);
+    /*
+     * The deform type arrives off the stream, so a patch written by a build that knows
+     * more line modes than this one lands here as an out of range int. Fall back to Tape
+     * deliberately rather than letting an unknown value pick a branch by arithmetic.
+     *
+     * When Right is linked to Left it follows Left's line mode, the same way it follows
+     * Left's delay time.
+     */
+    auto asLineMode = [](int deform) {
+        if (deform < 0 || deform >= num_dly_line_modes)
+        {
+            return dly_line_tape;
+        }
+
+        return (delay_line_modes)deform;
+    };
+
+    auto modeL = asLineMode(this->deformType(dly_time_left));
+    auto modeR = asLineMode(this->deformType(isLinked));
 
     // entering Clean mode picks up wherever the gliding tap currently sits, so that
     // choosing the mode crossfades from there instead of jumping
