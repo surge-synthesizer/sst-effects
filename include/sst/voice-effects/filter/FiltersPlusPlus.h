@@ -120,6 +120,13 @@ template <filtersplusplus::FilterModel Model> struct FilterModelConfiguration
         {
             c.extraName = "Gain";
         }
+        if constexpr (Model == fmd::CytomicCascade)
+        {
+            // compensated is lowpass only; configFilter drops it for the other passbands
+            c.submodels.emplace_back(fsm::UNSUPPORTED);
+            c.submodels.emplace_back(fsm::Compensated);
+            c.subName = "Mode";
+        }
         if constexpr (Model == fmd::Comb)
         {
             c.slopes.emplace_back(fsl::Comb_Bipolar_ContinuousMix);
@@ -202,6 +209,8 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
         {
         case filtersplusplus::FilterModel::CytomicSVF:
             return "filt-cytomic";
+        case filtersplusplus::FilterModel::CytomicCascade:
+            return "filt-cytomic-cascade";
         case filtersplusplus::FilterModel::VemberClassic:
             return "vemberclassic";
         case filtersplusplus::FilterModel::DiodeLadder:
@@ -446,7 +455,10 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
 
             for (int i = 0; i < opts.submodels.size(); ++i)
             {
-                smm.insert({i, fpp::toString(opts.submodels[i])});
+                if (opts.submodels[i] == fsm::UNSUPPORTED)
+                    smm.insert({i, "Standard"});
+                else
+                    smm.insert({i, fpp::toString(opts.submodels[i])});
             }
             return pmd()
                 .asInt()
@@ -786,6 +798,11 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
                 mid = std::clamp(this->getIntParam(ipSubmodel), 0, ms - 1);
             }
             cfg.mt = opts.submodels[mid];
+            if constexpr (Model == fpp::FilterModel::CytomicCascade)
+            {
+                if (cfg.pt != fpb::LP)
+                    cfg.mt = fsm::UNSUPPORTED;
+            }
 
             return cfg;
         }

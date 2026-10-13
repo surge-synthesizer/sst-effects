@@ -173,6 +173,8 @@ TEST_CASE("Can Create Voice FX")
         VTester<
             sst::voice_effects::filter::FiltersPlusPlus<VTestConfig, fmd::CytomicSVF>>::TestVFX();
         VTester<sst::voice_effects::filter::FiltersPlusPlus<VTestConfig,
+                                                            fmd::CytomicCascade>>::TestVFX();
+        VTester<sst::voice_effects::filter::FiltersPlusPlus<VTestConfig,
                                                             fmd::VemberClassic>>::TestVFX();
         VTester<
             sst::voice_effects::filter::FiltersPlusPlus<VTestConfig, fmd::DiodeLadder>>::TestVFX();
