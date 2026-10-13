@@ -220,11 +220,11 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
             MUL(DIV(ONE, MUL(SETALL(440 * this->note_to_pitch_ignoring_tuning(p)), COMBSPACE)),
                 SampleRateSSE);
 
-        double rate = this->envelope_rate_linear_nowrap(-this->getFloatParam(fpRate)) *
-                      this->getTempoSyncRatio();
+        // envelope_rate_linear_nowrap already applies the temposync ratio
+        double rate = this->envelope_rate_linear_nowrap(-this->getFloatParam(fpRate));
 
-        lfoPhase = std::fmod(lfoPhase + rate, 1.f);
-        float currentPhase{lfoPhase};
+        lfoPhase = std::fmod(lfoPhase + rate, 1.0);
+        float currentPhase = lfoPhase;
 
         if (this->getIntParam(ipBehavior))
         {
@@ -306,13 +306,13 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
             MUL(DIV(ONE, MUL(SETALL(440 * this->note_to_pitch_ignoring_tuning(p)), COMBSPACE)),
                 SampleRateSSE);
 
-        double rate = this->envelope_rate_linear_nowrap(-this->getFloatParam(fpRate)) *
-                      this->getTempoSyncRatio();
+        // envelope_rate_linear_nowrap already applies the temposync ratio
+        double rate = this->envelope_rate_linear_nowrap(-this->getFloatParam(fpRate));
 
-        lfoPhase = std::fmod(lfoPhase + rate, 1.f);
-        monoLfoPhase = std::fmod(lfoPhase + rate * .6666667f, 1.f);
-        float curLFOPhase{lfoPhase};
-        float curLevPhase{lfoPhase};
+        lfoPhase = std::fmod(lfoPhase + rate, 1.0);
+        monoLfoPhase = std::fmod(lfoPhase + rate * .6666667, 1.0);
+        float curLFOPhase = lfoPhase;
+        float curLevPhase = lfoPhase;
 
         if (this->getIntParam(ipBehavior))
         {
@@ -420,8 +420,8 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
     basic_blocks::dsp::lipol_sse<VFXConfig::blockSize, true> feedbackLerp;
     filtersplusplus::Filter LPfilter, DCblocker;
 
-    float lfoPhase;
-    float monoLfoPhase;
+    double lfoPhase{0};
+    double monoLfoPhase{0};
     float rnd_hist[4] = {0, 0, 0, 0};
 
     const SIMD_M128 ONE = SETALL(1.f);
