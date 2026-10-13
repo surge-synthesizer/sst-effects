@@ -127,9 +127,9 @@ template <VoiceEffectConfig VFXConfig> struct VoiceEffectTemplateBase : public V
         return that->getSampleRateInv();
     }
 
-    float envelope_rate_linear_nowrap(float f)
+    double envelope_rate_linear_nowrap(float f)
     {
-        auto res = VFXConfig::blockSize * VFXConfig::getSampleRateInv(this) * std::pow(2, -f);
+        auto res = VFXConfig::blockSize / (double)getSampleRate() * std::pow(2.0, -(double)f);
         if (getIsTemposync())
         {
             updateTempo();

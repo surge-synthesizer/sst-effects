@@ -122,6 +122,40 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
 
     void initVoiceEffectParams() { this->initToParamMetadataDefault(this); }
 
+    double loopLengthSamples()
+    {
+        if (this->getIsTemposync())
+        {
+            // the param snaps to note lengths at 120bpm
+            this->updateTempo();
+            auto secs =
+                std::pow(2.0, (double)this->getFloatParam(fpLoopLength)) * this->temposyncratioinv;
+            secs = std::min(secs, std::pow(2.0, maxTime));
+            return std::max((double)FIRipol, secs * this->getSampleRate());
+        }
+        auto secs = this->note_to_pitch_ignoring_tuning(12 * this->getFloatParam(fpLoopLength));
+        return std::max(FIRipol, secs * this->getSampleRate());
+    }
+
+    // synced repeats end at the first zero crossing after the grid point, not a whole
+    // length after the last crossing, so the overshoot never accumulates
+    bool repeatEnds(int c, double loopLength, bool lockToTempo, float sample)
+    {
+        auto threshold = std::max(loopLength - loopDrift[c], (double)FIRipol);
+        if (bufpos[c]++ > threshold)
+        {
+            if (zcf[c].checkSample(sample))
+            {
+                if (lockToTempo)
+                    loopDrift[c] += bufpos[c] - loopLength;
+                return true;
+            }
+            return false;
+        }
+        zcf[c].logSample(sample);
+        return false;
+    }
+
     template <typename T>
     void stereoImpl(const std::array<T *, 2> &lines, const float *const datainL,
                     const float *const datainR, float *dataoutL, float *dataoutR)
@@ -155,9 +189,8 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
         if (repeats == 65)
             repeats = INT_MAX;
 
-        float loopLength = std::max(
-            FIRipol, this->note_to_pitch_ignoring_tuning(12 * this->getFloatParam(fpLoopLength)) *
-                         this->getSampleRate());
+        auto loopLength = loopLengthSamples();
+        auto lockToTempo = this->getIsTemposync();
 
         for (int k = 0; k < VFXConfig::blockSize; k++)
         {
@@ -179,22 +212,15 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
                         current[c] = lines[c]->readNaivelyAt(bufpos[c]);
                     }
 
-                    if (bufpos[c]++ > loopLength)
+                    if (repeatEnds(c, loopLength, lockToTempo, current[c]))
                     {
-                        if (zcf[c].checkSample(current[c]))
+                        bufpos[c] = 0;
+                        if (++repeated[c] >= repeats)
                         {
-                            bufpos[c] = 0;
-                            if (++repeated[c] >= repeats)
-                            {
-                                LOOP[c] = false;
-                                REC[c] = false;
-                                ARM = LOOP[0] || LOOP[1];
-                            }
+                            LOOP[c] = false;
+                            REC[c] = false;
+                            ARM = LOOP[0] || LOOP[1];
                         }
-                    }
-                    else
-                    {
-                        zcf[c].logSample(current[c]);
                     }
                 }
                 else
@@ -205,6 +231,7 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
                         {
                             bufpos[c] = 0;
                             REC[c] = true;
+                            loopDrift[c] = 0;
                             LOOP[c] = true;
                         }
                     }
@@ -240,9 +267,8 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
         if (repeats == 65)
             repeats = INT_MAX;
 
-        float loopLength = std::max(
-            FIRipol, this->note_to_pitch_ignoring_tuning(12 * this->getFloatParam(fpLoopLength)) *
-                         this->getSampleRate());
+        auto loopLength = loopLengthSamples();
+        auto lockToTempo = this->getIsTemposync();
 
         for (int k = 0; k < VFXConfig::blockSize; k++)
         {
@@ -261,22 +287,15 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
                     current = line->readNaivelyAt(bufpos[0]);
                 }
 
-                if (bufpos[0]++ > loopLength)
+                if (repeatEnds(0, loopLength, lockToTempo, current))
                 {
-                    if (zcf[0].checkSample(current))
+                    bufpos[0] = 0;
+                    if (++repeated[0] >= repeats)
                     {
-                        bufpos[0] = 0;
-                        if (++repeated[0] >= repeats)
-                        {
-                            LOOP[0] = false;
-                            REC[0] = false;
-                            ARM = false;
-                        }
+                        LOOP[0] = false;
+                        REC[0] = false;
+                        ARM = false;
                     }
-                }
-                else
-                {
-                    zcf[0].logSample(current);
                 }
             }
             else
@@ -287,6 +306,7 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
                     {
                         bufpos[0] = 0;
                         REC[0] = true;
+                        loopDrift[0] = 0;
                         LOOP[0] = true;
                     }
                 }
@@ -321,6 +341,7 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
     float srComp{1.f};
     uint16_t repeated[2]{1, 1};
     int bufpos[2]{0, 0}, buflength[2]{0, 0};
+    double loopDrift[2]{0, 0};
     bool ARM{false};
     bool REC[2]{false, false};
     bool LOOP[2]{false, false};
