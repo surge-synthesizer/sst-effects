@@ -71,7 +71,7 @@ template <typename FXConfig> struct Reverb1 : core::EffectTemplateBase<FXConfig>
     {
         assert(idx >= 0 && idx < numParams);
         using pmd = basic_blocks::params::ParamMetaData;
-        auto result = pmd().withName("Unknown " + std::to_string(idx));
+        auto result = pmd();
         // Once this switch is off we can turn on the configureControlsFromFXMetadata in
         // Reverb1Effect.cpp::init_ctrltypes
 
@@ -106,7 +106,7 @@ template <typename FXConfig> struct Reverb1 : core::EffectTemplateBase<FXConfig>
             return result.withName("High Cut")
                 .asAudibleFrequency()
                 .deactivatable()
-                .withDefault(72.f);
+                .withDefault(70.f);
         case rev1_mix:
             return result.withName("Mix").asPercent().withDefault(0.5f);
         case rev1_width:
@@ -115,7 +115,7 @@ template <typename FXConfig> struct Reverb1 : core::EffectTemplateBase<FXConfig>
             break;
         }
 
-        return result;
+        return result.withName("Unknown " + std::to_string(idx));
     }
 
   protected:

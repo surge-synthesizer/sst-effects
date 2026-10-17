@@ -94,7 +94,7 @@ template <typename FXConfig> struct RotarySpeaker : core::EffectTemplateBase<FXC
     {
         assert(idx >= 0 && idx < numParams);
         using pmd = basic_blocks::params::ParamMetaData;
-        auto result = pmd().withName("Unknown " + std::to_string(idx));
+        auto result = pmd();
 
         switch ((rotary_params)idx)
         {
@@ -126,9 +126,9 @@ template <typename FXConfig> struct RotarySpeaker : core::EffectTemplateBase<FXC
         case rot_mix:
             return result.asPercent().withDefault(0.33f).withName("Mix");
         case rot_num_params:
-            return result;
+            return result.withName("Unknown " + std::to_string(idx));
         }
-        return result;
+        return result.withName("Unknown " + std::to_string(idx));
     };
 
   protected:

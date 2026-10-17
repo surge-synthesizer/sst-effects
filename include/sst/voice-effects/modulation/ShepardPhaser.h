@@ -73,9 +73,17 @@ template <typename VFXConfig> struct ShepardPhaser : core::VoiceEffectTemplateBa
         case fpRate:
             return pmd().asLfoRate(-7, 3).withDefault(0).withName("Rate");
         case fpStartFreq:
-            return pmd().asAudibleFrequency().withName("Start Freq").withDefault(-30);
+            return pmd()
+                .asAudibleFrequency()
+                .withName("Start Freq")
+                .withShortName("Start")
+                .withDefault(-30);
         case fpEndFreq:
-            return pmd().asAudibleFrequency().withName("End Freq").withDefault(40);
+            return pmd()
+                .asAudibleFrequency()
+                .withName("End Freq")
+                .withShortName("End")
+                .withDefault(40);
         }
         return pmd().asFloat().withName("Error");
     }

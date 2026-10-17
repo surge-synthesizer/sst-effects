@@ -79,7 +79,8 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
             return pmd()
                 .asLog2SecondsRange(-8.f, maxTime, -6.f)
                 .withMilisecondsBelowOneSecond()
-                .withName("Repeat Length");
+                .withName("Repeat Length")
+                .withShortName("Length");
         case fpThreshold:
             return pmd()
                 .asLinearDecibel()
@@ -88,7 +89,11 @@ template <typename VFXConfig> struct MicroGate : core::VoiceEffectTemplateBase<V
                 .withDefault(0.f)
                 .withMultiplicativeModulationOffByDefault();
         case fpThruLevel:
-            return pmd().asLinearDecibel().withName("Thru Level").withDefault(0.f);
+            return pmd()
+                .asLinearDecibel()
+                .withName("Thru Level")
+                .withShortName("Thru")
+                .withDefault(0.f);
         }
 
         return pmd().withName("Unknown " + std::to_string(idx));

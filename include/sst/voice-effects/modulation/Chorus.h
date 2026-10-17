@@ -86,7 +86,8 @@ template <typename VFXConfig> struct Chorus : core::VoiceEffectTemplateBase<VFXC
                 .withRange(0.f, maxMiliseconds * .5f)
                 .withDefault(7.5f)
                 .withLinearScaleFormatting("ms")
-                .withName("Base Delay");
+                .withName("Base Delay")
+                .withShortName("Time");
         case fpFeedback:
             return pmd().asPercent().withDefault(0.f).withName("Feedback");
         case fpRate:

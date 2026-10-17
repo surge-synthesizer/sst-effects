@@ -100,10 +100,15 @@ template <typename VFXConfig> struct Phaser : core::VoiceEffectTemplateBase<VFXC
                     .asFloat()
                     .withRange(-48, 48)
                     .withName("Center Freq Offset")
+                    .withShortName("Center")
                     .withDefault(0)
                     .withSemitoneFormatting();
             }
-            return pmd().asAudibleFrequency().withName("Center Frequency").withDefault(0);
+            return pmd()
+                .asAudibleFrequency()
+                .withName("Center Frequency")
+                .withShortName("Center")
+                .withDefault(0);
         }
         return pmd().asFloat().withName("Error");
     }

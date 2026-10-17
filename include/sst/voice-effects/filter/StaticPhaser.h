@@ -102,13 +102,14 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
                 return pmd()
                     .asFloat()
                     .withRange(-48, 48)
-                    .withName(std::string("Offset L") + (stereo ? " L" : ""))
+                    .withName(std::string("Cutoff Offset") + (stereo ? " L" : ""))
+                    .withShortName(std::string("Cutoff") + (stereo ? " L" : ""))
                     .withDefault(0)
                     .withSemitoneFormatting();
             }
             return pmd()
                 .asAudibleFrequency()
-                .withName(std::string("Frequency") + (stereo ? " L" : ""))
+                .withName(std::string("Cutoff") + (stereo ? " L" : ""))
                 .withDefault(0);
         case fpCenterFrequencyR:
             if (keytrackOn)
@@ -116,13 +117,14 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
                 return pmd()
                     .asFloat()
                     .withRange(-48, 48)
-                    .withName(!stereo ? std::string() : "Offset R")
+                    .withName(!stereo ? std::string() : "Cutoff Offset R")
+                    .withShortName(!stereo ? std::string() : "Cutoff R")
                     .withDefault(0)
                     .withSemitoneFormatting();
             }
             return pmd()
                 .asAudibleFrequency()
-                .withName(!stereo ? std::string() : "Frequency R")
+                .withName(!stereo ? std::string() : "Cutoff R")
                 .withDefault(0);
         case fpSpacing:
             return pmd()
@@ -132,7 +134,7 @@ template <typename VFXConfig> struct StaticPhaser : core::VoiceEffectTemplateBas
                 .withName("Spacing")
                 .withSemitoneFormatting();
         case fpResonance:
-            return pmd().asPercent().withDefault(0.5f).withName("Resonance");
+            return pmd().asPercent().withDefault(0.5f).withName("Resonance").withShortName("Reso");
         case fpFeedback:
             return pmd().asPercent().withDefault(0.f).withName("Feedback");
 

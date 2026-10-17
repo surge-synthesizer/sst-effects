@@ -59,7 +59,8 @@ template <typename VFXConfig> struct RingMod : core::VoiceEffectTemplateBase<VFX
                 return pmd()
                     .asFloat()
                     .withRange(-48, 48)
-                    .withName("Offset")
+                    .withName("Frequency Offset")
+                    .withShortName("Frequency")
                     .withDefault(0)
                     .withSemitoneFormatting();
             }

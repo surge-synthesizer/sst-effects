@@ -859,7 +859,7 @@ template <typename FXConfig> struct Bonsai : core::EffectTemplateBase<FXConfig>
     {
         assert(idx >= 0 && idx < numParams);
         using pmd = basic_blocks::params::ParamMetaData;
-        auto result = pmd().withName("Unknown " + std::to_string(idx));
+        auto result = pmd();
 
         switch ((b_params)idx)
         {
@@ -902,7 +902,7 @@ template <typename FXConfig> struct Bonsai : core::EffectTemplateBase<FXConfig>
         case b_num_params:
             throw std::logic_error("getParam called with num_params");
         }
-        return result;
+        return result.withName("Unknown " + std::to_string(idx));
     }
 
     int ringout_value = -1;

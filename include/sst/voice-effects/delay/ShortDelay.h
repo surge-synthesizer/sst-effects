@@ -101,13 +101,16 @@ template <typename VFXConfig> struct ShortDelay : core::VoiceEffectTemplateBase<
         case fpFeedback:
             return pmd().asPercent().withDefault(0.f).withName("Feedback");
         case fpCrossFeed:
-            return pmd().asPercent().withDefault(0.f).withName(!stereo ? std::string()
-                                                                       : "CrossFeed");
+            return pmd()
+                .asPercent()
+                .withDefault(0.f)
+                .withName(!stereo ? std::string() : "Crossfeed")
+                .withShortName("Crossfeed");
 
         case fpLowCut:
-            return pmd().asAudibleFrequency().withDefault(-60).withName("LowCut").deactivatable();
+            return pmd().asAudibleFrequency().withDefault(-60).withName("Lo Cut").deactivatable();
         case fpHighCut:
-            return pmd().asAudibleFrequency().withDefault(70).withName("HighCut").deactivatable();
+            return pmd().asAudibleFrequency().withDefault(70).withName("Hi Cut").deactivatable();
         }
         return pmd().withName("Error");
     }

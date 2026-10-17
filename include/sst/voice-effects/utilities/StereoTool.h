@@ -70,7 +70,7 @@ struct StereoTool : core::VoiceEffectTemplateBase<VFXConfig>,
         case fpWidth:
             return this->getWidthParam().withName("Width");
         case fpOutputBalance:
-            return pmd().asPan().withName("Output Balance");
+            return pmd().asPan().withName("Output Balance").withShortName("Out Balance");
         }
         return pmd().asFloat().withName("Error");
     }

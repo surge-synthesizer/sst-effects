@@ -88,7 +88,7 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
                     .withSemitoneFormatting()
                     .withName("Tune");
             }
-            return pmd().asAudibleFrequency().withName("Frequency");
+            return pmd().asAudibleFrequency().withName("Frequency").withShortName("Tune");
         case fpSync:
             return pmd()
                 .asFloat()
@@ -97,7 +97,7 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
                 .withSemitoneFormatting()
                 .withName("Sync");
         case fpPulseWidth:
-            return pmd().asPercent().withDefault(0.5).withName("Width");
+            return pmd().asPercent().withDefault(0.5).withName("Pulse Width").withShortName("PW");
         case fpUniDetune:
             return pmd()
                 .asFloat()
@@ -106,7 +106,11 @@ struct EllipticBlepWaveforms : core::VoiceEffectTemplateBase<VFXConfig>
                 .withLinearScaleFormatting("cents", this->getIntParam(ipUnisonExtend) ? 1200 : 100)
                 .withName("Detune");
         case fpUniWidth:
-            return pmd().asPercent().withDefault(1.0).withName("Uni Width");
+            return pmd()
+                .asPercent()
+                .withDefault(1.0)
+                .withName("Unison Width")
+                .withShortName("Uni Width");
         case fpDrift:
             return pmd().asPercent().withDefault(0.f).withName("Drift");
         case fpLevel:

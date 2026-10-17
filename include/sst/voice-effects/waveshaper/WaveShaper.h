@@ -72,31 +72,33 @@ template <typename VFXConfig> struct WaveShaper : core::VoiceEffectTemplateBase<
         case WaveShaperFloatParams::bias:
             return pmd().asPercentBipolar().withName("Bias");
         case WaveShaperFloatParams::postgain:
-            return pmd().asLinearDecibel().withName("Gain");
+            return pmd().asLinearDecibel().withName("Level");
         case WaveShaperFloatParams::highpass:
             if (keytrackOn)
             {
                 return pmd()
                     .asFloat()
                     .withRange(-48, 48)
-                    .withName("HP Off")
+                    .withName("Lo Cut Offset")
+                    .withShortName("Lo Cut")
                     .withDefault(-48)
                     .deactivatable()
                     .withSemitoneFormatting();
             }
-            return pmd().asAudibleFrequency().withDefault(-60).withName("LoCut").deactivatable();
+            return pmd().asAudibleFrequency().withDefault(-60).withName("Lo Cut").deactivatable();
         case WaveShaperFloatParams::lowpass:
             if (keytrackOn)
             {
                 return pmd()
                     .asFloat()
                     .withRange(-48, 96)
-                    .withName("LP Off")
+                    .withName("Hi Cut Offset")
+                    .withShortName("Hi Cut")
                     .withDefault(48)
                     .withSemitoneFormatting()
                     .deactivatable();
             }
-            return pmd().asAudibleFrequency().withDefault(70).withName("HiCut").deactivatable();
+            return pmd().asAudibleFrequency().withDefault(70).withName("Hi Cut").deactivatable();
         default:
             break;
         }

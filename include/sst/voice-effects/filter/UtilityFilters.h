@@ -66,7 +66,8 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
                 return pmd()
                     .asFloat()
                     .withRange(-48, 48)
-                    .withName("LoCut Offset")
+                    .withName("Lo Cut Offset")
+                    .withShortName("Lo Cut")
                     .withDefault(-48)
                     .deactivatable()
                     .withSemitoneFormatting();
@@ -74,7 +75,8 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
             return pmd()
                 .asAudibleFrequency()
                 .withDefault(-60)
-                .withName("LoCut Freq")
+                .withName("Lo Cut Freq")
+                .withShortName("Lo Cut")
                 .deactivatable();
         case fpLPFreq:
             if (keytrackOn)
@@ -82,7 +84,8 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
                 return pmd()
                     .asFloat()
                     .withRange(-48, 96)
-                    .withName("HiCut Offset")
+                    .withName("Hi Cut Offset")
+                    .withShortName("Hi Cut")
                     .withDefault(96)
                     .deactivatable()
                     .withSemitoneFormatting();
@@ -90,7 +93,8 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
             return pmd()
                 .asAudibleFrequency()
                 .withDefault(70)
-                .withName("HiCut Freq")
+                .withName("Hi Cut Freq")
+                .withShortName("Hi Cut")
                 .deactivatable();
         case fpLSFreq:
             if (keytrackOn)
@@ -98,7 +102,8 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
                 return pmd()
                     .asFloat()
                     .withRange(-48, 48)
-                    .withName("LoSHelf Offset")
+                    .withName("Lo Shelf Offset")
+                    .withShortName("Lo Shelf")
                     .withDefault(12)
                     .deactivatable()
                     .withSemitoneFormatting();
@@ -106,7 +111,8 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
             return pmd()
                 .asAudibleFrequency()
                 .withDefault(-60)
-                .withName("LoShelf Freq")
+                .withName("Lo Shelf Freq")
+                .withShortName("Lo Shelf")
                 .deactivatable();
         case fpHSFreq:
             if (keytrackOn)
@@ -114,7 +120,8 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
                 return pmd()
                     .asFloat()
                     .withRange(0, 96)
-                    .withName("HiShelf Offset")
+                    .withName("Hi Shelf Offset")
+                    .withShortName("Hi Shelf")
                     .withDefault(24)
                     .deactivatable()
                     .withSemitoneFormatting();
@@ -122,16 +129,33 @@ template <typename VFXConfig> struct UtilityFilters : core::VoiceEffectTemplateB
             return pmd()
                 .asAudibleFrequency()
                 .withDefault(70)
-                .withName("HiShelf Freq")
+                .withName("Hi Shelf Freq")
+                .withShortName("Hi Shelf")
                 .deactivatable();
         case fpLSGain:
-            return pmd().asDecibelWithRange(-12.f, 12.f).withName("LoShelf Gain").withDefault(0.f);
+            return pmd()
+                .asDecibelWithRange(-12.f, 12.f)
+                .withName("Lo Shelf Gain")
+                .withShortName("Gain")
+                .withDefault(0.f);
         case fpHSGain:
-            return pmd().asDecibelWithRange(-12.f, 12.f).withName("LoShelf Gain").withDefault(0.f);
+            return pmd()
+                .asDecibelWithRange(-12.f, 12.f)
+                .withName("Hi Shelf Gain")
+                .withShortName("Gain")
+                .withDefault(0.f);
         case fpHPRes:
-            return pmd().asPercent().withName("HP Reso").withDefault(0.5f);
+            return pmd()
+                .asPercent()
+                .withName("Lo Cut Reso")
+                .withShortName("Reso")
+                .withDefault(0.5f);
         case fpLPRes:
-            return pmd().asPercent().withName("LP Reso").withDefault(0.5f);
+            return pmd()
+                .asPercent()
+                .withName("Hi Cut Reso")
+                .withShortName("Reso")
+                .withDefault(0.5f);
         }
 
         return pmd().withName("Error");

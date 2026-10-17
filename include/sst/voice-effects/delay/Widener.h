@@ -88,6 +88,7 @@ template <typename VFXConfig> struct Widener : core::VoiceEffectTemplateBase<VFX
                 .asPercent()
                 .withDefault(0.5)
                 .withName("Source (M/S)")
+                .withShortName("Source")
                 .withCustomMaxDisplay("Side")
                 .withCustomMinDisplay("Mid");
         }
