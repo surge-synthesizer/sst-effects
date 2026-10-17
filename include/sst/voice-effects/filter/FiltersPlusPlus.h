@@ -130,7 +130,7 @@ template <filtersplusplus::FilterModel Model> struct FilterModelConfiguration
         if constexpr (Model == fmd::Comb)
         {
             c.slopes.emplace_back(fsl::Comb_Bipolar_ContinuousMix);
-            c.extraName = "+/- blend";
+            c.extraName = "Blend -/+";
         }
 
         // in this one case it's better UI/UX wise to have a single list
@@ -330,7 +330,8 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
                 return pmd()
                     .asFloat()
                     .withRange(-48, 96)
-                    .withName(std::string("Offset") + (stereo ? " L" : ""))
+                    .withName(std::string("Cutoff Offset") + (stereo ? " L" : ""))
+                    .withShortName(std::string("Cutoff") + (stereo ? " L" : ""))
                     .withDefault(0)
                     .withSemitoneFormatting();
             }
@@ -344,7 +345,8 @@ struct FiltersPlusPlus : core::VoiceEffectTemplateBase<VFXConfig>
                 return pmd()
                     .asFloat()
                     .withRange(-48, 96)
-                    .withName(!stereo ? std::string() : "Offset R")
+                    .withName(!stereo ? std::string() : "Cutoff Offset R")
+                    .withShortName(!stereo ? std::string() : "Cutoff R")
                     .withDefault(0)
                     .withSemitoneFormatting();
             }

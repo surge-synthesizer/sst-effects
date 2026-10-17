@@ -110,7 +110,7 @@ template <typename VFXConfig> struct Compressor : core::VoiceEffectTemplateBase<
                 .withLinearScaleFormatting("ms", 1000.f)
                 .withName("Release");
         case fpMakeUp:
-            return pmd().asDecibelWithRange(0, 24).withName("Makeup Gain");
+            return pmd().asDecibelWithRange(0, 24).withName("Makeup Gain").withShortName("Makeup");
         case fpSCTiltAmt:
             return pmd()
                 .asFloat()

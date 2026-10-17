@@ -75,13 +75,14 @@ template <typename VFXConfig> struct ThreeOpPhaseMod : core::VoiceEffectTemplate
                     .asFloat()
                     .withRange(-5, 5)
                     .withATwoToTheBFormatting(1, 1, "x")
-                    .withName("Op 2 Ratio")
+                    .withName("Op2 Ratio")
+                    .withShortName("Ratio 2")
                     .withDecimalPlaces(4)
                     .withDefault(0.0)
                     .withFeature(pmd::Features::BELOW_ONE_IS_INVERSE_FRACTION)
                     .withFeature(pmd::Features::ALLOW_FRACTIONAL_TYPEINS);
             }
-            return pmd().asAudibleFrequency().withName("Op 2 Freq");
+            return pmd().asAudibleFrequency().withName("Op2 Freq").withShortName("Freq 2");
         case fpRatio3:
             if (keytrackOn)
             {
@@ -89,27 +90,61 @@ template <typename VFXConfig> struct ThreeOpPhaseMod : core::VoiceEffectTemplate
                     .asFloat()
                     .withRange(-5, 5)
                     .withATwoToTheBFormatting(1, 1, "x")
-                    .withName("Op 3 Ratio")
+                    .withName("Op3 Ratio")
+                    .withShortName("Ratio 3")
                     .withDecimalPlaces(4)
                     .withDefault(0.0)
                     .withFeature(pmd::Features::BELOW_ONE_IS_INVERSE_FRACTION)
                     .withFeature(pmd::Features::ALLOW_FRACTIONAL_TYPEINS);
             }
-            return pmd().asAudibleFrequency().withName("Op 3 Freq");
+            return pmd().asAudibleFrequency().withName("Op3 Freq").withShortName("Freq 3");
         case fpFeedback2:
-            return pmd().asFloat().asPercentBipolar().withName("Op 2 Feedback");
+            return pmd()
+                .asFloat()
+                .asPercentBipolar()
+                .withName("Op2 Feedback")
+                .withShortName("Fdbk 2");
         case fpFeedback3:
-            return pmd().asFloat().asPercentBipolar().withName("Op 3 Feedback");
+            return pmd()
+                .asFloat()
+                .asPercentBipolar()
+                .withName("Op3 Feedback")
+                .withShortName("Fdbk 3");
         case fp1to2:
-            return pmd().asFloat().asPercent().withDefault(0.f).withName("1->2 Depth");
+            return pmd()
+                .asFloat()
+                .asPercent()
+                .withDefault(0.f)
+                .withName("1->2 Depth")
+                .withShortName("1->2");
         case fp1to3:
-            return pmd().asFloat().asPercent().withDefault(0.f).withName("1->3 Depth");
+            return pmd()
+                .asFloat()
+                .asPercent()
+                .withDefault(0.f)
+                .withName("1->3 Depth")
+                .withShortName("1->3");
         case fp2to3:
-            return pmd().asFloat().asPercent().withDefault(0.f).withName("2->3 Depth");
+            return pmd()
+                .asFloat()
+                .asPercent()
+                .withDefault(0.f)
+                .withName("2->3 Depth")
+                .withShortName("2->3");
         case fpLevel2:
-            return pmd().asFloat().asPercent().withDefault(0.f).withName("Op 2 Level");
+            return pmd()
+                .asFloat()
+                .asPercent()
+                .withDefault(0.f)
+                .withName("Op2 Level")
+                .withShortName("Level 2");
         case fpLevel3:
-            return pmd().asFloat().asPercent().withDefault(.75f).withName("Op 3 Level");
+            return pmd()
+                .asFloat()
+                .asPercent()
+                .withDefault(.75f)
+                .withName("Op3 Level")
+                .withShortName("Level 3");
         };
 
         return pmd().withName("Error");

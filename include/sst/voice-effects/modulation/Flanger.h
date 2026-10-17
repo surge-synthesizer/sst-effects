@@ -88,11 +88,17 @@ template <typename VFXConfig> struct VoiceFlanger : core::VoiceEffectTemplateBas
         case fpRoot:
             if (keytrackOn)
             {
-                return pmd().asFloat().withName("Tune").asSemitoneRange(-36, 36).withDefault(0);
+                return pmd()
+                    .asFloat()
+                    .withName("Base Offset")
+                    .withShortName("Base")
+                    .asSemitoneRange(-36, 36)
+                    .withDefault(0);
             }
             return pmd()
                 .asFloat()
                 .withName("Base Freq")
+                .withShortName("Base")
                 .withSemitoneZeroAt440Formatting()
                 .withDefault(-0)
                 .withRange(-24, 24.f);

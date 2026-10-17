@@ -81,7 +81,7 @@ struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
                     .withSemitoneFormatting()
                     .withName("Tune");
             }
-            return pmd().asAudibleFrequency().withName("Frequency");
+            return pmd().asAudibleFrequency().withName("Frequency").withShortName("Tune");
         case fpOffsetA:
             if (quantA)
             {
@@ -117,9 +117,17 @@ struct SinePlus : core::VoiceEffectTemplateBase<VFXConfig>
                 .withDefault(43.02f)
                 .withSemitoneFormatting();
         case fpMainBalance:
-            return pmd().asPercentBipolar().withDefault(-.5f).withName("Root<>Overtones Blend");
+            return pmd()
+                .asPercentBipolar()
+                .withDefault(-.5f)
+                .withName("Root<>Overtones Blend")
+                .withShortName("Root<>AB");
         case fpOvertoneBalance:
-            return pmd().asPercentBipolar().withDefault(-.5f).withName("Overtone A<>B Blend");
+            return pmd()
+                .asPercentBipolar()
+                .withDefault(-.5f)
+                .withName("Overtone A<>B Blend")
+                .withShortName("A<>B");
         case fpLevel:
             return pmd().asCubicDecibelAttenuation().withDefault(1.f).withName("Level");
         }

@@ -65,7 +65,8 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
                     .withRange(-128, 128)
                     .withSemitoneFormatting()
                     .withDefault(-12)
-                    .withName("Offset");
+                    .withName("Frequency Offset")
+                    .withShortName("Frequency");
             }
             return pmd().asAudibleFrequency().withRange(-140, 70).withDefault(0).withName(
                 "Frequency");
@@ -78,10 +79,15 @@ template <typename VFXConfig> struct PhaseMod : core::VoiceEffectTemplateBase<VF
                     .withSemitoneFormatting()
                     .withDefault(128)
                     .deactivatable()
-                    .withName("Lowpass Offset");
+                    .withName("Lowpass Offset")
+                    .withShortName("Lowpass");
             }
-            return pmd().asAudibleFrequency().withDefault(70).deactivatable().withName(
-                "Lowpass Frequency");
+            return pmd()
+                .asAudibleFrequency()
+                .withDefault(70)
+                .deactivatable()
+                .withName("Lowpass Frequency")
+                .withShortName("Lowpass");
         case fpDepth:
             return pmd().asDecibel().withName("Depth").withDefault(0);
         default:

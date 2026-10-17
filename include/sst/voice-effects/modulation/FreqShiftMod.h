@@ -77,7 +77,8 @@ template <typename VFXConfig> struct FreqShiftMod : core::VoiceEffectTemplateBas
             {
                 return pmd()
                     .asFloat()
-                    .withName("Offset")
+                    .withName("Coarse Offset")
+                    .withShortName("Coarse")
                     .withRange(-48.f, 48.f)
                     .withDefault(0)
                     .withSemitoneFormatting();

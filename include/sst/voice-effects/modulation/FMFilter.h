@@ -64,13 +64,14 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
                 return pmd()
                     .asFloat()
                     .withRange(-48, 96)
-                    .withName(std::string("Offset") + (stereo ? " L" : ""))
+                    .withName(std::string("Cutoff Offset") + (stereo ? " L" : ""))
+                    .withShortName(std::string("Cutoff") + (stereo ? " L" : ""))
                     .withDefault(0)
                     .withSemitoneFormatting();
             }
             return pmd()
                 .asAudibleFrequency()
-                .withName(std::string("Frequency") + (stereo ? " L" : ""))
+                .withName(std::string("Cutoff") + (stereo ? " L" : ""))
                 .withDefault(0);
         case fpFreqR:
             if (keytrackOn)
@@ -78,11 +79,12 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
                 return pmd()
                     .asFloat()
                     .withRange(-48, 96)
-                    .withName(!stereo ? std::string() : "Offset R")
+                    .withName(!stereo ? std::string() : "Cutoff Offset R")
+                    .withShortName(!stereo ? std::string() : "Cutoff R")
                     .withDefault(0)
                     .withSemitoneFormatting();
             }
-            return pmd().asAudibleFrequency().withName(!stereo ? std::string() : "Frequency R");
+            return pmd().asAudibleFrequency().withName(!stereo ? std::string() : "Cutoff R");
         case fpDepth:
             return pmd().asPercent().withRange(0.f, 1.f).withDefault(0.f).withName("FM Depth");
         case fpRes:
@@ -98,6 +100,7 @@ template <typename VFXConfig> struct FMFilter : core::VoiceEffectTemplateBase<VF
                 .withRange(-48, 48)
                 .withDefault(0.f)
                 .withName("Modulator Tuning")
+                .withShortName("Mod Tune")
                 .withSemitoneFormatting();
         }
         return pmd().withName("error ");

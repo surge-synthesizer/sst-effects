@@ -112,7 +112,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
                     .withRange(-48, 48)
                     .withDefault(0)
                     .withSemitoneFormatting()
-                    .withName(std::string("Offset") + (dual ? " One" : ""));
+                    .withName(std::string("Frequency Offset") + (dual ? " One" : ""));
             }
             return pmd().asAudibleFrequency().withName(std::string("Frequency") +
                                                        (dual ? " One" : ""));
@@ -124,7 +124,7 @@ template <typename VFXConfig> struct StringResonator : core::VoiceEffectTemplate
                     .withRange(-48, 48)
                     .withDefault(0)
                     .withSemitoneFormatting()
-                    .withName(!dual ? std::string() : "Offset Two");
+                    .withName(!dual ? std::string() : "Frequency Offset Two");
             }
             return pmd()
                 .asAudibleFrequency()

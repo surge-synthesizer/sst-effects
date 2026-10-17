@@ -65,19 +65,21 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
                 return pmd()
                     .asFloat()
                     .withRange(0, 96)
-                    .withName("Samplerate Offset")
+                    .withName("Sample Rate Offset")
+                    .withShortName("Rate")
                     .withDefault(96)
                     .withSemitoneFormatting();
             }
             return pmd()
                 .asAudibleFrequency()
                 .withRange(-12, 80)
-                .withName("Samplerate")
+                .withName("Sample Rate")
+                .withShortName("Rate")
                 .withDefault(80);
         case fpBitdepth:
-            return pmd().asPercent().withName("bitdepth").withDefault(1.f);
+            return pmd().asPercent().withName("Bit Depth").withShortName("Bits").withDefault(1.f);
         case fpZeropoint:
-            return pmd().asPercent().withName("zeropoint").withDefault(0.f);
+            return pmd().asPercent().withName("Zero Point").withDefault(0.f);
         case fpCutoff:
             if (keytrackOn)
             {
@@ -85,12 +87,13 @@ template <typename VFXConfig> struct BitCrusher : core::VoiceEffectTemplateBase<
                     .asFloat()
                     .withRange(-48, 96)
                     .withName("Cutoff Offset")
+                    .withShortName("Cutoff")
                     .withDefault(96)
                     .withSemitoneFormatting();
             }
             return pmd().asAudibleFrequency().withName("Cutoff");
         case fpResonance:
-            return pmd().asPercent().withName("resonance").withDefault(0.5f);
+            return pmd().asPercent().withName("Resonance").withShortName("Reso").withDefault(0.5f);
         default:
             break;
         }

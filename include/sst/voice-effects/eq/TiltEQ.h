@@ -63,7 +63,8 @@ template <typename VFXConfig> struct TiltEQ : core::VoiceEffectTemplateBase<VFXC
                 return pmd()
                     .asFloat()
                     .withRange(-48, 96)
-                    .withName("Freq Offset")
+                    .withName("Frequency Offset")
+                    .withShortName("Frequency")
                     .withDefault(24)
                     .withSemitoneFormatting();
             }

@@ -93,11 +93,12 @@ template <typename VFXConfig> struct AutoWah : core::VoiceEffectTemplateBase<VFX
                 return pmd()
                     .asFloat()
                     .withRange(-48, 96)
-                    .withName("Freq Offset")
+                    .withName("Center Freq Offset")
+                    .withShortName("Base Freq")
                     .withDefault(0)
                     .withSemitoneFormatting();
             }
-            return pmd().asAudibleFrequency().withName("Center Freq");
+            return pmd().asAudibleFrequency().withName("Center Freq").withShortName("Base Freq");
         case fpRes:
             return pmd()
                 .asFloat()
